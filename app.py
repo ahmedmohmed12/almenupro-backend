@@ -21,7 +21,6 @@ from config import (
     UPLOAD_DIR,
 )
 from invoice_extractor import extract_invoice_fields
-from seed import seed_database
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -417,6 +416,8 @@ def run_seed():
             return error_response("Invalid or missing seed key", 401)
 
     try:
+        from seed import seed_database
+
         result = seed_database()
         logger.info("Run-seed completed via HTTP")
         return jsonify(result)
