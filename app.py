@@ -356,10 +356,14 @@ def request_entity_too_large(_):
 
 def bootstrap():
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    db.init_db()
-    db.ensure_demo_driver()
+    try:
+        db.init_db()
+        db.ensure_demo_driver()
+    except Exception as e:
+        logger.error(f"Bootstrap db error: {e}")
     logger.info("Upload directory: %s", UPLOAD_DIR)
-bootstrap()
+
+# لا تستدعي bootstrap() بشكل عام هنا!
 @app.route('/api/items', methods=['GET'])
 def get_items():
     try:
@@ -376,3 +380,7 @@ if __name__ == "__main__":
     logger.info("Driver app:     http://127.0.0.1:%s/", port)
     logger.info("Restaurant app: http://127.0.0.1:%s/restaurant.html", port)
     app.run(host="0.0.0.0", port=port, debug=os.getenv("FLASK_DEBUG") == "1")
+    if __name__ == "__main__":
+    bootstrap()  # 👈 إضافة الاستدعاء هنا
+    port = int(os.getenv("PORT", "5050"))
+    # ... باقي الكود كما هو
