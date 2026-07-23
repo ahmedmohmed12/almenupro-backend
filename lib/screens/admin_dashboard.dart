@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../firebase_options.dart';
 import '../utils/firebase_config.dart';
 import '../utils/image_url.dart';
+import '../services/analytics_demo_service.dart';
 import '../services/menu_storage_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
@@ -721,16 +722,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildAnalyticsTab() {
     if (!isFirebaseConfigured) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'التحليلات غير متاحة حالياً.\n'
-            'يرجى إعداد Firebase في firebase_options.dart لتفعيل هذه الميزة.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-        ),
+      return FutureBuilder<AnalyticsSnapshot>(
+        future: AnalyticsDemoService.load(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF6B1124)),
+            );
+          }
+
+          return _buildAnalyticsDashboard(
+            snapshot.data ?? AnalyticsDemoService.fallback(),
+            showDemoBanner: true,
+          );
+        },
       );
     }
 
@@ -786,94 +791,161 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final sortedItems = itemSalesCount.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 900;
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isWide)
-                      Row(
-                        children: [
-                          _buildStatCard(
-                            'مبيعات اليوم',
-                            '${todaySales.toStringAsFixed(3)} د.ك',
-                            Icons.today,
-                            Colors.green,
-                          ),
-                          const SizedBox(width: 15),
-                          _buildStatCard(
-                            'مبيعات آخر 7 أيام',
-                            '${lastWeekSales.toStringAsFixed(3)} د.ك',
-                            Icons.date_range,
-                            Colors.blue,
-                          ),
-                          const SizedBox(width: 15),
-                          _buildStatCard(
-                            'مبيعات آخر 30 يوم',
-                            '${lastMonthSales.toStringAsFixed(3)} د.ك',
-                            Icons.calendar_month,
-                            Colors.orange,
-                          ),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          _buildStatCard(
-                            'مبيعات اليوم',
-                            '${todaySales.toStringAsFixed(3)} د.ك',
-                            Icons.today,
-                            Colors.green,
-                            expanded: false,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildStatCard(
-                            'مبيعات آخر 7 أيام',
-                            '${lastWeekSales.toStringAsFixed(3)} د.ك',
-                            Icons.date_range,
-                            Colors.blue,
-                            expanded: false,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildStatCard(
-                            'مبيعات آخر 30 يوم',
-                            '${lastMonthSales.toStringAsFixed(3)} د.ك',
-                            Icons.calendar_month,
-                            Colors.orange,
-                            expanded: false,
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 25),
-                    if (isWide)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: _buildTopItemsCard(sortedItems)),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: _buildTimeCard(hourlyOrders, dailyOrders),
-                          ),
-                        ],
-                      )
-                    else ...[
-                      _buildTopItemsCard(sortedItems),
-                      const SizedBox(height: 20),
-                      _buildTimeCard(hourlyOrders, dailyOrders),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
+        return _buildAnalyticsDashboard(
+          AnalyticsSnapshot(
+            todaySales: todaySales,
+            lastWeekSales: lastWeekSales,
+            lastMonthSales: lastMonthSales,
+            topItems: sortedItems,
+            hourlyOrders: hourlyOrders,
+            dailyOrders: dailyOrders,
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildAnalyticsDashboard(
+    AnalyticsSnapshot data, {
+    bool showDemoBanner = false,
+  }) {
+    final todaySales = data.todaySales;
+    final lastWeekSales = data.lastWeekSales;
+    final lastMonthSales = data.lastMonthSales;
+    final sortedItems = data.topItems;
+    final hourlyOrders = data.hourlyOrders;
+    final dailyOrders = data.dailyOrders;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 900;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (showDemoBanner) _buildDemoAnalyticsBanner(),
+                if (showDemoBanner) const SizedBox(height: 16),
+                if (isWide)
+                  Row(
+                    children: [
+                      _buildStatCard(
+                        'مبيعات اليوم',
+                        '${todaySales.toStringAsFixed(3)} د.ك',
+                        Icons.today,
+                        Colors.green,
+                      ),
+                      const SizedBox(width: 15),
+                      _buildStatCard(
+                        'مبيعات آخر 7 أيام',
+                        '${lastWeekSales.toStringAsFixed(3)} د.ك',
+                        Icons.date_range,
+                        Colors.blue,
+                      ),
+                      const SizedBox(width: 15),
+                      _buildStatCard(
+                        'مبيعات آخر 30 يوم',
+                        '${lastMonthSales.toStringAsFixed(3)} د.ك',
+                        Icons.calendar_month,
+                        Colors.orange,
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    children: [
+                      _buildStatCard(
+                        'مبيعات اليوم',
+                        '${todaySales.toStringAsFixed(3)} د.ك',
+                        Icons.today,
+                        Colors.green,
+                        expanded: false,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatCard(
+                        'مبيعات آخر 7 أيام',
+                        '${lastWeekSales.toStringAsFixed(3)} د.ك',
+                        Icons.date_range,
+                        Colors.blue,
+                        expanded: false,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatCard(
+                        'مبيعات آخر 30 يوم',
+                        '${lastMonthSales.toStringAsFixed(3)} د.ك',
+                        Icons.calendar_month,
+                        Colors.orange,
+                        expanded: false,
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 25),
+                if (isWide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildTopItemsCard(sortedItems)),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _buildTimeCard(hourlyOrders, dailyOrders),
+                      ),
+                    ],
+                  )
+                else ...[
+                  _buildTopItemsCard(sortedItems),
+                  const SizedBox(height: 20),
+                  _buildTimeCard(hourlyOrders, dailyOrders),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDemoAnalyticsBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD49A00).withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.insights_outlined, color: Color(0xFF6B1124)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'عرض تجريبي للتحليلات',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF6B1124),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'البيانات المعروضة تقديرية مبنية على المنيو الحالي. '
+                  'لتتبع المبيعات والطلبات الحقيقية، اربط Firebase في firebase_options.dart.',
+                  style: TextStyle(
+                    color: Colors.brown.shade700,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
