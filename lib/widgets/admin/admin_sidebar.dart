@@ -35,8 +35,9 @@ class AdminSidebar extends StatelessWidget {
     return Container(
       width: width,
       color: sidebarBg,
-      child: Column(
-        children: [
+      child: SafeArea(
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
             child: Row(
@@ -150,6 +151,7 @@ class AdminSidebar extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

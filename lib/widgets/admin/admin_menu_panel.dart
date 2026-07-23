@@ -123,25 +123,32 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : _loadFromApi,
-              icon: const Icon(Icons.refresh),
-              label: const Text('تحديث من السيرفر'),
-            ),
-            const SizedBox(width: 10),
-            OutlinedButton.icon(
-              onPressed: widget.onAutofillTalabat,
-              icon: const Icon(Icons.cloud_download),
-              label: const Text('تعبئة Talabat'),
-            ),
-            const SizedBox(width: 10),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: burgundy),
-              onPressed: widget.onAddItem,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'إضافة صنف جديد',
-                style: TextStyle(color: Colors.white),
+            Flexible(
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                alignment: WrapAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _loadFromApi,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('تحديث من السيرفر'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: widget.onAutofillTalabat,
+                    icon: const Icon(Icons.cloud_download),
+                    label: const Text('تعبئة Talabat'),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: burgundy),
+                    onPressed: widget.onAddItem,
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    label: const Text(
+                      'إضافة صنف جديد',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -341,59 +348,91 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
   Widget _buildApiTable(List<MenuItem> items) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 800) {
+        if (constraints.maxWidth < 900) {
           return ListView.builder(
             itemCount: items.length,
             itemBuilder: (context, index) => _apiItemCard(items[index]),
           );
         }
 
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth - 48),
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(
-                    burgundy.withValues(alpha: 0.08),
-                  ),
-                  columns: const [
-                    DataColumn(label: Text('الصورة')),
-                    DataColumn(label: Text('الاسم')),
-                    DataColumn(label: Text('القسم')),
-                    DataColumn(label: Text('السعر')),
-                    DataColumn(label: Text('الحالة')),
-                  ],
-                  rows: items.map(_apiDataRow).toList(),
-                ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildWideTableHeader(),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) => _buildWideTableRow(items[index]),
               ),
             ),
-          ),
+          ],
         );
       },
     );
   }
 
-  DataRow _apiDataRow(MenuItem item) {
-    return DataRow(
-      cells: [
-        DataCell(_itemThumb(item.imageUrl)),
-        DataCell(Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600))),
-        DataCell(Text(item.categoryName)),
-        DataCell(Text('${item.price.toStringAsFixed(3)} د.ك')),
-        DataCell(
-          Chip(
-            label: Text(item.isAvailable ? 'متوفر' : 'غير متوفر'),
-            backgroundColor:
-                item.isAvailable ? Colors.green.shade50 : Colors.red.shade50,
-            visualDensity: VisualDensity.compact,
+  Widget _buildWideTableHeader() {
+    const headerStyle = TextStyle(
+      fontWeight: FontWeight.bold,
+      color: burgundy,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          const SizedBox(width: 72, child: Text('الصورة', style: headerStyle)),
+          const Expanded(
+            flex: 3,
+            child: Text('الاسم', style: headerStyle),
           ),
-        ),
-      ],
+          const Expanded(
+            flex: 2,
+            child: Text('القسم', style: headerStyle),
+          ),
+          const Expanded(
+            child: Text('السعر', style: headerStyle),
+          ),
+          const SizedBox(width: 110, child: Text('الحالة', style: headerStyle)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideTableRow(MenuItem item) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(width: 72, height: 56, child: _itemThumb(item.imageUrl)),
+          Expanded(
+            flex: 3,
+            child: Text(
+              item.name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(item.categoryName),
+          ),
+          Expanded(
+            child: Text('${item.price.toStringAsFixed(3)} د.ك'),
+          ),
+          SizedBox(
+            width: 110,
+            child: Chip(
+              label: Text(item.isAvailable ? 'متوفر' : 'غير متوفر'),
+              backgroundColor:
+                  item.isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

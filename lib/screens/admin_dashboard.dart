@@ -610,27 +610,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ),
                   Expanded(
-                    child: IndexedStack(
-                      index: _showOrdersPanel ? 3 : _selectedIndex,
-                      children: [
-                        AdminMenuPanel(
-                          onAddItem: () => _showItemDialog(),
-                          onEditItem: (record) =>
-                              _showItemDialog(record: record),
-                          onDeleteItem: _deleteItem,
-                          onAutofillTalabat: _showAutofillDialog,
-                        ),
-                        _buildAnalyticsTab(),
-                        _buildSettingsTab(),
-                        AdminOrdersPanel(
-                          onPendingCountChanged: (count) {
-                            if (_pendingOrdersCount != count && mounted) {
-                              setState(() => _pendingOrdersCount = count);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
+                    child: _buildActiveTab(),
                   ),
                 ],
               ),
@@ -639,6 +619,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
       ),
     );
+  }
+
+  Widget _buildActiveTab() {
+    if (_showOrdersPanel) {
+      return AdminOrdersPanel(
+        onPendingCountChanged: (count) {
+          if (_pendingOrdersCount != count && mounted) {
+            setState(() => _pendingOrdersCount = count);
+          }
+        },
+      );
+    }
+
+    switch (_selectedIndex) {
+      case 1:
+        return _buildAnalyticsTab();
+      case 2:
+        return _buildSettingsTab();
+      case 0:
+      default:
+        return AdminMenuPanel(
+          onAddItem: () => _showItemDialog(),
+          onEditItem: (record) => _showItemDialog(record: record),
+          onDeleteItem: _deleteItem,
+          onAutofillTalabat: _showAutofillDialog,
+        );
+    }
   }
 
   Widget _buildSettingsTab() {
@@ -785,78 +792,83 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isWide)
-                    Row(
-                      children: [
-                        _buildStatCard(
-                          'مبيعات اليوم',
-                          '${todaySales.toStringAsFixed(3)} د.ك',
-                          Icons.today,
-                          Colors.green,
-                        ),
-                        const SizedBox(width: 15),
-                        _buildStatCard(
-                          'مبيعات آخر 7 أيام',
-                          '${lastWeekSales.toStringAsFixed(3)} د.ك',
-                          Icons.date_range,
-                          Colors.blue,
-                        ),
-                        const SizedBox(width: 15),
-                        _buildStatCard(
-                          'مبيعات آخر 30 يوم',
-                          '${lastMonthSales.toStringAsFixed(3)} د.ك',
-                          Icons.calendar_month,
-                          Colors.orange,
-                        ),
-                      ],
-                    )
-                  else
-                    Column(
-                      children: [
-                        _buildStatCard(
-                          'مبيعات اليوم',
-                          '${todaySales.toStringAsFixed(3)} د.ك',
-                          Icons.today,
-                          Colors.green,
-                          expanded: false,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatCard(
-                          'مبيعات آخر 7 أيام',
-                          '${lastWeekSales.toStringAsFixed(3)} د.ك',
-                          Icons.date_range,
-                          Colors.blue,
-                          expanded: false,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatCard(
-                          'مبيعات آخر 30 يوم',
-                          '${lastMonthSales.toStringAsFixed(3)} د.ك',
-                          Icons.calendar_month,
-                          Colors.orange,
-                          expanded: false,
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 25),
-                  if (isWide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildTopItemsCard(sortedItems)),
-                        const SizedBox(width: 20),
-                        Expanded(child: _buildTimeCard(hourlyOrders, dailyOrders)),
-                      ],
-                    )
-                  else ...[
-                    _buildTopItemsCard(sortedItems),
-                    const SizedBox(height: 20),
-                    _buildTimeCard(hourlyOrders, dailyOrders),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isWide)
+                      Row(
+                        children: [
+                          _buildStatCard(
+                            'مبيعات اليوم',
+                            '${todaySales.toStringAsFixed(3)} د.ك',
+                            Icons.today,
+                            Colors.green,
+                          ),
+                          const SizedBox(width: 15),
+                          _buildStatCard(
+                            'مبيعات آخر 7 أيام',
+                            '${lastWeekSales.toStringAsFixed(3)} د.ك',
+                            Icons.date_range,
+                            Colors.blue,
+                          ),
+                          const SizedBox(width: 15),
+                          _buildStatCard(
+                            'مبيعات آخر 30 يوم',
+                            '${lastMonthSales.toStringAsFixed(3)} د.ك',
+                            Icons.calendar_month,
+                            Colors.orange,
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          _buildStatCard(
+                            'مبيعات اليوم',
+                            '${todaySales.toStringAsFixed(3)} د.ك',
+                            Icons.today,
+                            Colors.green,
+                            expanded: false,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildStatCard(
+                            'مبيعات آخر 7 أيام',
+                            '${lastWeekSales.toStringAsFixed(3)} د.ك',
+                            Icons.date_range,
+                            Colors.blue,
+                            expanded: false,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildStatCard(
+                            'مبيعات آخر 30 يوم',
+                            '${lastMonthSales.toStringAsFixed(3)} د.ك',
+                            Icons.calendar_month,
+                            Colors.orange,
+                            expanded: false,
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 25),
+                    if (isWide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildTopItemsCard(sortedItems)),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: _buildTimeCard(hourlyOrders, dailyOrders),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      _buildTopItemsCard(sortedItems),
+                      const SizedBox(height: 20),
+                      _buildTimeCard(hourlyOrders, dailyOrders),
+                    ],
                   ],
-                ],
+                ),
               ),
             );
           },
