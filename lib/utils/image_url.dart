@@ -24,14 +24,22 @@ bool isLocalMenuImagePath(String url) {
       trimmed.startsWith('/api/uploads/menu/');
 }
 
+String? localMenuImageFilename(String url) {
+  final trimmed = url.trim();
+  if (!isLocalMenuImagePath(trimmed)) return null;
+  final parts = trimmed.split('/');
+  return parts.isEmpty ? null : parts.last;
+}
+
 /// Normalizes menu image paths for display. Prefers locally hosted Almenupro URLs
 /// and ignores legacy Talabat CDN links that should be migrated on the server.
 String resolveImageUrl(String url) {
   final trimmed = url.trim();
   if (trimmed.isEmpty) return trimmed;
 
-  if (isLocalMenuImagePath(trimmed)) {
-    return '$menuImageApiOrigin$trimmed';
+  final filename = localMenuImageFilename(trimmed);
+  if (filename != null && filename.isNotEmpty) {
+    return '${ApiService.baseUrl}/menu-image/$filename';
   }
 
   if (isLegacyTalabatImageUrl(trimmed)) {

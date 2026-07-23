@@ -309,6 +309,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const menuImageApiMatch = url.pathname.match(/^\/api\/menu-image\/([^/]+)$/);
+  if (req.method === 'GET' && menuImageApiMatch) {
+    serveMenuImage(res, decodeURIComponent(menuImageApiMatch[1]));
+    return;
+  }
+
   const uploadMatch = url.pathname.match(/^\/api\/uploads\/menu\/([^/]+)$/);
   if (req.method === 'GET' && uploadMatch) {
     serveMenuImage(res, decodeURIComponent(uploadMatch[1]));
