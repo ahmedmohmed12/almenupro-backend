@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../firebase_options.dart';
+import '../utils/firebase_config.dart';
 import '../services/menu_storage_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
@@ -710,6 +711,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // Analytics tab kept below
 
   Widget _buildAnalyticsTab() {
+    if (!isFirebaseConfigured) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'التحليلات غير متاحة حالياً.\n'
+            'يرجى إعداد Firebase في firebase_options.dart لتفعيل هذه الميزة.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('orders').snapshots(),
       builder: (context, snapshot) {

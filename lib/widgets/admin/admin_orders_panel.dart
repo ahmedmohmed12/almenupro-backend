@@ -78,6 +78,20 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_firebaseService.isAvailable) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'إدارة الطلبات غير متاحة حالياً.\n'
+            'يرجى إعداد Firebase لتفعيل استقبال الطلبات.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      );
+    }
+
     final dateFormat = DateFormat('d/M • HH:mm');
 
     return StreamBuilder<List<Order>>(

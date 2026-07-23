@@ -13,13 +13,7 @@ import 'services/molton_upload_service.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/configure_url_strategy.dart' show configureUrlStrategy;
-
-bool get isFirebaseConfigured {
-  if (!kIsWeb) return true;
-  final options = DefaultFirebaseOptions.web;
-  return !options.apiKey.startsWith('YOUR_') &&
-      !options.projectId.startsWith('YOUR_');
-}
+import 'utils/firebase_config.dart';
 
 Future<void> main() async {
   // Flutter Web: usePathUrlStrategy() — see configure_url_strategy_web.dart
@@ -88,9 +82,8 @@ class MyApp extends StatelessWidget {
   }
 
   static List<Route<dynamic>> onGenerateInitialRoutes(String initialRoute) {
-    final route = normalizeRoute(
-      initialRoute.isNotEmpty ? initialRoute : Uri.base.path,
-    );
+    // On web, Uri.base.path reflects the browser URL (/admin, etc.).
+    final route = normalizeRoute(kIsWeb ? Uri.base.path : initialRoute);
     return [onGenerateRoute(RouteSettings(name: route))];
   }
 

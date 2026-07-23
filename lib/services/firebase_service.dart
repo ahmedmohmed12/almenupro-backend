@@ -2,27 +2,47 @@ import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 
 import '../models/menu_item.dart';
 import '../models/order.dart';
+import '../utils/firebase_config.dart';
 
 class FirebaseService {
   FirebaseService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ??
+            (isFirebaseConfigured ? FirebaseFirestore.instance : null);
 
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _firestore;
+
+  bool get isAvailable => _firestore != null;
 
   static const String menuItemsCollection = 'menu_items';
   static const String itemsCollection = 'items';
   static const String ordersCollection = 'orders';
 
-  CollectionReference<Map<String, dynamic>> get _menuItemsRef =>
-      _firestore.collection(menuItemsCollection);
+  CollectionReference<Map<String, dynamic>> get _menuItemsRef {
+    final firestore = _firestore;
+    if (firestore == null) {
+      throw StateError('Firebase is not configured');
+    }
+    return firestore.collection(menuItemsCollection);
+  }
 
-  CollectionReference<Map<String, dynamic>> get _itemsRef =>
-      _firestore.collection(itemsCollection);
+  CollectionReference<Map<String, dynamic>> get _itemsRef {
+    final firestore = _firestore;
+    if (firestore == null) {
+      throw StateError('Firebase is not configured');
+    }
+    return firestore.collection(itemsCollection);
+  }
 
-  CollectionReference<Map<String, dynamic>> get _ordersRef =>
-      _firestore.collection(ordersCollection);
+  CollectionReference<Map<String, dynamic>> get _ordersRef {
+    final firestore = _firestore;
+    if (firestore == null) {
+      throw StateError('Firebase is not configured');
+    }
+    return firestore.collection(ordersCollection);
+  }
 
   Stream<List<MenuItem>> watchMenuItems({bool availableOnly = true}) {
+    if (_firestore == null) return Stream.value(const []);
     return _itemsRef.orderBy('categoryName').snapshots().asyncMap(
       (itemsSnapshot) async {
         if (itemsSnapshot.docs.isNotEmpty) {
@@ -73,6 +93,7 @@ class FirebaseService {
   }
 
   Stream<List<Order>> watchOrders() {
+    if (_firestore == null) return Stream.value(const []);
     return _ordersRef
         .orderBy('createdAt', descending: true)
         .snapshots()

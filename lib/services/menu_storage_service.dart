@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/menu_item.dart';
+import '../utils/firebase_config.dart';
 import 'api_service.dart';
 
 class MenuItemRecord {
@@ -38,7 +39,9 @@ class MenuStorageService {
   static const _metaKey = 'menu_meta_v1';
   static const _itemsCollection = 'items';
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore? get _firestore =>
+      isFirebaseConfigured ? FirebaseFirestore.instance : null;
+
   final StreamController<List<MenuItemRecord>> _controller =
       StreamController<List<MenuItemRecord>>.broadcast();
 
@@ -87,7 +90,9 @@ class MenuStorageService {
       _emit();
     }
 
-    _startFirestoreListener();
+    if (_firestore != null) {
+      _startFirestoreListener();
+    }
     unawaited(_refreshFromRemote());
 
     _initialized = true;
@@ -109,8 +114,11 @@ class MenuStorageService {
 
     if (_items.isNotEmpty) return;
 
+    final firestore = _firestore;
+    if (firestore == null) return;
+
     try {
-      final snapshot = await _firestore
+      final snapshot = await firestore
           .collection(_itemsCollection)
           .get()
           .timeout(const Duration(seconds: 8));
@@ -134,8 +142,11 @@ class MenuStorageService {
   }
 
   void _startFirestoreListener() {
+    final firestore = _firestore;
+    if (firestore == null) return;
+
     _firestoreSub?.cancel();
-    _firestoreSub = _firestore
+    _firestoreSub = firestore
         .collection(_itemsCollection)
         .snapshots()
         .listen(
@@ -169,9 +180,11 @@ class MenuStorageService {
     );
     final id = _generateId();
 
+    final firestore = _firestore;
     try {
+      if (firestore == null) throw StateError('Firebase not configured');
       final docRef =
-          await _firestore.collection(_itemsCollection).add(normalized);
+          await firestore.collection(_itemsCollection).add(normalized);
       final record = MenuItemRecord(id: docRef.id, data: normalized);
       _upsertInMemory(record);
       await _saveToPrefs(_items);
@@ -193,12 +206,15 @@ class MenuStorageService {
     final normalized = _normalizeItemData(data, preserveFrom: _findById(id)?.data);
     normalized['updatedAt'] = DateTime.now().toIso8601String();
 
+    final firestore = _firestore;
     try {
-      await _firestore.collection(_itemsCollection).doc(id).update(normalized);
+      if (firestore == null) throw StateError('Firebase not configured');
+      await firestore.collection(_itemsCollection).doc(id).update(normalized);
     } catch (error) {
       debugPrint('MenuStorageService updateItem Firestore failed: $error');
       try {
-        await _firestore
+        if (firestore == null) throw StateError('Firebase not configured');
+        await firestore
             .collection(_itemsCollection)
             .doc(id)
             .set(normalized, SetOptions(merge: true));
@@ -215,8 +231,10 @@ class MenuStorageService {
   Future<void> deleteItem(String id) async {
     await initialize();
 
+    final firestore = _firestore;
     try {
-      await _firestore.collection(_itemsCollection).doc(id).delete();
+      if (firestore == null) throw StateError('Firebase not configured');
+      await firestore.collection(_itemsCollection).doc(id).delete();
     } catch (error) {
       debugPrint('MenuStorageService deleteItem Firestore failed: $error');
     }
@@ -286,7 +304,7 @@ class MenuStorageService {
 
       final normalized = Map<String, dynamic>.from(item);
       normalized.putIfAbsent('createdAt', () => now);
-      final id = _firestore.collection(_itemsCollection).doc().id;
+      final id = _firestore?.collection(_itemsCollection).doc().id ?? _generateId();
       final record = MenuItemRecord(id: id, data: normalized);
       pendingWrites.add(record);
       if (hasTalabatId) {
@@ -330,10 +348,13 @@ class MenuStorageService {
           : records.length;
       final chunk = records.sublist(start, end);
 
+      final firestore = _firestore;
+      if (firestore == null) return;
+
       try {
-        final batch = _firestore.batch();
+        final batch = firestore.batch();
         for (final record in chunk) {
-          final ref = _firestore.collection(_itemsCollection).doc(record.id);
+          final ref = firestore.collection(_itemsCollection).doc(record.id);
           batch.set(ref, record.data, SetOptions(merge: true));
         }
         await batch.commit();
@@ -352,8 +373,10 @@ class MenuStorageService {
     };
     await prefs.setString(_metaKey, jsonEncode(meta));
 
+    final firestore = _firestore;
     try {
-      await _firestore.collection('app_meta').doc('menu_import').set({
+      if (firestore == null) return;
+      await firestore.collection('app_meta').doc('menu_import').set({
         'sourceUrl': sourceUrl,
         'importedAt': FieldValue.serverTimestamp(),
         'itemCount': itemCount,
