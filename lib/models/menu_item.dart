@@ -42,6 +42,7 @@ class MenuItem {
   final String description;
   final double price;
   final String imageUrl;
+  final int? talabatId;
   final bool isAvailable;
   final List<MenuOption> options;
 
@@ -53,6 +54,7 @@ class MenuItem {
     required this.description,
     required this.price,
     required this.imageUrl,
+    this.talabatId,
     required this.isAvailable,
     this.options = const [],
   });
@@ -60,7 +62,11 @@ class MenuItem {
   /// Backward-compatible alias used by older screens.
   String get category => categoryName;
 
+  /// Talabat CDN image URL (`image_url` in API JSON).
+  String get image_url => imageUrl;
+
   factory MenuItem.fromJson(Map<String, dynamic> json) {
+    final rawImage = json['image_url'] ?? json['imageUrl'] ?? '';
     return MenuItem(
       id: json['id'] is int ? json['id'] as int : int.parse(json['id'].toString()),
       categoryId: json['category_id'] is int
@@ -70,7 +76,10 @@ class MenuItem {
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       price: double.parse(json['price'].toString()),
-      imageUrl: json['image_url']?.toString() ?? '',
+      imageUrl: rawImage.toString(),
+      talabatId: json['talabat_id'] is int
+          ? json['talabat_id'] as int
+          : int.tryParse(json['talabat_id']?.toString() ?? ''),
       isAvailable: json['is_available'] == 1 || json['is_available'] == true,
       options: (json['options'] as List<dynamic>? ?? [])
           .whereType<Map>()
@@ -98,6 +107,9 @@ class MenuItem {
           double.tryParse(map['price']?.toString() ?? '') ??
           0,
       imageUrl: (map['imageUrl'] ?? map['image_url'] ?? '').toString(),
+      talabatId: map['talabat_id'] is int
+          ? map['talabat_id'] as int
+          : int.tryParse(map['talabat_id']?.toString() ?? ''),
       isAvailable: map['is_available'] == 1 ||
           map['is_available'] == true ||
           map['isAvailable'] == true ||
@@ -118,6 +130,7 @@ class MenuItem {
       'description': description,
       'price': price,
       'image_url': imageUrl,
+      if (talabatId != null) 'talabat_id': talabatId,
       'is_available': isAvailable ? 1 : 0,
       if (options.isNotEmpty)
         'options': options.map((option) => option.toMap()).toList(),

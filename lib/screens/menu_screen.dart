@@ -13,6 +13,7 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   late Future<List<MenuItem>> _itemsFuture;
+  String _selectedCategory = 'الكل';
 
   @override
   void initState() {
@@ -27,67 +28,240 @@ class _MenuScreenState extends State<MenuScreen> {
     await _itemsFuture;
   }
 
+  List<String> _categories(List<MenuItem> items) {
+    final categories = <String>{'الكل'};
+    for (final item in items) {
+      if (item.categoryName.trim().isNotEmpty) {
+        categories.add(item.categoryName.trim());
+      }
+    }
+    return categories.toList();
+  }
+
+  List<MenuItem> _filteredItems(List<MenuItem> items) {
+    if (_selectedCategory == 'الكل') return items;
+    return items
+        .where((item) => item.categoryName.trim() == _selectedCategory)
+        .toList();
+  }
+
+  int _gridColumns(double width) {
+    if (width >= 1200) return 4;
+    if (width >= 900) return 3;
+    if (width >= 600) return 2;
+    return 2;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.brandBackground,
-      appBar: AppBar(
-        title: const Text('قائمة الطعام'),
-        actions: [
-          IconButton(
-            tooltip: 'تحديث',
-            onPressed: _reload,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: FutureBuilder<List<MenuItem>>(
-        future: _itemsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppTheme.brandMaroon),
-            );
-          }
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppTheme.brandBackground,
+        body: FutureBuilder<List<MenuItem>>(
+          future: _itemsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppTheme.brandOrange),
+              );
+            }
 
-          if (snapshot.hasError) {
-            return _ErrorState(
-              message: snapshot.error.toString(),
-              onRetry: _reload,
-            );
-          }
+            if (snapshot.hasError) {
+              return _ErrorState(
+                message: snapshot.error.toString(),
+                onRetry: _reload,
+              );
+            }
 
-          final items = snapshot.data ?? [];
-          if (items.isEmpty) {
-            return _ErrorState(
-              message: 'لا توجد أصناف متاحة حالياً',
-              onRetry: _reload,
-            );
-          }
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return _ErrorState(
+                message: 'لا توجد أصناف متاحة حالياً',
+                onRetry: _reload,
+              );
+            }
 
-          return RefreshIndicator(
-            color: AppTheme.brandMaroon,
-            onRefresh: _reload,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= 720;
-                final crossAxisCount = isWide ? 3 : 2;
+            final categories = _categories(items);
+            final filtered = _filteredItems(items);
 
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: isWide ? 0.78 : 0.72,
+            return RefreshIndicator(
+              color: AppTheme.brandOrange,
+              onRefresh: _reload,
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _MenuHeader(onRefresh: _reload)),
+                  SliverToBoxAdapter(
+                    child: _CategoryBar(
+                      categories: categories,
+                      selected: _selectedCategory,
+                      onSelected: (value) {
+                        setState(() => _selectedCategory = value);
+                      },
+                    ),
                   ),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    return _MenuItemCard(item: items[index]);
-                  },
-                );
-              },
+                  if (filtered.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(
+                          'لا توجد أصناف في هذا التصنيف',
+                          style: TextStyle(
+                            color: AppTheme.brandBlack,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverLayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.crossAxisExtent;
+                        final columns = _gridColumns(width);
+                        final cardWidth = (width - 32 - (columns - 1) * 16) / columns;
+
+                        return SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          sliver: SliverGrid(
+                            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: cardWidth,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              mainAxisExtent: columns >= 3 ? 320 : 300,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                return _MenuItemCard(item: filtered[index]);
+                              },
+                              childCount: filtered.length,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuHeader extends StatelessWidget {
+  const _MenuHeader({required this.onRefresh});
+
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      decoration: const BoxDecoration(
+        color: AppTheme.brandSurface,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE8E0D8), width: 1),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppTheme.brandOrange.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.cookie_outlined,
+                color: AppTheme.brandOrange,
+                size: 28,
+              ),
             ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Molten Cookies',
+                    style: TextStyle(
+                      color: AppTheme.brandBlack,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'قائمة الطعام — ميني بايتس وكوكيز',
+                    style: TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'تحديث',
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded, color: AppTheme.brandOrange),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryBar extends StatelessWidget {
+  const _CategoryBar({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> categories;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 56,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final category = categories[index];
+          final isSelected = category == selected;
+
+          return FilterChip(
+            label: Text(category),
+            selected: isSelected,
+            showCheckmark: false,
+            labelStyle: TextStyle(
+              color: isSelected ? Colors.white : AppTheme.brandBlack,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            backgroundColor: Colors.white,
+            selectedColor: AppTheme.brandOrange,
+            side: BorderSide(
+              color: isSelected
+                  ? AppTheme.brandOrange
+                  : const Color(0xFFE0D6CC),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            onSelected: (_) => onSelected(category),
           );
         },
       ),
@@ -102,64 +276,91 @@ class _MenuItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            flex: 5,
             child: _MenuItemImage(imageUrl: item.imageUrl),
           ),
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.categoryName.isNotEmpty)
-                    Text(
-                      item.categoryName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppTheme.brandMaroon,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.brandBlack,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
                   ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Text(
-                      item.description.isNotEmpty
-                          ? item.description
-                          : 'لا يوجد وصف',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.black54,
-                            height: 1.3,
-                          ),
-                    ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item.description.isNotEmpty
+                      ? item.description
+                      : 'لا يوجد وصف',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF555555),
+                    fontSize: 12,
+                    height: 1.35,
                   ),
-                  Text(
-                    '${item.price.toStringAsFixed(3)} د.ك',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppTheme.brandOrange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ],
-              ),
+                ),
+              ],
+            ),
+          ),
+          _PriceBar(price: item.price),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceBar extends StatelessWidget {
+  const _PriceBar({required this.price});
+
+  final double price;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: const BoxDecoration(
+        color: AppTheme.brandOrange,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Icon(
+            Icons.add_shopping_cart_outlined,
+            color: Colors.white,
+            size: 18,
+          ),
+          Text(
+            '${price.toStringAsFixed(3)} د.ك',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -189,7 +390,7 @@ class _MenuItemImage extends StatelessWidget {
           alignment: Alignment.center,
           child: const CircularProgressIndicator(
             strokeWidth: 2,
-            color: AppTheme.brandMaroon,
+            color: AppTheme.brandOrange,
           ),
         );
       },
@@ -202,9 +403,9 @@ class _MenuItemImage extends StatelessWidget {
       color: AppTheme.brandSurface,
       alignment: Alignment.center,
       child: const Icon(
-        Icons.restaurant,
-        size: 42,
-        color: AppTheme.brandMaroon,
+        Icons.cookie_outlined,
+        size: 48,
+        color: AppTheme.brandOrange,
       ),
     );
   }
@@ -230,17 +431,20 @@ class _ErrorState extends StatelessWidget {
             const Icon(
               Icons.cloud_off,
               size: 56,
-              color: AppTheme.brandMaroon,
+              color: AppTheme.brandOrange,
             ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
+              style: const TextStyle(color: AppTheme.brandBlack),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.brandOrange,
+              ),
               icon: const Icon(Icons.refresh),
               label: const Text('إعادة المحاولة'),
             ),

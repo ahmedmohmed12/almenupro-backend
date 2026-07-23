@@ -11,6 +11,7 @@ import 'screens/menu_screen.dart';
 import 'services/menu_storage_service.dart';
 import 'services/molton_upload_service.dart';
 import 'services/seed_service.dart';
+import 'theme/app_theme.dart';
 import 'utils/configure_url_strategy.dart';
 
 Future<void> main() async {
@@ -40,7 +41,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Almenupro',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.brown),
+      theme: AppTheme.light(),
       initialRoute: '/',
       onGenerateRoute: (settings) {
         if (settings.name == '/admin' || settings.name == 'admin') {
