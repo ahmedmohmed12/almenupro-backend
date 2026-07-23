@@ -14,7 +14,7 @@ import '../widgets/admin/admin_sidebar.dart';
 import '../widgets/admin/admin_top_header.dart';
 
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({Key? key}) : super(key: key);
+  const AdminDashboard({super.key});
 
   @override
   State<AdminDashboard> createState() => _AdminDashboardState();
@@ -639,9 +639,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildActiveTab() {
     if (_showOrdersPanel) {
       return AdminOrdersPanel(
-        onPendingCountChanged: (count) {
-          if (_pendingOrdersCount != count && mounted) {
-            setState(() => _pendingOrdersCount = count);
+        onPendingCountChanged: (pendingCount) {
+          if (_pendingOrdersCount != pendingCount && mounted) {
+            setState(() => _pendingOrdersCount = pendingCount);
           }
         },
       );

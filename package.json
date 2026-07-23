@@ -6,7 +6,8 @@
     "start": "node apiServer.js",
     "seed": "node seedFromTalabat.js",
     "migrate:images": "node scripts/migrateMenuImages.js",
-    "prepare:uploads": "node scripts/preparePublicUploads.js"
+    "prepare:uploads": "node scripts/preparePublicUploads.js",
+    "vercel-build": "node scripts/preparePublicUploads.js"
   },
   "engines": {
     "node": ">=18"
