@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/menu_item.dart';
 import '../services/api_service.dart';
-import '../theme/app_theme.dart';
+import '../widgets/network_menu_image.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -380,8 +380,8 @@ class _MenuItemImage extends StatelessWidget {
       return _placeholder();
     }
 
-    return Image.network(
-      imageUrl,
+    return NetworkMenuImage(
+      imageUrl: imageUrl,
       fit: BoxFit.cover,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/menu_item.dart';
 import '../../theme/app_theme.dart';
+import '../network_menu_image.dart';
 
 class MenuItemCard extends StatelessWidget {
   const MenuItemCard({
@@ -27,8 +28,8 @@ class MenuItemCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 4 / 3,
               child: item.imageUrl.isNotEmpty
-                  ? Image.network(
-                      item.imageUrl,
+                  ? NetworkMenuImage(
+                      imageUrl: item.imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => const _ImageFallback(),
                     )

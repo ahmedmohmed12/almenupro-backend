@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/menu_item.dart';
 import '../../services/api_service.dart';
 import '../../services/menu_storage_service.dart';
+import '../network_menu_image.dart';
 
 class AdminMenuPanel extends StatefulWidget {
   const AdminMenuPanel({
@@ -476,8 +477,8 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        imageUrl,
+      child: NetworkMenuImage(
+        imageUrl: imageUrl,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) =>
             const Icon(Icons.broken_image, color: Colors.grey),

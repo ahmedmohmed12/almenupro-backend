@@ -29,6 +29,57 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+const ALLOWED_IMAGE_HOSTS = new Set([
+  'images.deliveryhero.io',
+  'deliveryhero.io',
+]);
+
+function isAllowedImageUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return [...ALLOWED_IMAGE_HOSTS].some(
+      (allowed) => host === allowed || host.endsWith(`.${allowed}`),
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function proxyImage(res, rawUrl) {
+  if (!isAllowedImageUrl(rawUrl)) {
+    sendJson(res, 400, { error: 'Invalid or disallowed image URL' });
+    return;
+  }
+
+  try {
+    const upstream = await fetch(rawUrl, {
+      headers: {
+        'User-Agent': 'AlmenuproImageProxy/1.0',
+        Accept: 'image/*,*/*;q=0.8',
+      },
+    });
+
+    if (!upstream.ok) {
+      sendJson(res, upstream.status, { error: 'Failed to fetch image' });
+      return;
+    }
+
+    const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=86400, immutable',
+    });
+    res.end(buffer);
+  } catch (error) {
+    sendJson(res, 502, { error: error.message || 'Image proxy failed' });
+  }
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -169,6 +220,16 @@ const server = http.createServer(async (req, res) => {
     const items = readItems();
     rebuildCategoryIds(items);
     sendJson(res, 200, items);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/image-proxy') {
+    const imageUrl = url.searchParams.get('url');
+    if (!imageUrl) {
+      sendJson(res, 400, { error: 'Missing url query parameter' });
+      return;
+    }
+    await proxyImage(res, imageUrl);
     return;
   }
 

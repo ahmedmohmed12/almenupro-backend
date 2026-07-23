@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../services/menu_storage_service.dart';
 import '../utils/whatsapp_launcher.dart';
+import '../widgets/network_menu_image.dart';
 
 class ClientMenuPage extends StatefulWidget {
   const ClientMenuPage({Key? key}) : super(key: key);
@@ -131,8 +132,8 @@ class _ClientMenuPageState extends State<ClientMenuPage> {
                         width: double.infinity,
                         height: 260,
                         child: imageUrl.isNotEmpty
-                            ? Image.network(
-                                imageUrl,
+                            ? NetworkMenuImage(
+                                imageUrl: imageUrl,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) =>
                                     _buildImagePlaceholder(large: true),
@@ -690,8 +691,8 @@ $itemsDetails
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: imageUrl.isNotEmpty
-                          ? Image.network(
-                              imageUrl,
+                          ? NetworkMenuImage(
+                              imageUrl: imageUrl,
                               width: 85,
                               height: 85,
                               fit: BoxFit.cover,
