@@ -117,6 +117,13 @@ function ensureDataFile() {
 
 function readItems() {
   if (IS_VERCEL) {
+    try {
+      delete require.cache[require.resolve('./data/menu_items.json')];
+      const fresh = require('./data/menu_items.json');
+      if (Array.isArray(fresh)) {
+        memoryItems = fresh;
+      }
+    } catch (_) {}
     return memoryItems;
   }
 
@@ -282,6 +289,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  const menuImageMatch = url.pathname.match(/^\/menu-images\/([^/]+)$/);
+  if (req.method === 'GET' && menuImageMatch) {
+    serveMenuImage(res, decodeURIComponent(menuImageMatch[1]));
+    return;
+  }
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
     const items = readItems();
