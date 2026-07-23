@@ -19,17 +19,9 @@ class ApiService {
   static String get baseUrl {
     const configured = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: '',
+      defaultValue: 'https://almenupro-backend.vercel.app/api',
     );
-    if (configured.isNotEmpty) {
-      return configured;
-    }
-
-    if (kIsWeb) {
-      return '${Uri.base.origin}/api';
-    }
-
-    return 'https://almenupro-backend.vercel.app/api';
+    return configured;
   }
   static const Duration _fetchTimeout = Duration(seconds: 15);
 
