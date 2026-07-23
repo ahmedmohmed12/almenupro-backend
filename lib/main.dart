@@ -14,20 +14,35 @@ import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/configure_url_strategy.dart';
 
+bool get _isFirebaseConfigured {
+  if (!kIsWeb) return true;
+  final options = DefaultFirebaseOptions.web;
+  return !options.apiKey.startsWith('YOUR_') &&
+      !options.projectId.startsWith('YOUR_');
+}
+
 Future<void> main() async {
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    if (_isFirebaseConfigured) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } else {
+      debugPrint('Skipping Firebase init: web credentials not configured.');
+    }
     await MenuStorageService.instance.initialize();
-    unawaited(SeedService().seedMenuIfEmpty());
-    unawaited(MoltonUploadService().uploadMoltonDataIfEmpty());
+    if (_isFirebaseConfigured) {
+      unawaited(SeedService().seedMenuIfEmpty());
+      unawaited(MoltonUploadService().uploadMoltonDataIfEmpty());
+    }
   } catch (e) {
-    debugPrint('Firebase Error: $e');
-    await MenuStorageService.instance.initialize();
+    debugPrint('Bootstrap error: $e');
+    try {
+      await MenuStorageService.instance.initialize();
+    } catch (_) {}
   }
 
   runApp(const MyApp());
@@ -36,22 +51,47 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static String _normalizeRoute(String? routeName) {
+    var route = (routeName == null || routeName.isEmpty) ? Uri.base.path : routeName;
+    if (route.endsWith('/') && route.length > 1) {
+      route = route.substring(0, route.length - 1);
+    }
+    return route.isEmpty ? '/' : route;
+  }
+
+  static Route<dynamic> _onGenerateRoute(RouteSettings settings) {
+    switch (_normalizeRoute(settings.name)) {
+      case '/admin':
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const AdminDashboard(),
+        );
+      case '/legacy-menu':
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const ClientMenuPage(),
+        );
+      case '/':
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const MenuScreen(),
+        );
+      default:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const MenuScreen(),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Almenupro',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      initialRoute: '/',
-      onGenerateRoute: (settings) {
-        if (settings.name == '/admin' || settings.name == 'admin') {
-          return MaterialPageRoute(builder: (_) => const AdminDashboard());
-        }
-        if (settings.name == '/legacy-menu') {
-          return MaterialPageRoute(builder: (_) => const ClientMenuPage());
-        }
-        return MaterialPageRoute(builder: (_) => const MenuScreen());
-      },
+      onGenerateRoute: _onGenerateRoute,
+      onUnknownRoute: _onGenerateRoute,
     );
   }
 }
