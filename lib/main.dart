@@ -12,7 +12,7 @@ import 'services/menu_storage_service.dart';
 import 'services/molton_upload_service.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
-import 'utils/configure_url_strategy.dart';
+import 'utils/configure_url_strategy.dart' show configureUrlStrategy;
 
 bool get isFirebaseConfigured {
   if (!kIsWeb) return true;
@@ -22,6 +22,7 @@ bool get isFirebaseConfigured {
 }
 
 Future<void> main() async {
+  // Flutter Web: usePathUrlStrategy() — see configure_url_strategy_web.dart
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
 
