@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/order.dart';
-import '../../services/firebase_service.dart';
+import '../../services/orders_service.dart';
 import '../../utils/order_sound.dart';
 import 'order_status_chip.dart';
 
@@ -19,13 +19,13 @@ class AdminOrdersPanel extends StatefulWidget {
 }
 
 class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
-  final _firebaseService = FirebaseService();
+  final _ordersService = OrdersService.instance;
   final Set<String> _knownOrderIds = {};
   var _initialized = false;
 
   Future<void> _updateStatus(String orderId, OrderStatus status) async {
     try {
-      await _firebaseService.updateOrderStatus(orderId, status);
+      await _ordersService.updateOrderStatus(orderId, status);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم تحديث الحالة: ${status.arabicLabel}')),
@@ -78,24 +78,10 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_firebaseService.isAvailable) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'إدارة الطلبات غير متاحة حالياً.\n'
-            'يرجى إعداد Firebase لتفعيل استقبال الطلبات.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16),
-          ),
-        ),
-      );
-    }
-
     final dateFormat = DateFormat('d/M • HH:mm');
 
     return StreamBuilder<List<Order>>(
-      stream: _firebaseService.watchOrders(),
+      stream: _ordersService.watchOrders(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -115,27 +101,81 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           return const Center(
             child: Text(
               'لا توجد طلبات حتى الآن.\n'
-              'ستظهر الطلبات هنا فور إرسال العميل عبر الواتساب.',
+              'ستظهر الطلبات هنا فور إرسال العميل عبر المنيو أو الواتساب.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16),
             ),
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: orders.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final order = orders[index];
-            return _AdminOrderCard(
-              order: order,
-              dateFormat: dateFormat,
-              onStatusChanged: _updateStatus,
-            );
-          },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_ordersService.isDemoMode) _DemoOrdersBanner(),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: orders.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final order = orders[index];
+                  return _AdminOrderCard(
+                    order: order,
+                    dateFormat: dateFormat,
+                    onStatusChanged: _updateStatus,
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _DemoOrdersBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD49A00).withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.receipt_long_outlined, color: Color(0xFF6B1124)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'وضع تجريبي — طلبات واردة',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF6B1124),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'تُعرض طلبات تجريبية لاختبار لوحة التحكم. الطلبات الحقيقية '
+                  'من المنيو تُحفظ تلقائياً على الباك إند. لربط Firebase '
+                  'للتزامن الفوري، حدّث firebase_options.dart.',
+                  style: TextStyle(
+                    color: Colors.brown.shade700,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

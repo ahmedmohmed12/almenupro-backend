@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/cart_provider.dart';
+import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/whatsapp_launcher.dart';
 
@@ -86,6 +89,21 @@ $itemsDetails
       phone: _whatsappNumber,
       message: message,
     );
+
+    if (opened) {
+      try {
+        await OrdersService.instance.submitOrderFromCart(
+          cartItems: List.from(cart.items),
+          customerName: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          address: _addressController.text.trim(),
+          paymentMethod: _paymentMethod,
+          invoiceNumber: invoiceNumber,
+        );
+      } catch (error) {
+        debugPrint('Order backend sync failed: $error');
+      }
+    }
 
     if (!mounted) return;
 

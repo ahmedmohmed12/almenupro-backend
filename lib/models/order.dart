@@ -166,6 +166,26 @@ class Order {
     );
   }
 
+  Order copyWith({
+    OrderStatus? status,
+    String? invoiceNumber,
+    String? paymentMethod,
+  }) {
+    return Order(
+      id: id,
+      customerName: customerName,
+      phone: phone,
+      address: address,
+      items: items,
+      totalPrice: totalPrice,
+      orderType: orderType,
+      status: status ?? this.status,
+      createdAt: createdAt,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'customerName': customerName,
@@ -175,9 +195,15 @@ class Order {
       'totalPrice': totalPrice,
       'orderType': orderType.label,
       'status': status.name,
-      'createdAt': createdAt.toUtc(),
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      if (invoiceNumber != null && invoiceNumber!.isNotEmpty)
+        'invoiceNumber': invoiceNumber,
+      if (paymentMethod != null && paymentMethod!.isNotEmpty)
+        'paymentMethod': paymentMethod,
     };
   }
+
+  bool get isDemoOrder => id.startsWith('demo-');
 
   static DateTime _parseDateTime(dynamic value) {
     if (value is Timestamp) {

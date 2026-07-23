@@ -9,17 +9,26 @@ const {
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
+const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
 const IS_VERCEL = Boolean(process.env.VERCEL);
 
 let seedItems = [];
+let seedOrders = [];
 try {
   seedItems = require('./data/menu_items.json');
   if (!Array.isArray(seedItems)) seedItems = [];
 } catch {
   seedItems = [];
 }
+try {
+  seedOrders = require('./data/orders.json');
+  if (!Array.isArray(seedOrders)) seedOrders = [];
+} catch {
+  seedOrders = [];
+}
 
 let memoryItems = [...seedItems];
+let memoryOrders = [...seedOrders];
 
 const categoryIds = new Map();
 let nextCategoryId = 1;
@@ -28,7 +37,7 @@ function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(JSON.stringify(payload));
@@ -128,6 +137,65 @@ function writeItems(items) {
 
   ensureDataFile();
   fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf8');
+}
+
+function ensureOrdersFile() {
+  const dir = path.dirname(ORDERS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  if (!fs.existsSync(ORDERS_FILE)) {
+    fs.writeFileSync(ORDERS_FILE, '[]', 'utf8');
+  }
+}
+
+function readOrders() {
+  if (IS_VERCEL) {
+    return memoryOrders;
+  }
+
+  ensureOrdersFile();
+  const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
+  const parsed = JSON.parse(raw || '[]');
+  const orders = Array.isArray(parsed) ? parsed : [];
+  memoryOrders = orders;
+  return orders;
+}
+
+function writeOrders(orders) {
+  memoryOrders = orders;
+
+  if (IS_VERCEL) {
+    return;
+  }
+
+  ensureOrdersFile();
+  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+}
+
+function normalizeOrder(raw, id) {
+  const createdAt = raw.createdAt || new Date().toISOString();
+  return {
+    id: String(id),
+    customerName: String(raw.customerName || raw.customer_name || '').trim(),
+    phone: String(raw.phone || '').trim(),
+    address: String(raw.address || '').trim(),
+    items: Array.isArray(raw.items) ? raw.items : [],
+    totalPrice: Number(raw.totalPrice ?? raw.total_price ?? 0) || 0,
+    orderType: String(raw.orderType || raw.order_type || 'Delivery'),
+    status: String(raw.status || 'pending'),
+    createdAt,
+    invoiceNumber: raw.invoiceNumber?.toString() || raw.invoice_number?.toString() || null,
+    paymentMethod: raw.paymentMethod?.toString() || raw.payment_method?.toString() || null,
+  };
+}
+
+function sortOrdersDesc(orders) {
+  return [...orders].sort((a, b) => {
+    const aTime = Date.parse(a.createdAt || 0);
+    const bTime = Date.parse(b.createdAt || 0);
+    return bTime - aTime;
+  });
 }
 
 function categoryIdFor(name) {
@@ -271,13 +339,65 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/orders') {
+    const orders = sortOrdersDesc(readOrders());
+    sendJson(res, 200, orders);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/orders') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const id = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const order = normalizeOrder(body, id);
+      const orders = readOrders();
+      orders.unshift(order);
+      writeOrders(orders);
+      sendJson(res, 201, order);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  const orderStatusMatch = url.pathname.match(/^\/api\/orders\/([^/]+)\/status$/);
+  if (req.method === 'PATCH' && orderStatusMatch) {
+    try {
+      const orderId = decodeURIComponent(orderStatusMatch[1]);
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const nextStatus = String(body.status || '').trim();
+      if (!nextStatus) {
+        sendJson(res, 400, { error: 'Missing status' });
+        return;
+      }
+
+      const orders = readOrders();
+      const index = orders.findIndex((order) => String(order.id) === orderId);
+      if (index === -1) {
+        sendJson(res, 404, { error: 'Order not found' });
+        return;
+      }
+
+      orders[index] = { ...orders[index], status: nextStatus };
+      writeOrders(orders);
+      sendJson(res, 200, orders[index]);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
   sendJson(res, 404, { error: 'Not found' });
 });
 
 ensureDataFile();
+ensureOrdersFile();
 ensureUploadDir();
 if (!IS_VERCEL && memoryItems.length === 0) {
   memoryItems = readItems();
+}
+if (!IS_VERCEL && memoryOrders.length === 0) {
+  memoryOrders = readOrders();
 }
 rebuildCategoryIds(memoryItems);
 

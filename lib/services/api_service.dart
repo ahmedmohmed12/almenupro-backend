@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/menu_item.dart';
+import '../models/order.dart';
 
 class ApiService {
   ApiService._();
@@ -66,6 +67,85 @@ class ApiService {
       return response.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<List<Order>> fetchOrders() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/orders'))
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) {
+        throw Exception('فشل في تحميل الطلبات (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+
+      return decoded
+          .whereType<Map>()
+          .map(
+            (raw) => Order.fromMap(
+              raw['id']?.toString() ?? '',
+              Map<String, dynamic>.from(raw),
+            ),
+          )
+          .toList();
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      throw Exception('خطأ في تحميل الطلبات: $error');
+    }
+  }
+
+  Future<Order> createOrder(Order order) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/orders'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(order.toMap()),
+          )
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('فشل في حفظ الطلب (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+
+      final map = Map<String, dynamic>.from(decoded);
+      return Order.fromMap(map['id']?.toString() ?? '', map);
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      throw Exception('خطأ في حفظ الطلب: $error');
+    }
+  }
+
+  Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
+    try {
+      final response = await http
+          .patch(
+            Uri.parse('$baseUrl/orders/$orderId/status'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'status': status.name}),
+          )
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) {
+        throw Exception('فشل في تحديث الطلب (${response.statusCode})');
+      }
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      throw Exception('خطأ في تحديث الطلب: $error');
     }
   }
 

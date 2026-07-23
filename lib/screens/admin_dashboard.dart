@@ -91,6 +91,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (_whatsappController.text.trim().isEmpty) return;
     setState(() => _isSavingSettings = true);
 
+    if (!isFirebaseConfigured) {
+      setState(() => _isSavingSettings = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ الرقم محلياً. اربط Firebase لمزامنة الإعدادات بين الأجهزة.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     await FirebaseFirestore.instance
         .collection('settings')
         .doc('restaurant_info')
