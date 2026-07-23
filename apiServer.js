@@ -4,6 +4,17 @@ const path = require('path');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
+const IS_VERCEL = Boolean(process.env.VERCEL);
+
+let seedItems = [];
+try {
+  seedItems = require('./data/menu_items.json');
+  if (!Array.isArray(seedItems)) seedItems = [];
+} catch {
+  seedItems = [];
+}
+
+let memoryItems = [...seedItems];
 
 const categoryIds = new Map();
 let nextCategoryId = 1;
@@ -40,13 +51,25 @@ function ensureDataFile() {
 }
 
 function readItems() {
+  if (IS_VERCEL) {
+    return memoryItems;
+  }
+
   ensureDataFile();
   const raw = fs.readFileSync(DATA_FILE, 'utf8');
   const parsed = JSON.parse(raw || '[]');
-  return Array.isArray(parsed) ? parsed : [];
+  const items = Array.isArray(parsed) ? parsed : [];
+  memoryItems = items;
+  return items;
 }
 
 function writeItems(items) {
+  memoryItems = items;
+
+  if (IS_VERCEL) {
+    return;
+  }
+
   ensureDataFile();
   fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf8');
 }
@@ -172,7 +195,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 ensureDataFile();
-rebuildCategoryIds(readItems());
+if (!IS_VERCEL && memoryItems.length === 0) {
+  memoryItems = readItems();
+}
+rebuildCategoryIds(memoryItems);
 
 module.exports = server;
 

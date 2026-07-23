@@ -4,7 +4,10 @@
   "builds": [
     {
       "src": "apiServer.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "data/**"
+      }
     }
   ],
   "routes": [
