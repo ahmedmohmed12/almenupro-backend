@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/menu_item.dart';
+import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/menu/menu_checkout_sheet.dart';
 import '../widgets/network_menu_image.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -27,6 +30,17 @@ class _MenuScreenState extends State<MenuScreen> {
       _itemsFuture = ApiService.instance.fetchItems();
     });
     await _itemsFuture;
+  }
+
+  void _addToCart(MenuItem item) {
+    context.read<CartProvider>().addMenuItem(item);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تمت إضافة "${item.name}" إلى السلة'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   List<String> _categories(List<MenuItem> items) {
@@ -55,6 +69,8 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cart = context.watch<CartProvider>();
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -119,12 +135,14 @@ class _MenuScreenState extends State<MenuScreen> {
                       builder: (context, constraints) {
                         final width = constraints.crossAxisExtent;
                         final columns = _gridColumns(width);
-                        final cardWidth = (width - 32 - (columns - 1) * 16) / columns;
+                        final cardWidth =
+                            (width - 32 - (columns - 1) * 16) / columns;
 
                         return SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                           sliver: SliverGrid(
-                            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                            gridDelegate:
+                                SliverGridDelegateWithMaxCrossAxisExtent(
                               maxCrossAxisExtent: cardWidth,
                               crossAxisSpacing: 16,
                               mainAxisSpacing: 16,
@@ -132,7 +150,10 @@ class _MenuScreenState extends State<MenuScreen> {
                             ),
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
-                                return _MenuItemCard(item: filtered[index]);
+                                return _MenuItemCard(
+                                  item: filtered[index],
+                                  onAddToCart: () => _addToCart(filtered[index]),
+                                );
                               },
                               childCount: filtered.length,
                             ),
@@ -144,6 +165,91 @@ class _MenuScreenState extends State<MenuScreen> {
               ),
             );
           },
+        ),
+        bottomNavigationBar: cart.isEmpty
+            ? null
+            : _FloatingCartBar(
+                itemCount: cart.itemCount,
+                totalPrice: cart.totalPrice,
+                onCheckout: () => MenuCheckoutSheet.show(context),
+              ),
+      ),
+    );
+  }
+}
+
+class _FloatingCartBar extends StatelessWidget {
+  const _FloatingCartBar({
+    required this.itemCount,
+    required this.totalPrice,
+    required this.onCheckout,
+  });
+
+  final int itemCount;
+  final double totalPrice;
+  final VoidCallback onCheckout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.brandMaroon,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+          onPressed: onCheckout,
+          child: Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.brandOrange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$itemCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Expanded(
+                child: Text(
+                  'متابعة الطلب',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Text(
+                '${totalPrice.toStringAsFixed(3)} د.ك',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -271,100 +377,115 @@ class _CategoryBar extends StatelessWidget {
 }
 
 class _MenuItemCard extends StatelessWidget {
-  const _MenuItemCard({required this.item});
+  const _MenuItemCard({
+    required this.item,
+    required this.onAddToCart,
+  });
 
   final MenuItem item;
+  final VoidCallback onAddToCart;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: _MenuItemImage(imageUrl: item.imageUrl),
+      child: InkWell(
+        onTap: onAddToCart,
+        child: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.brandBlack,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _MenuItemImage(imageUrl: item.imageUrl),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.brandBlack,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.description.isNotEmpty
+                          ? item.description
+                          : 'لا يوجد وصف',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF555555),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  item.description.isNotEmpty
-                      ? item.description
-                      : 'لا يوجد وصف',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF555555),
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              _PriceBar(price: item.price, onAddToCart: onAddToCart),
+            ],
           ),
-          _PriceBar(price: item.price),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _PriceBar extends StatelessWidget {
-  const _PriceBar({required this.price});
+  const _PriceBar({
+    required this.price,
+    required this.onAddToCart,
+  });
 
   final double price;
+  final VoidCallback onAddToCart;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: const BoxDecoration(
-        color: AppTheme.brandOrange,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Icon(
-            Icons.add_shopping_cart_outlined,
-            color: Colors.white,
-            size: 18,
+    return Material(
+      color: AppTheme.brandOrange,
+      child: InkWell(
+        onTap: onAddToCart,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Icon(
+                Icons.add_shopping_cart_outlined,
+                color: Colors.white,
+                size: 18,
+              ),
+              Text(
+                '${price.toStringAsFixed(3)} د.ك',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-          Text(
-            '${price.toStringAsFixed(3)} د.ك',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
+import 'providers/cart_provider.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/client_menu_page.dart';
 import 'screens/menu_screen.dart';
@@ -40,7 +42,12 @@ Future<void> main() async {
     } catch (_) {}
   }
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => CartProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

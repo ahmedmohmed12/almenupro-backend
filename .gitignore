@@ -44,6 +44,7 @@ database.db
 uploads/*
 !uploads/menu/
 !uploads/menu/**
+public/api/uploads/menu/**
 .port
 
 # Vercel local link
