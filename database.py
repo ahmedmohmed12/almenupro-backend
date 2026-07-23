@@ -19,18 +19,16 @@ def get_connection() -> sqlite3.Connection:
 @contextmanager
 def db_cursor():
     conn = get_connection()
+    cursor = conn.cursor()
     try:
-        cursor = conn.cursor()
         yield cursor
         conn.commit()
-    except Exception:
+    except Exception as e:
         conn.rollback()
-        raise
+        raise e
     finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+        cursor.close()
+        conn.close()  # 👈 يضمن إغلاق الاتصال دائماً بعد كل طلب
 
 
 def init_db() -> None:
