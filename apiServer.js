@@ -174,7 +174,11 @@ const server = http.createServer(async (req, res) => {
 ensureDataFile();
 rebuildCategoryIds(readItems());
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Almenupro API running at http://127.0.0.1:${PORT}`);
-  console.log(`GET  http://127.0.0.1:${PORT}/api/items`);
-});
+module.exports = server;
+
+if (require.main === module) {
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`Almenupro API running at http://127.0.0.1:${PORT}`);
+    console.log(`GET  http://127.0.0.1:${PORT}/api/items`);
+  });
+}
