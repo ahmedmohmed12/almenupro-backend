@@ -20,7 +20,6 @@ flutter precache --web
 flutter pub get
 flutter build web \
   --release \
-  --web-renderer html \
   --dart-define=API_BASE_URL="$API_BASE_URL"
 
 rm -rf "$FRONTEND_DIR/dist"
