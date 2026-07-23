@@ -12,7 +12,9 @@ macos/
 windows/
 test/
 tmp/
-uploads/
+uploads/*
+!uploads/menu/
+!uploads/menu/**
 __pycache__/
 .venv/
 venv/

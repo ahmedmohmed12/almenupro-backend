@@ -41,7 +41,9 @@ htmlcov/
 *.sqlite
 *.sqlite3
 database.db
-uploads/
+uploads/*
+!uploads/menu/
+!uploads/menu/**
 .port
 
 # Vercel local link

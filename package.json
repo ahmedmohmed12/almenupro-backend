@@ -4,7 +4,8 @@
   "main": "apiServer.js",
   "scripts": {
     "start": "node apiServer.js",
-    "seed": "node seedFromTalabat.js"
+    "seed": "node seedFromTalabat.js",
+    "migrate:images": "node scripts/migrateMenuImages.js"
   },
   "engines": {
     "node": ">=18"

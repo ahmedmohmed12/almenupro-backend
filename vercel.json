@@ -6,7 +6,7 @@
       "src": "apiServer.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": "data/**"
+        "includeFiles": "data/**,uploads/menu/**"
       }
     }
   ],

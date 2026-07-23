@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../firebase_options.dart';
 import '../utils/firebase_config.dart';
+import '../utils/image_url.dart';
 import '../services/menu_storage_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
@@ -154,7 +155,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       text: data?['categoryName'] ?? 'أشهر الأصناف',
     );
     final imageUrlController = TextEditingController(
-      text: data?['imageUrl'] as String? ?? '',
+      text: normalizeMenuImageUrl(data?['imageUrl'] as String?),
     );
     var isAvailable = data?['isAvailable'] as bool? ?? true;
 
@@ -208,7 +209,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       controller: imageUrlController,
                       keyboardType: TextInputType.url,
                       decoration: const InputDecoration(
-                        labelText: 'رابط الصورة (اختياري)',
+                        labelText: 'مسار الصورة المحلية (اختياري)',
+                        hintText: '/api/uploads/menu/123456.jpg',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -248,7 +250,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       'price': double.tryParse(priceController.text) ?? 0.0,
                       'categoryName': categoryController.text.trim(),
                       'categoryId': data?['categoryId'] ?? '',
-                      'imageUrl': imageUrlController.text.trim(),
+                      'imageUrl': normalizeMenuImageUrl(imageUrlController.text.trim()),
                       'options': data?['options'] ?? <dynamic>[],
                       'isAvailable': isAvailable,
                     };
@@ -357,7 +359,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'أدخل رابط Talabat (طلبات) لسحب الأصناف مع الصورة والسعر والوصف تلقائياً:',
+                      'أدخل رابط Talabat لسحب الأصناف — سيتم حفظ الصور محلياً على السيرفر تلقائياً:',
                       style: TextStyle(fontSize: 13, color: Colors.black87),
                     ),
                     const SizedBox(height: 15),

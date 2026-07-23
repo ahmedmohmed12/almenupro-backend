@@ -1,3 +1,5 @@
+import '../utils/image_url.dart';
+
 class MenuOption {
   const MenuOption({
     required this.id,
@@ -62,11 +64,10 @@ class MenuItem {
   /// Backward-compatible alias used by older screens.
   String get category => categoryName;
 
-  /// Talabat CDN image URL (`image_url` in API JSON).
+  /// Local Almenupro image path or absolute URL (`image_url` in API JSON).
   String get image_url => imageUrl;
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
-    final rawImage = json['image_url'] ?? json['imageUrl'] ?? '';
     return MenuItem(
       id: json['id'] is int ? json['id'] as int : int.parse(json['id'].toString()),
       categoryId: json['category_id'] is int
@@ -76,7 +77,7 @@ class MenuItem {
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       price: double.parse(json['price'].toString()),
-      imageUrl: rawImage.toString(),
+      imageUrl: normalizeMenuImageUrl(json['image_url'] ?? json['imageUrl']),
       talabatId: json['talabat_id'] is int
           ? json['talabat_id'] as int
           : int.tryParse(json['talabat_id']?.toString() ?? ''),
@@ -106,7 +107,7 @@ class MenuItem {
       price: (map['price'] as num?)?.toDouble() ??
           double.tryParse(map['price']?.toString() ?? '') ??
           0,
-      imageUrl: (map['imageUrl'] ?? map['image_url'] ?? '').toString(),
+      imageUrl: normalizeMenuImageUrl(map['imageUrl'] ?? map['image_url']),
       talabatId: map['talabat_id'] is int
           ? map['talabat_id'] as int
           : int.tryParse(map['talabat_id']?.toString() ?? ''),

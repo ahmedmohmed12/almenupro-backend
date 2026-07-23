@@ -1,6 +1,11 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const {
+  persistMenuItemsImages,
+  serveMenuImage,
+  ensureUploadDir,
+} = require('./lib/menuImageStorage');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
@@ -223,6 +228,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const uploadMatch = url.pathname.match(/^\/api\/uploads\/menu\/([^/]+)$/);
+  if (req.method === 'GET' && uploadMatch) {
+    serveMenuImage(res, decodeURIComponent(uploadMatch[1]));
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/image-proxy') {
     const imageUrl = url.searchParams.get('url');
     if (!imageUrl) {
@@ -237,14 +248,22 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
       const incoming = Array.isArray(body.items) ? body.items : [];
+      const downloadImages = body.downloadImages !== false;
+      const normalizedIncoming = incoming.map((raw, index) => normalizeIncoming(raw, index));
+      const preparedIncoming = downloadImages
+        ? await persistMenuItemsImages(normalizedIncoming)
+        : normalizedIncoming;
       const existing = readItems();
-      const merged = mergeItems(existing, incoming);
+      const merged = mergeItems(existing, preparedIncoming);
       rebuildCategoryIds(merged);
       writeItems(merged);
       sendJson(res, 200, {
         ok: true,
         total: merged.length,
         synced: incoming.length,
+        imagesStoredLocally: preparedIncoming.filter((item) =>
+          String(item.image_url || '').startsWith('/api/uploads/menu/'),
+        ).length,
       });
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
@@ -256,6 +275,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 ensureDataFile();
+ensureUploadDir();
 if (!IS_VERCEL && memoryItems.length === 0) {
   memoryItems = readItems();
 }

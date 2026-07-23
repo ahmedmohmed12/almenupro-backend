@@ -2,22 +2,55 @@ import 'package:flutter/foundation.dart';
 
 import '../services/api_service.dart';
 
-/// Rewrites third-party CDN URLs through our API proxy on Flutter Web so
-/// CanvasKit can fetch image bytes without browser CORS blocks.
+/// API origin without the `/api` suffix, e.g. https://almenupro-backend.vercel.app
+String get menuImageApiOrigin {
+  final base = ApiService.baseUrl;
+  if (base.endsWith('/api')) {
+    return base.substring(0, base.length - 4);
+  }
+  return base.replaceAll(RegExp(r'/api/?$'), '');
+}
+
+bool isLegacyTalabatImageUrl(String url) {
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return false;
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null || !uri.hasScheme) return false;
+  final host = uri.host.toLowerCase();
+  return host.contains('deliveryhero.io') || host.contains('talabat.com');
+}
+
+bool isLocalMenuImagePath(String url) {
+  final trimmed = url.trim();
+  return trimmed.startsWith('/api/uploads/menu/');
+}
+
+/// Normalizes menu image paths for display. Prefers locally hosted Almenupro URLs
+/// and ignores legacy Talabat CDN links that should be migrated on the server.
 String resolveImageUrl(String url) {
   final trimmed = url.trim();
   if (trimmed.isEmpty) return trimmed;
-  if (!kIsWeb) return trimmed;
 
-  final uri = Uri.tryParse(trimmed);
-  if (uri == null || !uri.hasScheme) return trimmed;
+  if (isLocalMenuImagePath(trimmed)) {
+    return '${menuImageApiOrigin}$trimmed';
+  }
 
-  final host = uri.host.toLowerCase();
-  final needsProxy = host.contains('deliveryhero.io') ||
-      host.contains('talabat.com') ||
-      host.contains('images.deliveryhero.io');
+  if (isLegacyTalabatImageUrl(trimmed)) {
+    return '';
+  }
 
-  if (!needsProxy) return trimmed;
+  if (trimmed.startsWith('/')) {
+    return '${menuImageApiOrigin}$trimmed';
+  }
 
-  return '${ApiService.baseUrl}/image-proxy?url=${Uri.encodeComponent(trimmed)}';
+  return trimmed;
+}
+
+/// Used when parsing API payloads — keeps local paths, drops legacy CDN URLs.
+String normalizeMenuImageUrl(Object? raw) {
+  final value = (raw ?? '').toString().trim();
+  if (value.isEmpty) return '';
+  if (isLocalMenuImagePath(value)) return value;
+  if (isLegacyTalabatImageUrl(value)) return '';
+  return value;
 }

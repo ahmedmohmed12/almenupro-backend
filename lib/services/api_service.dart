@@ -77,7 +77,10 @@ class ApiService {
           .post(
             Uri.parse('$baseUrl/items/sync'),
             headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({'items': items}),
+            body: jsonEncode({
+              'items': items,
+              'downloadImages': true,
+            }),
           )
           .timeout(const Duration(seconds: 20));
 

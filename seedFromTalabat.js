@@ -1,12 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 const { scrapeTalabatMenu } = require('../functions/talabatScraper');
+const {
+  persistMenuItemsImages,
+  ensureUploadDir,
+} = require('./lib/menuImageStorage');
 
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
 const DEFAULT_URL =
   'https://www.talabat.com/ar/kuwait/restaurant/20426/molton-cookies?aid=62';
 
 async function main() {
+  ensureUploadDir();
+
   const url = process.argv[2] || DEFAULT_URL;
   const result = await scrapeTalabatMenu(url);
 
@@ -31,9 +37,18 @@ async function main() {
     source: 'Talabat',
   }));
 
+  console.log(`Downloaded scrape: ${items.length} items. Saving images locally...`);
+  const withLocalImages = await persistMenuItemsImages(items);
+
   fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf8');
-  console.log(`Saved ${items.length} items to ${DATA_FILE}`);
+  fs.writeFileSync(DATA_FILE, JSON.stringify(withLocalImages, null, 2), 'utf8');
+
+  const localCount = withLocalImages.filter((item) =>
+    String(item.image_url || '').startsWith('/api/uploads/menu/'),
+  ).length;
+
+  console.log(`Saved ${withLocalImages.length} items to ${DATA_FILE}`);
+  console.log(`${localCount} images stored under uploads/menu/`);
 }
 
 main().catch((error) => {

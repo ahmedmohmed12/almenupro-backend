@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/menu_item.dart';
 import '../utils/firebase_config.dart';
+import '../utils/image_url.dart';
 import 'api_service.dart';
 
 class MenuItemRecord {
@@ -426,9 +427,9 @@ class MenuStorageService {
     Map<String, dynamic> data, {
     Map<String, dynamic>? preserveFrom,
   }) {
-    final imageUrl = (data['imageUrl'] ?? preserveFrom?['imageUrl'] ?? '')
-        .toString()
-        .trim();
+    final imageUrl = normalizeMenuImageUrl(
+      data['imageUrl'] ?? preserveFrom?['imageUrl'] ?? preserveFrom?['image_url'],
+    );
 
     return {
       'name': (data['name'] ?? preserveFrom?['name'] ?? '').toString().trim(),
