@@ -14,7 +14,7 @@ import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/configure_url_strategy.dart';
 
-bool get _isFirebaseConfigured {
+bool get isFirebaseConfigured {
   if (!kIsWeb) return true;
   final options = DefaultFirebaseOptions.web;
   return !options.apiKey.startsWith('YOUR_') &&
@@ -26,7 +26,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    if (_isFirebaseConfigured) {
+    if (isFirebaseConfigured) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
@@ -34,7 +34,7 @@ Future<void> main() async {
       debugPrint('Skipping Firebase init: web credentials not configured.');
     }
     await MenuStorageService.instance.initialize();
-    if (_isFirebaseConfigured) {
+    if (isFirebaseConfigured) {
       unawaited(SeedService().seedMenuIfEmpty());
       unawaited(MoltonUploadService().uploadMoltonDataIfEmpty());
     }
@@ -51,16 +51,18 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  static String _normalizeRoute(String? routeName) {
-    var route = (routeName == null || routeName.isEmpty) ? Uri.base.path : routeName;
+  static String normalizeRoute(String? routeName) {
+    var route = (routeName == null || routeName.isEmpty)
+        ? (kIsWeb ? Uri.base.path : '/')
+        : routeName;
     if (route.endsWith('/') && route.length > 1) {
       route = route.substring(0, route.length - 1);
     }
     return route.isEmpty ? '/' : route;
   }
 
-  static Route<dynamic> _onGenerateRoute(RouteSettings settings) {
-    switch (_normalizeRoute(settings.name)) {
+  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
+    switch (normalizeRoute(settings.name)) {
       case '/admin':
         return MaterialPageRoute(
           settings: settings,
@@ -84,14 +86,33 @@ class MyApp extends StatelessWidget {
     }
   }
 
+  static List<Route<dynamic>> onGenerateInitialRoutes(String initialRoute) {
+    final route = normalizeRoute(
+      initialRoute.isNotEmpty ? initialRoute : Uri.base.path,
+    );
+    return [onGenerateRoute(RouteSettings(name: route))];
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Almenupro',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      onGenerateRoute: _onGenerateRoute,
-      onUnknownRoute: _onGenerateRoute,
+      onGenerateRoute: onGenerateRoute,
+      onUnknownRoute: onGenerateRoute,
+      onGenerateInitialRoutes: onGenerateInitialRoutes,
+      builder: (context, child) {
+        if (child == null) {
+          return const ColoredBox(
+            color: AppTheme.brandBackground,
+            child: Center(
+              child: CircularProgressIndicator(color: AppTheme.brandOrange),
+            ),
+          );
+        }
+        return child;
+      },
     );
   }
 }

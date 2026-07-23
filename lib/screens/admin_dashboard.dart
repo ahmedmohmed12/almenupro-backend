@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../firebase_options.dart';
 import '../services/menu_storage_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
@@ -56,6 +58,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _loadSettings() async {
+    if (kIsWeb &&
+        (DefaultFirebaseOptions.web.apiKey.startsWith('YOUR_') ||
+            DefaultFirebaseOptions.web.projectId.startsWith('YOUR_'))) {
+      _whatsappController.text = '96594774950';
+      if (mounted) setState(() {});
+      return;
+    }
+
     try {
       final doc = await FirebaseFirestore.instance
           .collection('settings')

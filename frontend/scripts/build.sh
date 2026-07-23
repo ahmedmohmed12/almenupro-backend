@@ -20,10 +20,12 @@ flutter precache --web
 flutter pub get
 flutter build web \
   --release \
+  --base-href=/ \
   --dart-define=API_BASE_URL="$API_BASE_URL"
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
 cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
+cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
 echo "Frontend build copied to frontend/dist"
