@@ -16,7 +16,21 @@ class ApiService {
   // Web / Desktop: localhost
   // Android Emulator: 10.0.2.2
   // Physical device: machine LAN IP
-  static const String baseUrl = 'https://almenupro-backend.vercel.app/api';
+  static String get baseUrl {
+    const configured = String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: '',
+    );
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+
+    if (kIsWeb) {
+      return '${Uri.base.origin}/api';
+    }
+
+    return 'https://almenupro-backend.vercel.app/api';
+  }
   static const Duration _fetchTimeout = Duration(seconds: 15);
 
   /// جلب قائمة الأصناف من الباك إند المنشور على Vercel.

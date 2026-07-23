@@ -8,12 +8,26 @@
       "config": {
         "includeFiles": "data/**"
       }
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build/web"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "apiServer.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

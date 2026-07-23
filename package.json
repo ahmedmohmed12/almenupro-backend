@@ -1,10 +1,11 @@
 {
-  "name": "almenupro-api",
+  "name": "almenupro",
   "private": true,
   "main": "apiServer.js",
   "scripts": {
     "start": "node apiServer.js",
-    "seed": "node seedFromTalabat.js"
+    "seed": "node seedFromTalabat.js",
+    "vercel-build": "bash scripts/vercel-build-web.sh"
   },
   "engines": {
     "node": ">=18"

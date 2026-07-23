@@ -46,6 +46,7 @@ uploads/
 
 # Vercel local link
 .vercel/
+.flutter/
 
 # =============================================================================
 # Flutter / Dart (almenupro, flutter_app)
