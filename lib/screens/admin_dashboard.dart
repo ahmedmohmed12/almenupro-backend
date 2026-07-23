@@ -225,7 +225,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       keyboardType: TextInputType.url,
                       decoration: const InputDecoration(
                         labelText: 'مسار الصورة المحلية (اختياري)',
-                        hintText: '/api/uploads/menu/123456.jpg',
+                        hintText: '/menu-images/123456.jpg',
                         border: OutlineInputBorder(),
                       ),
                     ),

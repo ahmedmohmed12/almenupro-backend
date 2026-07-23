@@ -6,7 +6,7 @@
     "name": "مينى بايتس كيندر",
     "description": "مينى بايتس كيندر 40 قطعة داخل البوكس",
     "price": 7,
-    "image_url": "/api/uploads/menu/1962105681.jpg",
+    "image_url": "/menu-images/1962105681.jpg",
     "is_available": 1,
     "talabat_id": 1962105681,
     "source": "Talabat"
@@ -18,7 +18,7 @@
     "name": "مينى بايتس ميكس",
     "description": "مينى بايتس مشكل 40 قطعة داخل البوكس",
     "price": 5.2,
-    "image_url": "/api/uploads/menu/1962105679.jpg",
+    "image_url": "/menu-images/1962105679.jpg",
     "is_available": 1,
     "talabat_id": 1962105679,
     "source": "Talabat"
@@ -30,7 +30,7 @@
     "name": "كوكيز شوكولاتة كيندر",
     "description": "16 قطعة، تقدم مع صوص شوكولاتة.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105699.jpg",
+    "image_url": "/menu-images/1962105699.jpg",
     "is_available": 1,
     "talabat_id": 1962105699,
     "source": "Talabat"
@@ -42,7 +42,7 @@
     "name": "2 بوكس مينى بايتس",
     "description": "40 قطعة لكل بوكس.",
     "price": 11,
-    "image_url": "/api/uploads/menu/1962105673.png",
+    "image_url": "/menu-images/1962105673.png",
     "is_available": 1,
     "talabat_id": 1962105673,
     "source": "Talabat"
@@ -54,7 +54,7 @@
     "name": "مولتن نوتيلا",
     "description": "6 حبات",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105665.jpg",
+    "image_url": "/menu-images/1962105665.jpg",
     "is_available": 1,
     "talabat_id": 1962105665,
     "source": "Talabat"
@@ -66,7 +66,7 @@
     "name": "مينى بايتس نوتيلا",
     "description": "مينى بايتس بشيكولاتة النوتيلا 40 قطعة داخل البوكس",
     "price": 5.2,
-    "image_url": "/api/uploads/menu/1962105689.jpg",
+    "image_url": "/menu-images/1962105689.jpg",
     "is_available": 1,
     "talabat_id": 1962105689,
     "source": "Talabat"
@@ -78,7 +78,7 @@
     "name": "كوكيز اكسترا شوكولاتة",
     "description": "كوكيز اكسترا شوكولاتة ميلك مع صوص الشيكولاته الذيذ 15 قطعه داحل البوكس.",
     "price": 5.2,
-    "image_url": "/api/uploads/menu/600220024.jpg",
+    "image_url": "/menu-images/600220024.jpg",
     "is_available": 1,
     "talabat_id": 600220024,
     "source": "Talabat"
@@ -90,7 +90,7 @@
     "name": "2 بوكس كوكيز",
     "description": "20 قطعة لكل بوكس.",
     "price": 11,
-    "image_url": "/api/uploads/menu/1962105672.jpg",
+    "image_url": "/menu-images/1962105672.jpg",
     "is_available": 1,
     "talabat_id": 1962105672,
     "source": "Talabat"
@@ -102,7 +102,7 @@
     "name": "2 بوكس كوكيز كب",
     "description": "16 قطعة لكل بوكس. تقدم مع صوص شوكولاتة.",
     "price": 11,
-    "image_url": "/api/uploads/menu/1962105670.jpg",
+    "image_url": "/menu-images/1962105670.jpg",
     "is_available": 1,
     "talabat_id": 1962105670,
     "source": "Talabat"
@@ -114,7 +114,7 @@
     "name": "كيندر ميني ماكس",
     "description": "كيندر ميني ماكس مع صوص الشوكلاتة الذيذ 32 حبة في صندوق",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/600217645.jpg",
+    "image_url": "/menu-images/600217645.jpg",
     "is_available": 1,
     "talabat_id": 600217645,
     "source": "Talabat"
@@ -126,7 +126,7 @@
     "name": "مينى بايتس توبليرون",
     "description": "مينى بايتس توبليرون شوكليت بالحليب 40 قطعة داخل البوكس",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105675.jpg",
+    "image_url": "/menu-images/1962105675.jpg",
     "is_available": 1,
     "talabat_id": 1962105675,
     "source": "Talabat"
@@ -138,7 +138,7 @@
     "name": "مينى بايتس هيرشيز كوكيز",
     "description": "مينى بايتس بشوكولاتة الهيرشيز 40 قطعة داخل البوكس",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105685.jpg",
+    "image_url": "/menu-images/1962105685.jpg",
     "is_available": 1,
     "talabat_id": 1962105685,
     "source": "Talabat"
@@ -150,7 +150,7 @@
     "name": "مينى بايتس هيرشيز الشيكولاتة البيضاء",
     "description": "مينى بايتس بشيكولاتة الهيرشيز البيضاء 40 قطعة داخل البوكس",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105687.jpg",
+    "image_url": "/menu-images/1962105687.jpg",
     "is_available": 1,
     "talabat_id": 1962105687,
     "source": "Talabat"
@@ -162,7 +162,7 @@
     "name": "اوريو ميني بايتس 40 قطعة",
     "description": "",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105691.jpg",
+    "image_url": "/menu-images/1962105691.jpg",
     "is_available": 1,
     "talabat_id": 1962105691,
     "source": "Talabat"
@@ -174,7 +174,7 @@
     "name": "بوستاشو ميني بايتس 40 قطعة",
     "description": "",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105693.jpg",
+    "image_url": "/menu-images/1962105693.jpg",
     "is_available": 1,
     "talabat_id": 1962105693,
     "source": "Talabat"
@@ -186,7 +186,7 @@
     "name": "مينى بايتس دوبل شوكليت",
     "description": "مينى بايتس دبل شوكليت 40 قطعة داخل البوكس",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105677.jpg",
+    "image_url": "/menu-images/1962105677.jpg",
     "is_available": 1,
     "talabat_id": 1962105677,
     "source": "Talabat"
@@ -198,7 +198,7 @@
     "name": "كوكيز محشية فستق",
     "description": "16 قطعة، تقدم مع صوص شوكولاتة.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105695.jpg",
+    "image_url": "/menu-images/1962105695.jpg",
     "is_available": 1,
     "talabat_id": 1962105695,
     "source": "Talabat"
@@ -210,7 +210,7 @@
     "name": "كوكيز شوكولاتة دوبل",
     "description": "16 قطعة، تقدم مع صوص شوكولاتة.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105697.jpg",
+    "image_url": "/menu-images/1962105697.jpg",
     "is_available": 1,
     "talabat_id": 1962105697,
     "source": "Talabat"
@@ -222,7 +222,7 @@
     "name": "كوكيز شوكولاتة نوتيلا",
     "description": "16 قطعة، تقدم مع صوص شوكولاتة.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105702.jpg",
+    "image_url": "/menu-images/1962105702.jpg",
     "is_available": 1,
     "talabat_id": 1962105702,
     "source": "Talabat"
@@ -234,7 +234,7 @@
     "name": "كوكيز مشكلة",
     "description": "16 قطعة، تقدم مع صوص شوكولاتة.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105703.jpg",
+    "image_url": "/menu-images/1962105703.jpg",
     "is_available": 1,
     "talabat_id": 1962105703,
     "source": "Talabat"
@@ -246,7 +246,7 @@
     "name": "كوكيز شوكولاتة نوتيلا بيضاء",
     "description": "16 قطعة، تقدم مع صوص شوكولاتة.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105705.jpg",
+    "image_url": "/menu-images/1962105705.jpg",
     "is_available": 1,
     "talabat_id": 1962105705,
     "source": "Talabat"
@@ -258,7 +258,7 @@
     "name": "مولتن كيندر",
     "description": "6 قطع.",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105707.jpg",
+    "image_url": "/menu-images/1962105707.jpg",
     "is_available": 1,
     "talabat_id": 1962105707,
     "source": "Talabat"
@@ -270,7 +270,7 @@
     "name": "مولتن نوتيلا",
     "description": "molten Nutella 6 pccs",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/172097966.jpg",
+    "image_url": "/menu-images/172097966.jpg",
     "is_available": 1,
     "talabat_id": 172097966,
     "source": "Talabat"
@@ -282,7 +282,7 @@
     "name": "توبليرون كوكيز",
     "description": "قطعة كوكيز بشيكولاتة التوبليرون 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105653.jpg",
+    "image_url": "/menu-images/1962105653.jpg",
     "is_available": 1,
     "talabat_id": 1962105653,
     "source": "Talabat"
@@ -294,7 +294,7 @@
     "name": "هرشيز كوكيز",
     "description": "قطعة كوكيز بشيكولاتة الهرشيز 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105654.jpg",
+    "image_url": "/menu-images/1962105654.jpg",
     "is_available": 1,
     "talabat_id": 1962105654,
     "source": "Talabat"
@@ -306,7 +306,7 @@
     "name": "كوكيز هرشيز البيضاء",
     "description": "قطعة كوكيز بشيكولاتة الهيرشيز البيضاء 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105655.jpg",
+    "image_url": "/menu-images/1962105655.jpg",
     "is_available": 1,
     "talabat_id": 1962105655,
     "source": "Talabat"
@@ -318,7 +318,7 @@
     "name": "ريسز كوكيز",
     "description": "قطعة كوكيز بشيكولاتة الريسز 20 قطعة داخل العلبة",
     "price": 5.5,
-    "image_url": "/api/uploads/menu/1962105656.jpg",
+    "image_url": "/menu-images/1962105656.jpg",
     "is_available": 1,
     "talabat_id": 1962105656,
     "source": "Talabat"
@@ -330,7 +330,7 @@
     "name": "ميكس كوكيز",
     "description": "قطعة كوكيز منوعة 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105657.jpg",
+    "image_url": "/menu-images/1962105657.jpg",
     "is_available": 1,
     "talabat_id": 1962105657,
     "source": "Talabat"
@@ -342,7 +342,7 @@
     "name": "بوكس من اختيارك",
     "description": "عبارة عن 20 قطعة مختلفة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105658.jpg",
+    "image_url": "/menu-images/1962105658.jpg",
     "is_available": 1,
     "talabat_id": 1962105658,
     "source": "Talabat"
@@ -354,7 +354,7 @@
     "name": "نوتيلا كوكيز",
     "description": "قطعة نوتيلا كوكيز 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105659.jpg",
+    "image_url": "/menu-images/1962105659.jpg",
     "is_available": 1,
     "talabat_id": 1962105659,
     "source": "Talabat"
@@ -366,7 +366,7 @@
     "name": "كوكيز دوبل",
     "description": "قطعة كوكيز دبل  20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105660.jpg",
+    "image_url": "/menu-images/1962105660.jpg",
     "is_available": 1,
     "talabat_id": 1962105660,
     "source": "Talabat"
@@ -378,7 +378,7 @@
     "name": "بستاشيو كوكيز",
     "description": "قطعة كوكيز بنكهة الباستاشيو 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105661.jpg",
+    "image_url": "/menu-images/1962105661.jpg",
     "is_available": 1,
     "talabat_id": 1962105661,
     "source": "Talabat"
@@ -390,7 +390,7 @@
     "name": "اوريو كوكيز",
     "description": "قطعة اوريو كوكيز 20 قطعة داخل العلبة",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105662.jpg",
+    "image_url": "/menu-images/1962105662.jpg",
     "is_available": 1,
     "talabat_id": 1962105662,
     "source": "Talabat"
@@ -402,7 +402,7 @@
     "name": "شيكولاتة شيبس",
     "description": "قطعة رقائق الشيكولاتة 20 قطعة داخل العلبة",
     "price": 5.5,
-    "image_url": "/api/uploads/menu/1962105663.jpg",
+    "image_url": "/menu-images/1962105663.jpg",
     "is_available": 1,
     "talabat_id": 1962105663,
     "source": "Talabat"
@@ -414,7 +414,7 @@
     "name": "مولتون كوكيز مشكل",
     "description": "6 قطع من كيندر و النوتيلا",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105664.jpg",
+    "image_url": "/menu-images/1962105664.jpg",
     "is_available": 1,
     "talabat_id": 1962105664,
     "source": "Talabat"
@@ -426,7 +426,7 @@
     "name": "كوكيز بشوكولاتة جلاكسي",
     "description": "20 قطعة من الكوكيز مع شوكولاتة جلاكسي بالحليب",
     "price": 6.5,
-    "image_url": "/api/uploads/menu/1962105667.jpg",
+    "image_url": "/menu-images/1962105667.jpg",
     "is_available": 1,
     "talabat_id": 1962105667,
     "source": "Talabat"

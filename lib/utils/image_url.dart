@@ -20,7 +20,8 @@ bool isLegacyTalabatImageUrl(String url) {
 
 bool isLocalMenuImagePath(String url) {
   final trimmed = url.trim();
-  return trimmed.startsWith('/api/uploads/menu/');
+  return trimmed.startsWith('/menu-images/') ||
+      trimmed.startsWith('/api/uploads/menu/');
 }
 
 /// Normalizes menu image paths for display. Prefers locally hosted Almenupro URLs

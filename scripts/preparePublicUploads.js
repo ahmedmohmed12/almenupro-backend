@@ -2,11 +2,16 @@ const fs = require('fs');
 const path = require('path');
 
 const sourceDir = path.join(__dirname, '..', 'uploads', 'menu');
-const targetDir = path.join(__dirname, '..', 'public', 'api', 'uploads', 'menu');
+const targetDir = path.join(__dirname, '..', 'public', 'menu-images');
+const legacyPublicApiDir = path.join(__dirname, '..', 'public', 'api');
 
 if (!fs.existsSync(sourceDir)) {
   console.log('No uploads/menu directory found, skipping public copy.');
   process.exit(0);
+}
+
+if (fs.existsSync(legacyPublicApiDir)) {
+  fs.rmSync(legacyPublicApiDir, { recursive: true, force: true });
 }
 
 fs.mkdirSync(targetDir, { recursive: true });
@@ -18,4 +23,4 @@ for (const filename of fs.readdirSync(sourceDir)) {
   copied += 1;
 }
 
-console.log(`Copied ${copied} menu images to public/api/uploads/menu`);
+console.log(`Copied ${copied} menu images to public/menu-images`);
