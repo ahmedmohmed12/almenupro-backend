@@ -53,7 +53,11 @@ def allowed_file(filename: str) -> bool:
 
 
 def row_to_dict(row) -> dict:
-    return dict(row) if row is not None else {}
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    return dict(row)
 
 
 def error_response(message: str, status: int = 400, **extra):
@@ -197,6 +201,7 @@ def driver_upload():
     save_path = UPLOAD_DIR / unique_name
 
     try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         file.save(save_path)
         logger.info(
             "Invoice image saved — driver_id=%s path=%s",
@@ -349,38 +354,45 @@ def restaurant_orders():
         return error_response(f"Failed to fetch orders: {exc}", 500)
 
 
+def bootstrap():
+    """Local dev setup: uploads folder + SQLite schema."""
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    db.init_db()
+    db.ensure_demo_driver()
+    logger.info("Upload directory: %s", UPLOAD_DIR)
+
+
 @app.errorhandler(413)
 def request_entity_too_large(_):
     return error_response("File too large (max 16 MB)", 413)
 
 
-def bootstrap():
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    try:
-        db.init_db()
-        db.ensure_demo_driver()
-    except Exception as e:
-        logger.error(f"Bootstrap db error: {e}")
-    logger.info("Upload directory: %s", UPLOAD_DIR)
-
-# لا تستدعي bootstrap() بشكل عام هنا!
-@app.route('/api/items', methods=['GET'])
+@app.route("/api/items", methods=["GET"])
 def get_items():
     try:
-        with db.db_cursor() as cursor:
-            cursor.execute("SELECT * FROM items")
-            items = [dict(row) for row in cursor.fetchall()]
-            return jsonify(items)
-except Exception as e:
-    logger.error(f"Error fetching items: {str(e)}")
-    return jsonify({"error": str(e)}), 500
+        return jsonify(db.list_items())
+    except Exception as exc:
+        logger.exception("Error fetching items")
+        return error_response(str(exc), 500)
+
+
+@app.route("/api/items/sync", methods=["POST"])
+def sync_items():
+    try:
+        payload = request.get_json(silent=True) or {}
+        incoming = payload.get("items") or []
+        if not isinstance(incoming, list):
+            return error_response("items must be an array", 400)
+        result = db.sync_menu_items(incoming)
+        return jsonify({"ok": True, **result})
+    except Exception as exc:
+        logger.exception("Error syncing items")
+        return error_response(str(exc), 500)
+
 
 if __name__ == "__main__":
+    bootstrap()
     port = int(os.getenv("PORT", "5050"))
     logger.info("Driver app:     http://127.0.0.1:%s/", port)
     logger.info("Restaurant app: http://127.0.0.1:%s/restaurant.html", port)
     app.run(host="0.0.0.0", port=port, debug=os.getenv("FLASK_DEBUG") == "1")
-    if __name__ == "__main__":
-    bootstrap()  # 👈 إضافة الاستدعاء هنا
-    port = int(os.getenv("PORT", "5050"))
-    # ... باقي الكود كما هو
