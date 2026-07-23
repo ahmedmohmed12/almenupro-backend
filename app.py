@@ -17,9 +17,11 @@ from config import (
     FLASK_SECRET_KEY,
     MAX_CONTENT_LENGTH,
     OPENAI_API_KEY,
+    PAGES_DIR,
     UPLOAD_DIR,
 )
 from invoice_extractor import extract_invoice_fields
+from seed import seed_database
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -103,15 +105,27 @@ def log_request():
         logger.info("%s %s", request.method, request.path)
 
 
-_STATIC_DIR = str(BASE_DIR)
+def _page_file(filename: str) -> Path | None:
+    """Resolve static HTML across local dev and Vercel serverless bundles."""
+    app_root = Path(__file__).resolve().parent
+    for candidate in (
+        PAGES_DIR / filename,
+        app_root / "public" / filename,
+        app_root / filename,
+        BASE_DIR / "public" / filename,
+        BASE_DIR / filename,
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def _send_page(filename: str):
-    path = BASE_DIR / filename
-    if not path.is_file():
-        logger.error("Missing page file: %s", path)
+    path = _page_file(filename)
+    if path is None:
+        logger.error("Missing page file: %s", filename)
         return error_response(f"Page not found: {filename}", 404)
-    return send_from_directory(_STATIC_DIR, filename)
+    return send_from_directory(str(path.parent), path.name)
 
 
 @app.route("/")
@@ -388,6 +402,27 @@ def sync_items():
     except Exception as exc:
         logger.exception("Error syncing items")
         return error_response(str(exc), 500)
+
+
+@app.route("/api/run-seed", methods=["GET", "POST"])
+def run_seed():
+    """
+    One-time seed endpoint for Vercel/local.
+    Optional protection: set SEED_SECRET env and pass ?key=YOUR_SECRET
+    """
+    secret = os.getenv("SEED_SECRET", "").strip()
+    if secret:
+        provided = (request.args.get("key") or request.headers.get("X-Seed-Key") or "").strip()
+        if provided != secret:
+            return error_response("Invalid or missing seed key", 401)
+
+    try:
+        result = seed_database()
+        logger.info("Run-seed completed via HTTP")
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Seed failed")
+        return error_response(f"Seed failed: {exc}", 500)
 
 
 if __name__ == "__main__":
