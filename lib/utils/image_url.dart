@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import '../services/api_service.dart';
 
 /// API origin without the `/api` suffix, e.g. https://almenupro-backend.vercel.app
@@ -32,7 +30,7 @@ String resolveImageUrl(String url) {
   if (trimmed.isEmpty) return trimmed;
 
   if (isLocalMenuImagePath(trimmed)) {
-    return '${menuImageApiOrigin}$trimmed';
+    return '$menuImageApiOrigin$trimmed';
   }
 
   if (isLegacyTalabatImageUrl(trimmed)) {
@@ -40,7 +38,7 @@ String resolveImageUrl(String url) {
   }
 
   if (trimmed.startsWith('/')) {
-    return '${menuImageApiOrigin}$trimmed';
+    return '$menuImageApiOrigin$trimmed';
   }
 
   return trimmed;

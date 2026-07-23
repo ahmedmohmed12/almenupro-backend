@@ -15,12 +15,14 @@ fi
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
 cd "$ROOT"
+flutter --version
 flutter config --enable-web --no-analytics
 flutter precache --web
 flutter pub get
 flutter build web \
   --release \
   --base-href=/ \
+  --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL"
 
 rm -rf "$FRONTEND_DIR/dist"
