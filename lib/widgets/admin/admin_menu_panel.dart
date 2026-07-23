@@ -44,17 +44,13 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     });
 
     try {
-      _apiOnline = await ApiService.instance.isOnline();
-      if (_apiOnline) {
-        _apiItems = await ApiService.instance.fetchMenuItems();
-      } else {
-        _apiItems = [];
-        _errorMessage =
-            'السيرفر غير متصل. شغّل: node backend/apiServer.js';
-      }
+      _apiItems = await ApiService.instance.fetchMenuItems();
+      _apiOnline = true;
+      _errorMessage = null;
     } catch (error) {
       _apiItems = [];
-      _errorMessage = error.toString();
+      _apiOnline = false;
+      _errorMessage = error.toString().replaceFirst('Exception: ', '');
     }
 
     if (mounted) {
@@ -94,6 +90,12 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
+                onPressed: _loading ? null : _loadFromApi,
+                icon: const Icon(Icons.refresh),
+                label: const Text('تحديث من السيرفر'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
                 onPressed: widget.onAutofillTalabat,
                 icon: const Icon(Icons.cloud_download),
                 label: const Text('تعبئة منيو Talabat'),
@@ -121,7 +123,7 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
               ),
             ),
             OutlinedButton.icon(
-              onPressed: _loadFromApi,
+              onPressed: _loading ? null : _loadFromApi,
               icon: const Icon(Icons.refresh),
               label: const Text('تحديث من السيرفر'),
             ),
@@ -148,29 +150,65 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
   }
 
   Widget _buildServerStatus() {
+    final apiUrl = ApiService.baseUrl;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: _apiOnline ? Colors.green.shade50 : Colors.orange.shade50,
+        color: _loading
+            ? Colors.blue.shade50
+            : _errorMessage != null
+                ? Colors.red.shade50
+                : _apiOnline
+                    ? Colors.green.shade50
+                    : Colors.orange.shade50,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: _apiOnline ? Colors.green.shade200 : Colors.orange.shade200,
+          color: _loading
+              ? Colors.blue.shade200
+              : _errorMessage != null
+                  ? Colors.red.shade200
+                  : _apiOnline
+                      ? Colors.green.shade200
+                      : Colors.orange.shade200,
         ),
       ),
       child: Row(
         children: [
           Icon(
-            _apiOnline ? Icons.cloud_done : Icons.cloud_off,
-            color: _apiOnline ? Colors.green.shade700 : Colors.orange.shade800,
+            _loading
+                ? Icons.sync
+                : _errorMessage != null
+                    ? Icons.error_outline
+                    : _apiOnline
+                        ? Icons.cloud_done
+                        : Icons.cloud_off,
+            color: _loading
+                ? Colors.blue.shade700
+                : _errorMessage != null
+                    ? Colors.red.shade700
+                    : _apiOnline
+                        ? Colors.green.shade700
+                        : Colors.orange.shade800,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              _apiOnline
-                  ? 'متصل بالسيرفر: https://almenupro-backend.vercel.app/items (${_apiItems.length} صنف)'
-                  : 'غير متصل بالسيرفر المحلي — يُعرض المنيو المحفوظ محلياً',
+              _loading
+                  ? 'جاري تحميل الأصناف من $apiUrl/items ...'
+                  : _errorMessage != null
+                      ? 'تعذر تحميل الأصناف: $_errorMessage'
+                      : _apiItems.isEmpty
+                          ? 'متصل بالسيرفر ($apiUrl) — لا توجد أصناف حالياً'
+                          : 'متصل بالسيرفر: $apiUrl/items (${_apiItems.length} صنف)',
               style: TextStyle(
-                color: _apiOnline ? Colors.green.shade900 : Colors.orange.shade900,
+                color: _loading
+                    ? Colors.blue.shade900
+                    : _errorMessage != null
+                        ? Colors.red.shade900
+                        : _apiOnline
+                            ? Colors.green.shade900
+                            : Colors.orange.shade900,
                 fontSize: 13,
               ),
             ),
@@ -182,10 +220,26 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
 
   Widget _buildContent() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: burgundy));
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: burgundy),
+            SizedBox(height: 16),
+            Text('جاري جلب الأصناف من السيرفر...'),
+          ],
+        ),
+      );
     }
 
-    if (_apiOnline && _apiItems.isNotEmpty) {
+    if (_errorMessage != null) {
+      return _buildErrorState(
+        message: _errorMessage!,
+        onRetry: _loadFromApi,
+      );
+    }
+
+    if (_apiItems.isNotEmpty) {
       return _buildApiTable(_apiItems);
     }
 
@@ -193,36 +247,93 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
       stream: MenuStorageService.instance.watchItems(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('خطأ: ${snapshot.error}'));
+          return _buildErrorState(
+            message: 'خطأ في التخزين المحلي: ${snapshot.error}',
+            onRetry: _loadFromApi,
+          );
         }
+
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: burgundy));
+          return const Center(
+            child: CircularProgressIndicator(color: burgundy),
+          );
         }
 
         final records = snapshot.data ?? [];
         if (records.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(_errorMessage ?? 'لا توجد أصناف في المنيو'),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: burgundy),
-                  onPressed: widget.onAutofillTalabat,
-                  child: const Text(
-                    'تعبئة منيو Talabat',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
+          return _buildErrorState(
+            message: 'لا توجد أصناف على السيرفر أو في التخزين المحلي.',
+            onRetry: _loadFromApi,
+            showTalabatButton: true,
           );
         }
 
-        return _buildLocalList(records);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'عرض ${records.length} صنف من التخزين المحلي (السيرفر فارغ)',
+                style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+              ),
+            ),
+            Expanded(child: _buildLocalList(records)),
+          ],
+        );
       },
+    );
+  }
+
+  Widget _buildErrorState({
+    required String message,
+    required VoidCallback onRetry,
+    bool showTalabatButton = false,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 56,
+              color: Colors.grey.shade500,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: burgundy),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text(
+                'إعادة المحاولة',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            if (showTalabatButton) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: widget.onAutofillTalabat,
+                icon: const Icon(Icons.cloud_download),
+                label: const Text('تعبئة منيو Talabat'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -239,22 +350,25 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
         return Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth - 48),
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(
-                  burgundy.withValues(alpha: 0.08),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth - 48),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    burgundy.withValues(alpha: 0.08),
+                  ),
+                  columns: const [
+                    DataColumn(label: Text('الصورة')),
+                    DataColumn(label: Text('الاسم')),
+                    DataColumn(label: Text('القسم')),
+                    DataColumn(label: Text('السعر')),
+                    DataColumn(label: Text('الحالة')),
+                  ],
+                  rows: items.map(_apiDataRow).toList(),
                 ),
-                columns: const [
-                  DataColumn(label: Text('الصورة')),
-                  DataColumn(label: Text('الاسم')),
-                  DataColumn(label: Text('القسم')),
-                  DataColumn(label: Text('السعر')),
-                  DataColumn(label: Text('الحالة')),
-                ],
-                rows: items.map(_apiDataRow).toList(),
               ),
             ),
           ),
