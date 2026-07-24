@@ -11,7 +11,7 @@ After deploy, verify: `https://<your-frontend>/build-info.json` should show buil
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `API_BASE_URL` | Recommended | `https://almenupro-backend.vercel.app/api` |
+| `API_BASE_URL` | Recommended | `https://almenupro-backend.vercel.app/api` (with or without `/api` suffix) |
 
 Passed to Flutter at build time via `--dart-define=API_BASE_URL=...`.
 

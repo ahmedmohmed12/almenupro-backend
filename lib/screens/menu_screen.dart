@@ -52,8 +52,12 @@ class _MenuScreenState extends State<MenuScreen> {
     }
 
     final restaurant = await ApiService.instance.fetchPublicRestaurant(slug);
-    final settings = await ApiService.instance.fetchSettings(slug: slug);
-    final items = await ApiService.instance.fetchItems(slug: slug);
+    final settings = await ApiService.instance.fetchPublicSettings(
+      restaurantId: restaurant.id,
+    );
+    final items = await ApiService.instance.fetchPublicItems(
+      restaurantId: restaurant.id,
+    );
     return _MenuPageData(
       items: items,
       context: CustomerRestaurantContext(

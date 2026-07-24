@@ -333,10 +333,6 @@ async function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = 
   const restaurantIdParam =
     url.searchParams.get('restaurant_id') || req.headers['x-restaurant-id'];
 
-  if (restaurantIdParam) {
-    return resolveRestaurantId(auth, restaurantIdParam, { allowPublicDefault });
-  }
-
   if (slugParam) {
     const match = restaurants.find(
       (entry) =>
@@ -344,6 +340,10 @@ async function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = 
     );
     if (!match) return null;
     return resolveRestaurantId(auth, match.id, { allowPublicDefault });
+  }
+
+  if (restaurantIdParam) {
+    return resolveRestaurantId(auth, restaurantIdParam, { allowPublicDefault });
   }
 
   const requested = resolveRestaurantFromQuery(url, restaurants);

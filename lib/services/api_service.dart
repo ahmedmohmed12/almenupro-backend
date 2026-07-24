@@ -42,18 +42,24 @@ class ApiService {
 
 
   static String get baseUrl {
-
     const configured = String.fromEnvironment(
-
       'API_BASE_URL',
-
       defaultValue: 'https://almenupro-backend.vercel.app/api',
-
     );
 
-    return configured;
-
+    var url = configured.trim();
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    if (!url.endsWith('/api')) {
+      url = '$url/api';
+    }
+    return url;
   }
+
+  static const Map<String, String> _publicHeaders = {
+    'Accept': 'application/json',
+  };
 
 
 
@@ -77,9 +83,8 @@ class ApiService {
 
 
   Uri _uri(String path, [Map<String, String>? query]) {
-
-    return Uri.parse('$baseUrl$path').replace(queryParameters: query);
-
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$baseUrl$normalizedPath').replace(queryParameters: query);
   }
 
 
@@ -265,7 +270,7 @@ class ApiService {
     }
 
     final response = await http
-        .get(_uri('/restaurants/public/$cleanSlug'))
+        .get(_uri('/restaurants/public/$cleanSlug'), headers: _publicHeaders)
         .timeout(_fetchTimeout);
 
     if (response.statusCode == 404) {
@@ -286,6 +291,91 @@ class ApiService {
 
 
 
+  Future<List<MenuItem>> fetchPublicItems({
+    String? slug,
+    String? restaurantId,
+  }) async {
+    try {
+      final query = _publicRestaurantQuery(slug: slug, restaurantId: restaurantId);
+      final response = await http
+          .get(_uri('/items', query), headers: _publicHeaders)
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode == 404) {
+        throw Exception('Restaurant not found');
+      }
+      if (response.statusCode != 200) {
+        throw Exception('فشل في تحميل الأصناف (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+
+      return decoded
+          .whereType<Map>()
+          .map((item) => MenuItem.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.name.trim().isNotEmpty)
+          .toList();
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } on FormatException {
+      throw Exception('تعذر قراءة بيانات المنيو من السيرفر');
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception('خطأ في الاتصال بالسيرفر: $error');
+    }
+  }
+
+  Future<RestaurantSettings> fetchPublicSettings({
+    String? slug,
+    String? restaurantId,
+  }) async {
+    try {
+      final query = _publicRestaurantQuery(slug: slug, restaurantId: restaurantId);
+      final response = await http
+          .get(_uri('/settings', query), headers: _publicHeaders)
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode == 404) {
+        throw Exception('Restaurant not found');
+      }
+      if (response.statusCode != 200) {
+        throw Exception('فشل في تحميل الإعدادات (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+
+      return RestaurantSettings.fromJson(Map<String, dynamic>.from(decoded));
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception('خطأ في تحميل الإعدادات: $error');
+    }
+  }
+
+  Map<String, String> _publicRestaurantQuery({
+    String? slug,
+    String? restaurantId,
+  }) {
+    final cleanSlug = slug?.trim();
+    if (cleanSlug != null && cleanSlug.isNotEmpty) {
+      return {'slug': cleanSlug.toLowerCase()};
+    }
+    final id = restaurantId?.trim();
+    if (id != null && id.isNotEmpty) {
+      return {'restaurant_id': id};
+    }
+    return {'restaurant_id': defaultRestaurantId};
+  }
+
+
+
   Future<List<MenuItem>> fetchItems({String? restaurantId, String? slug}) async {
 
     try {
@@ -293,7 +383,7 @@ class ApiService {
       final query = <String, String>{};
       final cleanSlug = slug?.trim();
       if (cleanSlug != null && cleanSlug.isNotEmpty) {
-        query['slug'] = cleanSlug.toLowerCase();
+        return fetchPublicItems(slug: cleanSlug);
       } else {
         query['restaurant_id'] = _scopedRestaurantId(restaurantId: restaurantId);
       }
@@ -307,12 +397,6 @@ class ApiService {
           .timeout(_fetchTimeout);
 
 
-
-      if (response.statusCode == 404 &&
-          cleanSlug != null &&
-          cleanSlug.isNotEmpty) {
-        throw Exception('Restaurant not found');
-      }
 
       if (response.statusCode != 200) {
 
@@ -527,13 +611,14 @@ class ApiService {
 
     try {
 
-      final query = <String, String>{};
       final cleanSlug = slug?.trim();
       if (cleanSlug != null && cleanSlug.isNotEmpty) {
-        query['slug'] = cleanSlug.toLowerCase();
-      } else {
-        query['restaurant_id'] = _scopedRestaurantId(restaurantId: restaurantId);
+        return fetchPublicSettings(slug: cleanSlug);
       }
+
+      final query = <String, String>{
+        'restaurant_id': _scopedRestaurantId(restaurantId: restaurantId),
+      };
 
       final response = await http
 
