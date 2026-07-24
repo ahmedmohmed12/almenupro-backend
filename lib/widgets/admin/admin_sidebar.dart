@@ -10,15 +10,40 @@ class AdminSidebarItem {
   final String label;
 }
 
+/// Default admin navigation — الطلبات first, then menu, analytics, settings.
 class AdminSidebar extends StatelessWidget {
   const AdminSidebar({
     super.key,
-    required this.items,
+    this.items = defaultItems,
     required this.selectedIndex,
     required this.onItemSelected,
     required this.onLogout,
     this.width = 260,
   });
+
+  static const int ordersIndex = 0;
+  static const int menuIndex = 1;
+  static const int analyticsIndex = 2;
+  static const int settingsIndex = 3;
+
+  static const List<AdminSidebarItem> defaultItems = [
+    AdminSidebarItem(
+      icon: Icons.receipt_long_outlined,
+      label: 'الطلبات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.restaurant_menu,
+      label: 'إدارة المنيو والأصناف',
+    ),
+    AdminSidebarItem(
+      icon: Icons.bar_chart,
+      label: 'التحليلات والمبيعات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.store,
+      label: 'إعدادات المحل والواتساب',
+    ),
+  ];
 
   static const Color sidebarBg = Color(0xFF2C353F);
   static const Color activeBg = Color(0xFF6B1124);

@@ -14,6 +14,8 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
+echo "Almenupro frontend build v1.2.0 (orders sidebar)"
+
 cd "$ROOT"
 flutter --version
 flutter config --enable-web --no-analytics

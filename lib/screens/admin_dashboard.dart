@@ -21,25 +21,6 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  static const _sidebarItems = [
-    AdminSidebarItem(
-      icon: Icons.receipt_long_outlined,
-      label: 'الطلبات',
-    ),
-    AdminSidebarItem(
-      icon: Icons.restaurant_menu,
-      label: 'إدارة المنيو والأصناف',
-    ),
-    AdminSidebarItem(
-      icon: Icons.bar_chart,
-      label: 'التحليلات والمبيعات',
-    ),
-    AdminSidebarItem(
-      icon: Icons.store,
-      label: 'إعدادات المحل والواتساب',
-    ),
-  ];
-
   final _ordersPanelKey = GlobalKey<AdminOrdersPanelState>();
 
   bool _isAuthenticated = false;
@@ -573,7 +554,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         body: Row(
           children: [
             AdminSidebar(
-              items: _sidebarItems,
               selectedIndex: _selectedIndex,
               onItemSelected: (index) {
                 setState(() => _selectedIndex = index);
@@ -582,7 +562,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 setState(() {
                   _isAuthenticated = false;
                   _passwordController.clear();
-                  _selectedIndex = 0;
+                  _selectedIndex = AdminSidebar.ordersIndex;
                 });
               },
             ),
@@ -592,7 +572,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   AdminTopHeader(
                     pendingOrdersCount: _pendingOrdersCount,
                     onNotificationsTap: () {
-                      setState(() => _selectedIndex = 0);
+                      setState(() => _selectedIndex = AdminSidebar.ordersIndex);
                       _ordersPanelKey.currentState?.selectNewOrdersTab();
                     },
                   ),
@@ -610,7 +590,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildActiveTab() {
     switch (_selectedIndex) {
-      case 0:
+      case AdminSidebar.ordersIndex:
         return AdminOrdersPanel(
           key: _ordersPanelKey,
           onPendingCountChanged: (pendingCount) {
@@ -619,11 +599,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             }
           },
         );
-      case 2:
+      case AdminSidebar.analyticsIndex:
         return _buildAnalyticsTab();
-      case 3:
+      case AdminSidebar.settingsIndex:
         return _buildSettingsTab();
-      case 1:
+      case AdminSidebar.menuIndex:
       default:
         return AdminMenuPanel(
           onAddItem: () => _showItemDialog(),
