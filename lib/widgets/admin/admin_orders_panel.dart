@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/order.dart';
+import '../../services/order_alert_sound_service.dart';
 import '../../services/orders_service.dart';
-import '../../utils/order_sound.dart';
 import 'order_status_chip.dart';
 
 class AdminOrdersPanel extends StatefulWidget {
@@ -43,6 +43,8 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
   }
 
   Future<void> _updateStatus(String orderId, OrderStatus status) async {
+    await OrderAlertSoundService.instance.acknowledgeOrder(orderId);
+
     try {
       await _ordersService.updateOrderStatus(orderId, status);
       if (!mounted) return;
@@ -58,8 +60,10 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
   }
 
   void _handleOrdersUpdate(List<Order> orders) {
-    final pendingCount =
-        orders.where((order) => order.status == OrderStatus.pending).length;
+    final pendingOrders =
+        orders.where((order) => order.status == OrderStatus.pending);
+    final pendingCount = pendingOrders.length;
+    final pendingIds = pendingOrders.map((order) => order.id).toSet();
     widget.onPendingCountChanged?.call(pendingCount);
 
     if (!_initialized) {
@@ -70,12 +74,13 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
       return;
     }
 
-    for (final order in orders) {
-      if (order.status != OrderStatus.pending) continue;
+    final newlyDetected = <String>{};
+
+    for (final order in pendingOrders) {
       if (_knownOrderIds.contains(order.id)) continue;
 
+      newlyDetected.add(order.id);
       _knownOrderIds.add(order.id);
-      playNewOrderSound();
 
       if (!mounted) continue;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,9 +95,21 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
       );
     }
 
+    OrderAlertSoundService.instance.syncPendingAlerts(
+      pendingIds,
+      newlyDetected: newlyDetected,
+    );
+
+    if (mounted) setState(() {});
+
     _knownOrderIds
       ..clear()
       ..addAll(orders.map((order) => order.id));
+  }
+
+  Future<void> _stopAlertLoop() async {
+    await OrderAlertSoundService.instance.stopAllAlerts();
+    if (mounted) setState(() {});
   }
 
   List<Order> _activeOrders(List<Order> orders) {
@@ -151,6 +168,9 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
               pendingCount: orders
                   .where((order) => order.status == OrderStatus.pending)
                   .length,
+              isAlertLooping:
+                  OrderAlertSoundService.instance.isAlertLoopActive,
+              onStopAlert: _stopAlertLoop,
             ),
             if (_ordersService.isDemoMode) const _DemoOrdersBanner(),
             Material(
@@ -221,11 +241,15 @@ class _OrdersPageHeader extends StatelessWidget {
     required this.activeCount,
     required this.archivedCount,
     required this.pendingCount,
+    required this.isAlertLooping,
+    required this.onStopAlert,
   });
 
   final int activeCount;
   final int archivedCount;
   final int pendingCount;
+  final bool isAlertLooping;
+  final VoidCallback onStopAlert;
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +295,20 @@ class _OrdersPageHeader extends StatelessWidget {
                 value: '$archivedCount',
                 color: Colors.brown,
               ),
+              if (isAlertLooping)
+                ActionChip(
+                  avatar: Icon(Icons.volume_off, color: Colors.red.shade700),
+                  label: Text(
+                    'إيقاف التنبيه',
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  backgroundColor: Colors.red.shade50,
+                  side: BorderSide(color: Colors.red.shade200),
+                  onPressed: onStopAlert,
+                ),
             ],
           ),
         ],

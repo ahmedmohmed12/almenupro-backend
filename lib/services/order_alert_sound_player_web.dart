@@ -4,6 +4,8 @@ import '../models/order_alert_sound.dart';
 
 final _players = <OrderAlertSoundType, html.AudioElement>{};
 var _audioUnlocked = false;
+var _looping = false;
+OrderAlertSoundType? _loopingType;
 
 String _assetPath(OrderAlertSoundType type) {
   switch (type) {
@@ -43,6 +45,7 @@ Future<void> unlockOrderAlertAudio() async {
 
 Future<void> playOrderAlertSound(OrderAlertSoundType type) async {
   final player = _playerFor(type);
+  player.loop = false;
   player.currentTime = 0;
 
   try {
@@ -52,4 +55,36 @@ Future<void> playOrderAlertSound(OrderAlertSoundType type) async {
   }
 }
 
+Future<void> startLoopingOrderAlert(OrderAlertSoundType type) async {
+  if (_looping && _loopingType == type) return;
+
+  await stopOrderAlertLoop();
+
+  final player = _playerFor(type);
+  player.loop = true;
+  player.currentTime = 0;
+  _looping = true;
+  _loopingType = type;
+
+  try {
+    await player.play();
+  } catch (_) {
+    _looping = false;
+    _loopingType = null;
+    _audioUnlocked = false;
+  }
+}
+
+Future<void> stopOrderAlertLoop() async {
+  _looping = false;
+  _loopingType = null;
+
+  for (final player in _players.values) {
+    player.loop = false;
+    player.pause();
+    player.currentTime = 0;
+  }
+}
+
 bool get isOrderAlertAudioUnlocked => _audioUnlocked;
+bool get isOrderAlertLoopActive => _looping;

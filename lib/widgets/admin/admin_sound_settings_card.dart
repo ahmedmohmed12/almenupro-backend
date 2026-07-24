@@ -107,7 +107,7 @@ class _AdminSoundSettingsCardState extends State<AdminSoundSettingsCard> {
             const SizedBox(height: 8),
             Text(
               enabled
-                  ? 'اختر نغمة التنبيه التي تُشغَّل تلقائياً عند وصول طلب جديد.'
+                  ? 'اختر نغمة التنبيه. تُكرَّر تلقائياً عند وصول طلب جديد حتى تقبله أو توقف التنبيه.'
                   : 'التنبيه الصوتي متوقف حالياً.',
               style: TextStyle(color: Colors.grey.shade700),
             ),
