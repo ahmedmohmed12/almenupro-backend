@@ -51,50 +51,25 @@ function warmMenuImageBundle() {
 
 warmMenuImageBundle();
 
+const {
+  initDataStore,
+  usesMongo,
+  readItems,
+  writeItems,
+  readOrders,
+  writeOrders,
+  readRestaurants,
+  writeRestaurants,
+  readSettingsMap,
+  writeSettingsMap,
+} = require('./lib/dataStore');
+
 const PORT = Number(process.env.PORT) || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
-const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
-const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
-const RESTAURANTS_FILE = path.join(__dirname, 'data', 'restaurants.json');
 const IS_VERCEL = Boolean(process.env.VERCEL);
-
-let seedItems = [];
-let seedOrders = [];
-try {
-  seedItems = require('./data/menu_items.json');
-  if (!Array.isArray(seedItems)) seedItems = [];
-} catch {
-  seedItems = [];
-}
-try {
-  seedOrders = require('./data/orders.json');
-  if (!Array.isArray(seedOrders)) seedOrders = [];
-} catch {
-  seedOrders = [];
-}
-
-let memoryItems = [...seedItems];
-let memoryOrders = [...seedOrders];
-let seedSettings = {};
-try {
-  seedSettings = require('./data/settings.json');
-  if (!seedSettings || typeof seedSettings !== 'object') seedSettings = {};
-} catch {
-  seedSettings = {};
-}
-let memorySettings = migrateSettingsShape(seedSettings);
-
-let seedRestaurants = [];
-try {
-  seedRestaurants = require('./data/restaurants.json');
-  if (!Array.isArray(seedRestaurants)) seedRestaurants = [];
-} catch {
-  seedRestaurants = [];
-}
-let memoryRestaurants = [...seedRestaurants];
 
 const categoryIds = new Map();
 let nextCategoryId = 1;
+let storeReady = initDataStore();
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, {
@@ -168,137 +143,6 @@ function readBody(req) {
   });
 }
 
-function ensureDataFile() {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, '[]', 'utf8');
-  }
-}
-
-function readItems() {
-  if (IS_VERCEL) {
-    try {
-      delete require.cache[require.resolve('./data/menu_items.json')];
-      const fresh = require('./data/menu_items.json');
-      if (Array.isArray(fresh)) {
-        memoryItems = fresh.map((item) => ensureRestaurantId(item));
-      }
-    } catch (_) {}
-    return memoryItems.map((item) => ensureRestaurantId(item));
-  }
-
-  ensureDataFile();
-  const raw = fs.readFileSync(DATA_FILE, 'utf8');
-  const parsed = JSON.parse(raw || '[]');
-  const items = Array.isArray(parsed) ? parsed : [];
-  memoryItems = items.map((item) => ensureRestaurantId(item));
-  return memoryItems;
-}
-
-function writeItems(items) {
-  memoryItems = items;
-
-  if (IS_VERCEL) {
-    return;
-  }
-
-  ensureDataFile();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf8');
-}
-
-function ensureOrdersFile() {
-  const dir = path.dirname(ORDERS_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(ORDERS_FILE)) {
-    fs.writeFileSync(ORDERS_FILE, '[]', 'utf8');
-  }
-}
-
-function readOrders() {
-  if (IS_VERCEL) {
-    return memoryOrders.map((order) => ensureRestaurantId(order));
-  }
-
-  ensureOrdersFile();
-  const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
-  const parsed = JSON.parse(raw || '[]');
-  const orders = Array.isArray(parsed) ? parsed : [];
-  memoryOrders = orders.map((order) => ensureRestaurantId(order));
-  return memoryOrders;
-}
-
-function ensureRestaurantsFile() {
-  const dir = path.dirname(RESTAURANTS_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(RESTAURANTS_FILE)) {
-    fs.writeFileSync(RESTAURANTS_FILE, '[]', 'utf8');
-  }
-}
-
-function readRestaurants() {
-  if (IS_VERCEL) {
-    try {
-      delete require.cache[require.resolve('./data/restaurants.json')];
-      const fresh = require('./data/restaurants.json');
-      if (Array.isArray(fresh)) {
-        memoryRestaurants = fresh;
-      }
-    } catch (_) {}
-    return memoryRestaurants;
-  }
-
-  ensureRestaurantsFile();
-  const raw = fs.readFileSync(RESTAURANTS_FILE, 'utf8');
-  const parsed = JSON.parse(raw || '[]');
-  const restaurants = Array.isArray(parsed) ? parsed : [];
-  memoryRestaurants = restaurants;
-  return restaurants;
-}
-
-function writeRestaurants(restaurants) {
-  memoryRestaurants = restaurants;
-
-  if (IS_VERCEL) {
-    return restaurants;
-  }
-
-  ensureRestaurantsFile();
-  fs.writeFileSync(RESTAURANTS_FILE, JSON.stringify(restaurants, null, 2), 'utf8');
-  return restaurants;
-}
-
-function writeOrders(orders) {
-  memoryOrders = orders;
-
-  if (IS_VERCEL) {
-    return;
-  }
-
-  ensureOrdersFile();
-  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
-}
-
-const DEFAULT_WORKING_HOURS = [
-  { weekday: 6, isOpen: true, open: '10:00', close: '22:00' },
-  { weekday: 7, isOpen: true, open: '10:00', close: '22:00' },
-  { weekday: 1, isOpen: true, open: '10:00', close: '22:00' },
-  { weekday: 2, isOpen: true, open: '10:00', close: '22:00' },
-  { weekday: 3, isOpen: true, open: '10:00', close: '22:00' },
-  { weekday: 4, isOpen: true, open: '10:00', close: '22:00' },
-  { weekday: 5, isOpen: true, open: '10:00', close: '23:00' },
-];
-
-function defaultSettings() {
-  return normalizeSettings(defaultSettingsPayload());
-}
-
 function normalizeSettings(raw) {
   const base = defaultSettingsPayload();
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -318,59 +162,19 @@ function normalizeSettings(raw) {
   };
 }
 
-function ensureSettingsFile() {
-  const dir = path.dirname(SETTINGS_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(SETTINGS_FILE)) {
-    fs.writeFileSync(
-      SETTINGS_FILE,
-      JSON.stringify(migrateSettingsShape(defaultSettingsPayload()), null, 2),
-      'utf8',
-    );
-  }
-}
-
-function readSettingsMap() {
-  if (IS_VERCEL) {
-    try {
-      delete require.cache[require.resolve('./data/settings.json')];
-      const fresh = require('./data/settings.json');
-      if (fresh && typeof fresh === 'object') {
-        memorySettings = migrateSettingsShape(fresh);
-      }
-    } catch (_) {}
-    return migrateSettingsShape(memorySettings);
-  }
-
-  ensureSettingsFile();
-  const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
-  const parsed = JSON.parse(raw || '{}');
-  memorySettings = migrateSettingsShape(parsed);
-  return memorySettings;
-}
-
-function readSettings(restaurantId = DEFAULT_RESTAURANT_ID) {
-  const map = readSettingsMap();
+async function readSettings(restaurantId = DEFAULT_RESTAURANT_ID) {
+  const map = await readSettingsMap();
   const scoped = map.byRestaurant?.[restaurantId];
   return normalizeSettings(scoped || defaultSettingsPayload());
 }
 
-function writeSettings(restaurantId, settings) {
-  const map = readSettingsMap();
+async function writeSettings(restaurantId, settings) {
+  const map = await readSettingsMap();
   if (!map.byRestaurant || typeof map.byRestaurant !== 'object') {
     map.byRestaurant = {};
   }
   map.byRestaurant[restaurantId] = normalizeSettings(settings);
-  memorySettings = map;
-
-  if (IS_VERCEL) {
-    return map.byRestaurant[restaurantId];
-  }
-
-  ensureSettingsFile();
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(memorySettings, null, 2), 'utf8');
+  await writeSettingsMap(map);
   return map.byRestaurant[restaurantId];
 }
 
@@ -508,8 +312,8 @@ function requireSuperAdmin(req, res) {
   return auth;
 }
 
-function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = false } = {}) {
-  const restaurants = readRestaurants();
+async function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = false } = {}) {
+  const restaurants = await readRestaurants();
   const requested =
     url.searchParams.get('restaurant_id') ||
     req.headers['x-restaurant-id'] ||
@@ -523,6 +327,13 @@ function findItemById(items, itemId) {
 }
 
 const server = http.createServer(async (req, res) => {
+  try {
+    await storeReady;
+  } catch (error) {
+    sendJson(res, 503, { error: 'Data store unavailable', details: error.message });
+    return;
+  }
+
   if (req.method === 'OPTIONS') {
     sendJson(res, 204, {});
     return;
@@ -567,7 +378,7 @@ const server = http.createServer(async (req, res) => {
         session = loginRestaurantAdmin(
           body.restaurantSlug ?? body.restaurant_slug,
           body.password,
-          readRestaurants(),
+          await readRestaurants(),
         );
       }
 
@@ -597,7 +408,7 @@ const server = http.createServer(async (req, res) => {
     const auth = requireSuperAdmin(req, res);
     if (!auth) return;
 
-    const restaurants = readRestaurants().map(sanitizeRestaurant);
+    const restaurants = (await readRestaurants()).map(sanitizeRestaurant);
     sendJson(res, 200, restaurants);
     return;
   }
@@ -608,7 +419,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
-      const restaurants = readRestaurants();
+      const restaurants = await readRestaurants();
       const record = createRestaurantRecord(body);
 
       if (
@@ -621,8 +432,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       restaurants.push(record);
-      writeRestaurants(restaurants);
-      writeSettings(record.id, defaultSettingsPayload());
+      await writeRestaurants(restaurants);
+      await writeSettings(record.id, defaultSettingsPayload());
 
       sendJson(res, 201, sanitizeRestaurant(record));
     } catch (error) {
@@ -632,11 +443,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    const items = readItems();
+    const items = await readItems();
     const { resolveImageDiskPath } = require('./lib/menuImageStorage');
     sendJson(res, 200, {
       ok: true,
       service: 'almenupro-api',
+      storage: usesMongo() ? 'mongodb' : IS_VERCEL ? 'ephemeral-json' : 'filesystem',
       items: items.length,
       imagesReady: Boolean(resolveImageDiskPath('1962105681.jpg')),
     });
@@ -645,7 +457,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/items') {
     const auth = parseAuthHeader(req);
-    const restaurantId = resolveScopedRestaurantId(req, url, auth, {
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
       allowPublicDefault: true,
     });
 
@@ -659,7 +471,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const items = filterByRestaurant(readItems(), restaurantId);
+    const items = filterByRestaurant(await readItems(), restaurantId);
     rebuildCategoryIds(items);
     sendJson(res, 200, items);
     return;
@@ -711,7 +523,7 @@ const server = http.createServer(async (req, res) => {
         body.restaurantId || body.restaurant_id || DEFAULT_RESTAURANT_ID,
       );
 
-      const restaurants = readRestaurants();
+      const restaurants = await readRestaurants();
       if (!restaurants.some((entry) => entry.id === restaurantId)) {
         sendJson(res, 404, { error: 'Restaurant not found' });
         return;
@@ -723,10 +535,10 @@ const server = http.createServer(async (req, res) => {
       const preparedIncoming = downloadImages
         ? await persistMenuItemsImages(normalizedIncoming)
         : normalizedIncoming;
-      const existing = readItems();
+      const existing = await readItems();
       const merged = mergeItems(existing, preparedIncoming, restaurantId);
       rebuildCategoryIds(filterByRestaurant(merged, restaurantId));
-      writeItems(merged);
+      await writeItems(merged);
       sendJson(res, 200, {
         ok: true,
         restaurantId,
@@ -750,14 +562,16 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse((await readBody(req)) || '{}');
       const restaurantId = resolveRestaurantId(
         auth,
-        body.restaurantId || body.restaurant_id,
+        body.restaurantId ||
+          body.restaurant_id ||
+          req.headers['x-restaurant-id'],
       );
 
       if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
         return;
       }
 
-      const items = readItems();
+      const items = await readItems();
       const scoped = filterByRestaurant(items, restaurantId);
       const categoryName = body.categoryName || body.category_name || 'عام';
       const item = ensureRestaurantId(
@@ -786,7 +600,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       items.push(item);
-      writeItems(items);
+      await writeItems(items);
       sendJson(res, 201, item);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
@@ -801,7 +615,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const itemId = decodeURIComponent(itemMatch[1]);
-      const items = readItems();
+      const items = await readItems();
       const item = findItemById(items, itemId);
 
       if (!item) {
@@ -815,7 +629,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (req.method === 'DELETE') {
-        writeItems(items.filter((entry) => String(entry.id) !== String(itemId)));
+        await writeItems(items.filter((entry) => String(entry.id) !== String(itemId)));
         sendJson(res, 200, { ok: true, id: itemId });
         return;
       }
@@ -842,7 +656,7 @@ const server = http.createServer(async (req, res) => {
         source: body.source || item.source || 'Manual',
       });
 
-      writeItems(items);
+      await writeItems(items);
       sendJson(res, 200, item);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
@@ -858,7 +672,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const itemId = decodeURIComponent(itemAvailabilityMatch[1]);
       const body = JSON.parse((await readBody(req)) || '{}');
-      const items = readItems();
+      const items = await readItems();
       const item = findItemById(items, itemId);
 
       if (!item) {
@@ -876,7 +690,7 @@ const server = http.createServer(async (req, res) => {
       item.is_available =
         nextAvailable === 0 || nextAvailable === false || nextAvailable === '0' ? 0 : 1;
 
-      writeItems(items);
+      await writeItems(items);
       sendJson(res, 200, item);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
@@ -888,17 +702,17 @@ const server = http.createServer(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
 
-    if (isSuperAdmin(auth) && !url.searchParams.get('restaurant_id')) {
-      sendJson(res, 200, sortOrdersDesc(readOrders()));
+    if (isSuperAdmin(auth) && !url.searchParams.get('restaurant_id') && !req.headers['x-restaurant-id']) {
+      sendJson(res, 200, sortOrdersDesc(await readOrders()));
       return;
     }
 
-    const restaurantId = resolveScopedRestaurantId(req, url, auth);
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth);
     if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
       return;
     }
 
-    const orders = sortOrdersDesc(filterByRestaurant(readOrders(), restaurantId));
+    const orders = sortOrdersDesc(filterByRestaurant(await readOrders(), restaurantId));
     sendJson(res, 200, orders);
     return;
   }
@@ -906,16 +720,16 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/orders') {
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
-      const restaurants = readRestaurants();
+      const restaurants = await readRestaurants();
       const restaurantId =
         body.restaurantId ||
         body.restaurant_id ||
         resolveRestaurantFromQuery(url, restaurants);
       const id = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const order = normalizeOrder(body, id, restaurantId);
-      const orders = readOrders();
+      const orders = await readOrders();
       orders.unshift(order);
-      writeOrders(orders);
+      await writeOrders(orders);
       sendJson(res, 201, order);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
@@ -934,7 +748,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const orders = readOrders();
+      const orders = await readOrders();
       const index = orders.findIndex((order) => String(order.id) === orderId);
       if (index === -1) {
         sendJson(res, 404, { error: 'Order not found' });
@@ -953,7 +767,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       orders[index] = { ...orders[index], status: nextStatus };
-      writeOrders(orders);
+      await writeOrders(orders);
       sendJson(res, 200, orders[index]);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
@@ -963,7 +777,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/settings') {
     const auth = parseAuthHeader(req);
-    const restaurantId = resolveScopedRestaurantId(req, url, auth, {
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
       allowPublicDefault: true,
     });
 
@@ -977,7 +791,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    sendJson(res, 200, readSettings(restaurantId));
+    sendJson(res, 200, await readSettings(restaurantId));
     return;
   }
 
@@ -991,15 +805,16 @@ const server = http.createServer(async (req, res) => {
         auth,
         body.restaurantId ||
           body.restaurant_id ||
-          url.searchParams.get('restaurant_id'),
+          url.searchParams.get('restaurant_id') ||
+          req.headers['x-restaurant-id'],
       );
 
       if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
         return;
       }
 
-      const current = readSettings(restaurantId);
-      const merged = writeSettings(restaurantId, {
+      const current = await readSettings(restaurantId);
+      const merged = await writeSettings(restaurantId, {
         ...current,
         ...body,
         workingHours: Array.isArray(body.workingHours)
@@ -1017,22 +832,11 @@ const server = http.createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Not found' });
 });
 
-ensureDataFile();
-ensureOrdersFile();
-ensureSettingsFile();
-ensureRestaurantsFile();
 ensureUploadDir();
-if (!IS_VERCEL && memoryItems.length === 0) {
-  memoryItems = readItems();
-}
-if (!IS_VERCEL && memoryOrders.length === 0) {
-  memoryOrders = readOrders();
-}
-if (!IS_VERCEL && memoryRestaurants.length === 0) {
-  memoryRestaurants = readRestaurants();
-}
-memorySettings = readSettingsMap();
-rebuildCategoryIds(memoryItems);
+storeReady = storeReady.then(async () => {
+  const items = await readItems();
+  rebuildCategoryIds(items);
+});
 
 module.exports = server;
 

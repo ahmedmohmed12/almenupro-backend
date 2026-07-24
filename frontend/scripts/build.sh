@@ -6,6 +6,7 @@ FRONTEND_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FLUTTER_VERSION="${FLUTTER_VERSION:-stable}"
 FLUTTER_HOME="${FLUTTER_HOME:-$ROOT/.flutter}"
 API_BASE_URL="${API_BASE_URL:-https://almenupro-backend.vercel.app/api}"
+SUPER_ADMIN_USER="${SUPER_ADMIN_USER:-superadmin}"
 
 if [ ! -x "$FLUTTER_HOME/bin/flutter" ]; then
   echo "Installing Flutter ($FLUTTER_VERSION)..."
@@ -14,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.6.0 (working hours settings)"
+echo "Almenupro frontend build v1.8.0 (super-admin restaurant selector + MongoDB persistence)"
 
 cd "$ROOT"
 flutter --version
@@ -26,15 +27,16 @@ flutter build web \
   --base-href=/ \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
-  --dart-define=BUILD_FEATURE=orders-sidebar-v1.3.0
+  --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
+  --dart-define=BUILD_FEATURE=multi-tenant-v1.8.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
 cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.3.0-orders-sidebar-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","sidebar":["الطلبات","إدارة المنيو والأصناف"],"ordersTabs":["الطلبات الجديدة","الطلبات السابقة"]}\n' "$BUILD_ID" \
+BUILD_ID="1.8.0-multi-tenant-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["restaurant-selector","mongodb-persistence"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 echo "Frontend build copied to frontend/dist ($BUILD_ID)"

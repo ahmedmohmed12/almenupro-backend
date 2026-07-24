@@ -16,7 +16,9 @@ import '../services/api_service.dart';
 import '../services/menu_storage_service.dart';
 import '../services/order_alert_sound_service.dart';
 import '../services/order_browser_notification_service.dart';
+import '../services/orders_demo_service.dart';
 import '../services/restaurant_settings_service.dart';
+import '../services/super_admin_scope_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
@@ -57,6 +59,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
     OrderAlertSoundService.instance.initialize();
   }
 
+  Future<void> _initSuperAdminScope() async {
+    if (!AdminAuthService.instance.isSuperAdmin) return;
+    await SuperAdminScopeService.instance.initialize();
+    await SuperAdminScopeService.instance.refreshRestaurants();
+    SuperAdminScopeService.instance.addListener(_onSuperAdminScopeChanged);
+    if (mounted) setState(() {});
+  }
+
+  void _onSuperAdminScopeChanged() {
+    if (!mounted) return;
+    setState(() {});
+    unawaited(_loadSettings());
+    unawaited(OrdersDemoService.refreshFromApi());
+  }
+
   Future<void> _bootstrapAuth() async {
     await AdminAuthService.instance.initialize();
     if (!mounted) return;
@@ -67,6 +84,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
         _restaurantLabel = AdminAuthService.instance.restaurantName;
       });
+      await _initSuperAdminScope();
       await _loadSettings();
       await _startAdminMonitoring();
     } else {
@@ -76,6 +94,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   void dispose() {
+    SuperAdminScopeService.instance.removeListener(_onSuperAdminScopeChanged);
     AdminOrderMonitorService.instance.stop();
     _usernameController.dispose();
     _slugController.dispose();
@@ -150,6 +169,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       });
 
       OrderAlertSoundService.instance.unlockFromUserGesture();
+      await _initSuperAdminScope();
       await _loadSettings();
       await _startAdminMonitoring();
     } catch (error) {
@@ -164,6 +184,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _logout() async {
     AdminOrderMonitorService.instance.stop();
+    SuperAdminScopeService.instance.removeListener(_onSuperAdminScopeChanged);
+    await SuperAdminScopeService.instance.clearSelection();
     await AdminAuthService.instance.logout();
     if (!mounted) return;
     setState(() {
@@ -766,6 +788,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         AdminOrderMonitorService.instance.pendingCount,
                     builder: (context, pendingCount, _) {
                       return AdminTopHeader(
+                        isSuperAdmin: _isSuperAdmin,
+                        restaurantLabel: _restaurantLabel,
                         pendingOrdersCount: pendingCount,
                         onNotificationsTap: () {
                           setState(
@@ -777,7 +801,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     },
                   ),
                   Expanded(
-                    child: _buildActiveTab(),
+                    child: ListenableBuilder(
+                      listenable: SuperAdminScopeService.instance,
+                      builder: (context, _) => _buildActiveTab(),
+                    ),
                   ),
                 ],
               ),
@@ -796,11 +823,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
           return AdminOrdersPanel(key: _ordersPanelKey);
         case AdminSidebar.menuIndex:
           return AdminMenuPanel(
+            key: ValueKey(
+              SuperAdminScopeService.instance.selectedRestaurantId ??
+                  ApiService.defaultRestaurantId,
+            ),
             onAddItem: () => _showItemDialog(),
             onEditItem: (record) => _showItemDialog(record: record),
             onDeleteItem: _deleteItem,
             canImportTalabat: false,
-            canManageItems: false,
+            canManageItems: SuperAdminScopeService.instance.hasSelection,
           );
         case AdminSidebar.restaurantsIndex:
           return const AdminSuperRestaurantsPanel();
