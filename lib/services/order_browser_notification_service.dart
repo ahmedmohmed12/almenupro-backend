@@ -2,9 +2,6 @@ import '../models/order.dart';
 import 'order_browser_notification_stub.dart'
     if (dart.library.html) 'order_browser_notification_web.dart';
 
-export 'order_browser_notification_stub.dart'
-    if (dart.library.html) 'order_browser_notification_web.dart';
-
 class OrderBrowserNotificationService {
   OrderBrowserNotificationService._();
 
