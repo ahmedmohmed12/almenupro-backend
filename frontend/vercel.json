@@ -6,7 +6,27 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/",
+      "destination": "/landing.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/menu/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/restaurant/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/legacy-menu",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/:slug",
       "destination": "/index.html"
     }
   ],
@@ -20,7 +40,7 @@
       ]
     },
     {
-      "source": "/(.*)\\.(js|json|wasm|png|jpg|jpeg|webp|svg|ico|woff2|ttf|frag)",
+      "source": "/(.*)\\.(js|json|wasm|png|jpg|jpeg|webp|svg|ico|woff2|ttf|frag|html)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]

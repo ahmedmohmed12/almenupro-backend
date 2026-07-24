@@ -379,7 +379,8 @@ const server = http.createServer(async (req, res) => {
         health: '/api/health',
         auth: '/api/auth/login',
         restaurants: '/api/restaurants',
-        restaurantPublic: '/api/restaurants/public/{slug}',
+        restaurantPublic: '/api/restaurants/public',
+        restaurantBySlug: '/api/restaurants/public/{slug}',
         menu: '/api/items?slug={slug}',
         orders: '/api/orders',
         settings: '/api/settings',
@@ -446,6 +447,13 @@ const server = http.createServer(async (req, res) => {
   const publicRestaurantMatch = url.pathname.match(
     /^\/api\/restaurants\/public\/([^/]+)$/,
   );
+  if (req.method === 'GET' && url.pathname === '/api/restaurants/public') {
+    const restaurants = (await readRestaurants())
+      .filter((entry) => String(entry.status || 'active') !== 'inactive')
+      .map(sanitizeRestaurant);
+    sendJson(res, 200, restaurants);
+    return;
+  }
   if (req.method === 'GET' && publicRestaurantMatch) {
     const slug = decodeURIComponent(publicRestaurantMatch[1]).trim().toLowerCase();
     const restaurants = await readRestaurants();

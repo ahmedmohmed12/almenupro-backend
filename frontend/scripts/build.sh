@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.10.2 (restaurant persistence guard)"
+echo "Almenupro frontend build v1.11.0 (platform landing page)"
 
 cd "$ROOT"
 flutter --version
@@ -28,15 +28,16 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=restaurant-persistence-v1.10.2
+  --dart-define=BUILD_FEATURE=landing-v1.11.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
 cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
+cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.10.2-restaurant-persist-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["restaurant-persistence","client-menu-slug","mongodb-required"]}\n' "$BUILD_ID" \
+BUILD_ID="1.11.0-landing-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["landing-page","restaurant-persistence","client-menu-slug"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 echo "Frontend build copied to frontend/dist ($BUILD_ID)"

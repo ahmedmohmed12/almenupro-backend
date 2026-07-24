@@ -21,7 +21,7 @@ The Node backend (`apiServer.js`) already sends `Access-Control-Allow-Origin: *`
 
 ## Routes
 
-- `/` — default customer menu (Molton Cookies)
+- `/` — platform landing page (restaurants + quick links)
 - `/menu/{slug}` — restaurant customer menu (canonical, e.g. `/menu/molton-cookies`)
 - `/{slug}` — short alias (e.g. `/molton-cookies`)
 - `/restaurant/{slug}` — alternate alias
