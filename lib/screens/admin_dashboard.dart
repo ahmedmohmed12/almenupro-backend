@@ -37,6 +37,7 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final _ordersPanelKey = GlobalKey<AdminOrdersPanelState>();
+  final _shellScaffoldKey = GlobalKey<ScaffoldState>();
 
   bool _isAuthenticated = false;
   bool _isSuperAdmin = false;
@@ -762,35 +763,69 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildAuthenticatedShell() {
-    final shell = Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      body: Row(
+    final sidebarItems = _isSuperAdmin
+        ? AdminSidebar.superAdminItems
+        : AdminSidebar.defaultItems;
+
+    Widget buildSidebar({required bool inDrawer}) {
+      return AdminSidebar(
+        items: sidebarItems,
+        selectedIndex: _selectedIndex,
+        onItemSelected: (index) {
+          setState(() => _selectedIndex = index);
+          if (inDrawer) {
+            Navigator.of(context).maybePop();
+          }
+        },
+        onLogout: _logout,
+        width: inDrawer ? 280 : 260,
+      );
+    }
+
+    Widget buildShell({required bool mobile}) {
+      final content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AdminSidebar(
-            items: _isSuperAdmin
-                ? AdminSidebar.superAdminItems
-                : AdminSidebar.defaultItems,
-            selectedIndex: _selectedIndex,
-            onItemSelected: (index) {
-              setState(() => _selectedIndex = index);
-            },
-            onLogout: _logout,
-          ),
+          _buildTopHeader(onMenuTap: mobile ? () => _shellScaffoldKey.currentState?.openDrawer() : null),
           Expanded(
-            child: Column(
-              children: [
-                _buildTopHeader(),
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: SuperAdminScopeService.instance,
-                    builder: (context, _) => _buildActiveTab(),
-                  ),
-                ),
-              ],
+            child: ListenableBuilder(
+              listenable: SuperAdminScopeService.instance,
+              builder: (context, _) => _buildActiveTab(),
             ),
           ),
         ],
-      ),
+      );
+
+      if (mobile) {
+        return Scaffold(
+          key: _shellScaffoldKey,
+          backgroundColor: const Color(0xFFF4F6F8),
+          drawer: Drawer(
+            width: 280,
+            backgroundColor: AdminSidebar.sidebarBg,
+            child: SafeArea(child: buildSidebar(inDrawer: true)),
+          ),
+          body: content,
+        );
+      }
+
+      return Scaffold(
+        backgroundColor: const Color(0xFFF4F6F8),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            buildSidebar(inDrawer: false),
+            Expanded(child: content),
+          ],
+        ),
+      );
+    }
+
+    final shell = LayoutBuilder(
+      builder: (context, constraints) {
+        final mobile = constraints.maxWidth < 900;
+        return buildShell(mobile: mobile);
+      },
     );
 
     if (_isSuperAdmin) return shell;
@@ -803,12 +838,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildTopHeader() {
+  Widget _buildTopHeader({VoidCallback? onMenuTap}) {
     if (_isSuperAdmin) {
       return AdminTopHeader(
         isSuperAdmin: true,
         showOrderNotifications: false,
         restaurantLabel: _restaurantLabel,
+        onMenuTap: onMenuTap,
       );
     }
 
@@ -820,6 +856,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           showOrderNotifications: true,
           restaurantLabel: _restaurantLabel,
           pendingOrdersCount: pendingCount,
+          onMenuTap: onMenuTap,
           onNotificationsTap: () {
             setState(() => _selectedIndex = AdminSidebar.ordersIndex);
             _ordersPanelKey.currentState?.selectNewOrdersTab();

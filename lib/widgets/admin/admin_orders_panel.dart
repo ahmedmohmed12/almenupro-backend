@@ -6,6 +6,7 @@ import '../../services/admin_order_monitor_service.dart';
 import '../../services/orders_service.dart';
 import 'order_status_chip.dart';
 import 'admin_corner_toast.dart';
+import 'admin_breakpoints.dart';
 
 class AdminOrdersPanel extends StatefulWidget {
   const AdminOrdersPanel({super.key});
@@ -121,34 +122,51 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
             if (_ordersService.isDemoMode) const _DemoOrdersBanner(),
             Material(
               color: Colors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: const Color(0xFF6B1124),
-                unselectedLabelColor: Colors.grey.shade600,
-                indicatorColor: const Color(0xFFD49A00),
-                indicatorWeight: 3,
-                tabs: [
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.fiber_new_outlined, size: 18),
-                        const SizedBox(width: 8),
-                        Text('الطلبات الجديدة (${activeOrders.length})'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.inventory_2_outlined, size: 18),
-                        const SizedBox(width: 8),
-                        Text('الطلبات السابقة (${archivedOrders.length})'),
-                      ],
-                    ),
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < AdminBreakpoints.compact;
+                  return TabBar(
+                    controller: _tabController,
+                    isScrollable: compact,
+                    labelColor: const Color(0xFF6B1124),
+                    unselectedLabelColor: Colors.grey.shade600,
+                    indicatorColor: const Color(0xFFD49A00),
+                    indicatorWeight: 3,
+                    tabAlignment: compact ? TabAlignment.start : TabAlignment.fill,
+                    tabs: [
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.fiber_new_outlined, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              compact
+                                  ? 'جديدة (${activeOrders.length})'
+                                  : 'الطلبات الجديدة (${activeOrders.length})',
+                            ),
+                          ],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.inventory_2_outlined, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              compact
+                                  ? 'سابقة (${archivedOrders.length})'
+                                  : 'الطلبات السابقة (${archivedOrders.length})',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             Expanded(
@@ -199,8 +217,10 @@ class _OrdersPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final padding = AdminBreakpoints.pagePadding(context);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+      padding: EdgeInsets.fromLTRB(padding, 16, padding, 12),
       color: const Color(0xFFF4F6F8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +228,7 @@ class _OrdersPageHeader extends StatelessWidget {
           const Text(
             'إدارة الطلبات',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: Color(0xFF6B1124),
             ),
@@ -499,22 +519,48 @@ class _AdminOrderCard extends StatelessWidget {
               style: TextStyle(color: Colors.grey.shade800, height: 1.5),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  '${order.totalPrice.toStringAsFixed(3)} د.ك',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.brown,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  dateFormat.format(order.createdAt.toLocal()),
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < AdminBreakpoints.compact;
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '${order.totalPrice.toStringAsFixed(3)} د.ك',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.brown,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dateFormat.format(order.createdAt.toLocal()),
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Text(
+                      '${order.totalPrice.toStringAsFixed(3)} د.ك',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.brown,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      dateFormat.format(order.createdAt.toLocal()),
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                );
+              },
             ),
             if (nextStatus != null && nextLabel != null) ...[
               const SizedBox(height: 14),
