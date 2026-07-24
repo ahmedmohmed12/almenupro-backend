@@ -6,6 +6,31 @@ const {
   serveMenuImage,
   ensureUploadDir,
 } = require('./lib/menuImageStorage');
+const {
+  ROLES,
+  DEFAULT_RESTAURANT_ID,
+  loginSuperAdmin,
+  loginRestaurantAdmin,
+  parseAuthHeader,
+  verifyToken,
+  buildAuthResponse,
+  isSuperAdmin,
+  isRestaurantAdmin,
+  canAccessRestaurant,
+  resolveRestaurantId,
+  authError,
+} = require('./lib/adminAuth');
+const {
+  ensureRestaurantId,
+  filterByRestaurant,
+  migrateSettingsShape,
+  defaultSettingsPayload,
+  sanitizeRestaurant,
+  createRestaurantRecord,
+  resolveRestaurantFromQuery,
+  assertRestaurantAccess,
+  nextNumericItemId,
+} = require('./lib/tenantStore');
 
 function warmMenuImageBundle() {
   const roots = [
@@ -30,6 +55,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
 const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+const RESTAURANTS_FILE = path.join(__dirname, 'data', 'restaurants.json');
 const IS_VERCEL = Boolean(process.env.VERCEL);
 
 let seedItems = [];
@@ -56,7 +82,16 @@ try {
 } catch {
   seedSettings = {};
 }
-let memorySettings = { ...seedSettings };
+let memorySettings = migrateSettingsShape(seedSettings);
+
+let seedRestaurants = [];
+try {
+  seedRestaurants = require('./data/restaurants.json');
+  if (!Array.isArray(seedRestaurants)) seedRestaurants = [];
+} catch {
+  seedRestaurants = [];
+}
+let memoryRestaurants = [...seedRestaurants];
 
 const categoryIds = new Map();
 let nextCategoryId = 1;
@@ -65,8 +100,8 @@ function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Restaurant-Id',
   });
   res.end(JSON.stringify(payload));
 }
@@ -149,18 +184,18 @@ function readItems() {
       delete require.cache[require.resolve('./data/menu_items.json')];
       const fresh = require('./data/menu_items.json');
       if (Array.isArray(fresh)) {
-        memoryItems = fresh;
+        memoryItems = fresh.map((item) => ensureRestaurantId(item));
       }
     } catch (_) {}
-    return memoryItems;
+    return memoryItems.map((item) => ensureRestaurantId(item));
   }
 
   ensureDataFile();
   const raw = fs.readFileSync(DATA_FILE, 'utf8');
   const parsed = JSON.parse(raw || '[]');
   const items = Array.isArray(parsed) ? parsed : [];
-  memoryItems = items;
-  return items;
+  memoryItems = items.map((item) => ensureRestaurantId(item));
+  return memoryItems;
 }
 
 function writeItems(items) {
@@ -186,15 +221,57 @@ function ensureOrdersFile() {
 
 function readOrders() {
   if (IS_VERCEL) {
-    return memoryOrders;
+    return memoryOrders.map((order) => ensureRestaurantId(order));
   }
 
   ensureOrdersFile();
   const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
   const parsed = JSON.parse(raw || '[]');
   const orders = Array.isArray(parsed) ? parsed : [];
-  memoryOrders = orders;
-  return orders;
+  memoryOrders = orders.map((order) => ensureRestaurantId(order));
+  return memoryOrders;
+}
+
+function ensureRestaurantsFile() {
+  const dir = path.dirname(RESTAURANTS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  if (!fs.existsSync(RESTAURANTS_FILE)) {
+    fs.writeFileSync(RESTAURANTS_FILE, '[]', 'utf8');
+  }
+}
+
+function readRestaurants() {
+  if (IS_VERCEL) {
+    try {
+      delete require.cache[require.resolve('./data/restaurants.json')];
+      const fresh = require('./data/restaurants.json');
+      if (Array.isArray(fresh)) {
+        memoryRestaurants = fresh;
+      }
+    } catch (_) {}
+    return memoryRestaurants;
+  }
+
+  ensureRestaurantsFile();
+  const raw = fs.readFileSync(RESTAURANTS_FILE, 'utf8');
+  const parsed = JSON.parse(raw || '[]');
+  const restaurants = Array.isArray(parsed) ? parsed : [];
+  memoryRestaurants = restaurants;
+  return restaurants;
+}
+
+function writeRestaurants(restaurants) {
+  memoryRestaurants = restaurants;
+
+  if (IS_VERCEL) {
+    return restaurants;
+  }
+
+  ensureRestaurantsFile();
+  fs.writeFileSync(RESTAURANTS_FILE, JSON.stringify(restaurants, null, 2), 'utf8');
+  return restaurants;
 }
 
 function writeOrders(orders) {
@@ -219,15 +296,11 @@ const DEFAULT_WORKING_HOURS = [
 ];
 
 function defaultSettings() {
-  return {
-    whatsappNumber: '96594774950',
-    workingHours: DEFAULT_WORKING_HOURS,
-    updatedAt: new Date().toISOString(),
-  };
+  return normalizeSettings(defaultSettingsPayload());
 }
 
 function normalizeSettings(raw) {
-  const base = defaultSettings();
+  const base = defaultSettingsPayload();
   const source = raw && typeof raw === 'object' ? raw : {};
   const workingHours = Array.isArray(source.workingHours) && source.workingHours.length
     ? source.workingHours
@@ -251,56 +324,74 @@ function ensureSettingsFile() {
     fs.mkdirSync(dir, { recursive: true });
   }
   if (!fs.existsSync(SETTINGS_FILE)) {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(defaultSettings(), null, 2), 'utf8');
+    fs.writeFileSync(
+      SETTINGS_FILE,
+      JSON.stringify(migrateSettingsShape(defaultSettingsPayload()), null, 2),
+      'utf8',
+    );
   }
 }
 
-function readSettings() {
+function readSettingsMap() {
   if (IS_VERCEL) {
     try {
       delete require.cache[require.resolve('./data/settings.json')];
       const fresh = require('./data/settings.json');
       if (fresh && typeof fresh === 'object') {
-        memorySettings = normalizeSettings(fresh);
+        memorySettings = migrateSettingsShape(fresh);
       }
     } catch (_) {}
-    return normalizeSettings(memorySettings);
+    return migrateSettingsShape(memorySettings);
   }
 
   ensureSettingsFile();
   const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
   const parsed = JSON.parse(raw || '{}');
-  memorySettings = normalizeSettings(parsed);
+  memorySettings = migrateSettingsShape(parsed);
   return memorySettings;
 }
 
-function writeSettings(settings) {
-  memorySettings = normalizeSettings(settings);
+function readSettings(restaurantId = DEFAULT_RESTAURANT_ID) {
+  const map = readSettingsMap();
+  const scoped = map.byRestaurant?.[restaurantId];
+  return normalizeSettings(scoped || defaultSettingsPayload());
+}
+
+function writeSettings(restaurantId, settings) {
+  const map = readSettingsMap();
+  if (!map.byRestaurant || typeof map.byRestaurant !== 'object') {
+    map.byRestaurant = {};
+  }
+  map.byRestaurant[restaurantId] = normalizeSettings(settings);
+  memorySettings = map;
 
   if (IS_VERCEL) {
-    return memorySettings;
+    return map.byRestaurant[restaurantId];
   }
 
   ensureSettingsFile();
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(memorySettings, null, 2), 'utf8');
-  return memorySettings;
+  return map.byRestaurant[restaurantId];
 }
 
-function normalizeOrder(raw, id) {
+function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
   const createdAt = raw.createdAt || new Date().toISOString();
-  return {
-    id: String(id),
-    customerName: String(raw.customerName || raw.customer_name || '').trim(),
-    phone: String(raw.phone || '').trim(),
-    address: String(raw.address || '').trim(),
-    items: Array.isArray(raw.items) ? raw.items : [],
-    totalPrice: Number(raw.totalPrice ?? raw.total_price ?? 0) || 0,
-    orderType: String(raw.orderType || raw.order_type || 'Delivery'),
-    status: String(raw.status || 'pending'),
-    createdAt,
-    invoiceNumber: raw.invoiceNumber?.toString() || raw.invoice_number?.toString() || null,
-    paymentMethod: raw.paymentMethod?.toString() || raw.payment_method?.toString() || null,
-  };
+  return ensureRestaurantId(
+    {
+      id: String(id),
+      customerName: String(raw.customerName || raw.customer_name || '').trim(),
+      phone: String(raw.phone || '').trim(),
+      address: String(raw.address || '').trim(),
+      items: Array.isArray(raw.items) ? raw.items : [],
+      totalPrice: Number(raw.totalPrice ?? raw.total_price ?? 0) || 0,
+      orderType: String(raw.orderType || raw.order_type || 'Delivery'),
+      status: String(raw.status || 'pending'),
+      createdAt,
+      invoiceNumber: raw.invoiceNumber?.toString() || raw.invoice_number?.toString() || null,
+      paymentMethod: raw.paymentMethod?.toString() || raw.payment_method?.toString() || null,
+    },
+    raw.restaurant_id || raw.restaurantId || restaurantId,
+  );
 }
 
 function sortOrdersDesc(orders) {
@@ -327,43 +418,53 @@ function rebuildCategoryIds(items) {
   }
 }
 
-function normalizeIncoming(raw, index) {
+function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
   const categoryName =
     raw.category_name || raw.categoryName || raw.category || 'عام';
   const talabatId = raw.talabat_id ?? raw.talabatId ?? null;
 
-  return {
-    id: Number(raw.id ?? talabatId ?? index + 1),
-    category_id: Number(raw.category_id ?? raw.categoryId ?? categoryIdFor(categoryName)),
-    category_name: String(categoryName).trim() || 'عام',
-    name: String(raw.name || '').trim(),
-    description: String(raw.description || ''),
-    price: Number(raw.price) || 0,
-    image_url: String(raw.image_url || raw.imageUrl || ''),
-    is_available:
-      raw.is_available === 0 || raw.is_available === false || raw.isAvailable === false
-        ? 0
-        : 1,
-    talabat_id: talabatId,
-    source: raw.source || 'Talabat',
-  };
+  return ensureRestaurantId(
+    {
+      id: Number(raw.id ?? talabatId ?? index + 1),
+      category_id: Number(raw.category_id ?? raw.categoryId ?? categoryIdFor(categoryName)),
+      category_name: String(categoryName).trim() || 'عام',
+      name: String(raw.name || '').trim(),
+      description: String(raw.description || ''),
+      price: Number(raw.price) || 0,
+      image_url: String(raw.image_url || raw.imageUrl || ''),
+      is_available:
+        raw.is_available === 0 || raw.is_available === false || raw.isAvailable === false
+          ? 0
+          : 1,
+      talabat_id: talabatId,
+      source: raw.source || 'Talabat',
+    },
+    restaurantId,
+  );
 }
 
-function mergeItems(existing, incoming) {
+function mergeItems(existing, incoming, restaurantId = DEFAULT_RESTAURANT_ID) {
+  const scopedExisting = filterByRestaurant(existing, restaurantId);
+  const otherRestaurants = existing.filter(
+    (item) =>
+      String(item.restaurant_id || item.restaurantId || DEFAULT_RESTAURANT_ID) !==
+      String(restaurantId),
+  );
+
   const byTalabatId = new Map();
   const byId = new Map();
   const byName = new Map();
 
-  for (const item of existing) {
+  for (const item of scopedExisting) {
     if (item.talabat_id != null) byTalabatId.set(String(item.talabat_id), item);
     byId.set(String(item.id), item);
     byName.set(String(item.name || '').trim().toLowerCase(), item);
   }
 
-  const merged = [...existing];
+  const merged = [...scopedExisting];
 
   incoming.forEach((raw, index) => {
-    const item = normalizeIncoming(raw, index);
+    const item = normalizeIncoming(raw, index, restaurantId);
     if (!item.name) return;
 
     const talabatKey = item.talabat_id != null ? String(item.talabat_id) : null;
@@ -385,7 +486,40 @@ function mergeItems(existing, incoming) {
     byName.set(item.name.toLowerCase(), item);
   });
 
-  return merged.filter((item) => item.name);
+  return [...otherRestaurants, ...merged.filter((item) => item.name)];
+}
+
+function requireAuth(req, res) {
+  const auth = parseAuthHeader(req);
+  if (!auth) {
+    authError(res, 401, 'Unauthorized');
+    return null;
+  }
+  return auth;
+}
+
+function requireSuperAdmin(req, res) {
+  const auth = requireAuth(req, res);
+  if (!auth) return null;
+  if (!isSuperAdmin(auth)) {
+    authError(res, 403, 'Super admin access required');
+    return null;
+  }
+  return auth;
+}
+
+function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = false } = {}) {
+  const restaurants = readRestaurants();
+  const requested =
+    url.searchParams.get('restaurant_id') ||
+    req.headers['x-restaurant-id'] ||
+    resolveRestaurantFromQuery(url, restaurants);
+
+  return resolveRestaurantId(auth, requested, { allowPublicDefault });
+}
+
+function findItemById(items, itemId) {
+  return items.find((item) => String(item.id) === String(itemId));
 }
 
 const server = http.createServer(async (req, res) => {
@@ -403,6 +537,8 @@ const server = http.createServer(async (req, res) => {
       message: 'Almenupro backend is running.',
       endpoints: {
         health: '/api/health',
+        auth: '/api/auth/login',
+        restaurants: '/api/restaurants',
         menu: '/api/items',
         orders: '/api/orders',
         settings: '/api/settings',
@@ -420,6 +556,81 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      let session = null;
+
+      if (body.username != null || body.user != null) {
+        session = loginSuperAdmin(body.username ?? body.user, body.password);
+      } else if (body.restaurantSlug != null || body.restaurant_slug != null) {
+        session = loginRestaurantAdmin(
+          body.restaurantSlug ?? body.restaurant_slug,
+          body.password,
+          readRestaurants(),
+        );
+      }
+
+      if (!session) {
+        sendJson(res, 401, { error: 'Invalid credentials' });
+        return;
+      }
+
+      sendJson(res, 200, session);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/auth/me') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const session = buildAuthResponse(token);
+    sendJson(res, 200, session || auth);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/restaurants') {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
+    const restaurants = readRestaurants().map(sanitizeRestaurant);
+    sendJson(res, 200, restaurants);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/restaurants') {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurants = readRestaurants();
+      const record = createRestaurantRecord(body);
+
+      if (
+        restaurants.some(
+          (entry) => String(entry.slug).toLowerCase() === String(record.slug).toLowerCase(),
+        )
+      ) {
+        sendJson(res, 409, { error: 'Restaurant slug already exists' });
+        return;
+      }
+
+      restaurants.push(record);
+      writeRestaurants(restaurants);
+      writeSettings(record.id, defaultSettingsPayload());
+
+      sendJson(res, 201, sanitizeRestaurant(record));
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/health') {
     const items = readItems();
     const { resolveImageDiskPath } = require('./lib/menuImageStorage');
@@ -433,7 +644,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/items') {
-    const items = readItems();
+    const auth = parseAuthHeader(req);
+    const restaurantId = resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: true,
+    });
+
+    if (!restaurantId) {
+      authError(res, 401, 'Restaurant context required');
+      return;
+    }
+
+    if (auth && !canAccessRestaurant(auth, restaurantId)) {
+      authError(res, 403, 'Access denied for this restaurant');
+      return;
+    }
+
+    const items = filterByRestaurant(readItems(), restaurantId);
     rebuildCategoryIds(items);
     sendJson(res, 200, items);
     return;
@@ -474,21 +700,37 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/items/sync') {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
       const incoming = Array.isArray(body.items) ? body.items : [];
       const downloadImages = body.downloadImages !== false;
-      const normalizedIncoming = incoming.map((raw, index) => normalizeIncoming(raw, index));
+      const restaurantId = String(
+        body.restaurantId || body.restaurant_id || DEFAULT_RESTAURANT_ID,
+      );
+
+      const restaurants = readRestaurants();
+      if (!restaurants.some((entry) => entry.id === restaurantId)) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+        return;
+      }
+
+      const normalizedIncoming = incoming.map((raw, index) =>
+        normalizeIncoming(raw, index, restaurantId),
+      );
       const preparedIncoming = downloadImages
         ? await persistMenuItemsImages(normalizedIncoming)
         : normalizedIncoming;
       const existing = readItems();
-      const merged = mergeItems(existing, preparedIncoming);
-      rebuildCategoryIds(merged);
+      const merged = mergeItems(existing, preparedIncoming, restaurantId);
+      rebuildCategoryIds(filterByRestaurant(merged, restaurantId));
       writeItems(merged);
       sendJson(res, 200, {
         ok: true,
-        total: merged.length,
+        restaurantId,
+        total: filterByRestaurant(merged, restaurantId).length,
         synced: incoming.length,
         imagesStoredLocally: preparedIncoming.filter((item) =>
           String(item.image_url || '').startsWith('/api/uploads/menu/'),
@@ -500,8 +742,163 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/items') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurantId = resolveRestaurantId(
+        auth,
+        body.restaurantId || body.restaurant_id,
+      );
+
+      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const items = readItems();
+      const scoped = filterByRestaurant(items, restaurantId);
+      const categoryName = body.categoryName || body.category_name || 'عام';
+      const item = ensureRestaurantId(
+        {
+          id: nextNumericItemId(scoped),
+          category_id: categoryIdFor(categoryName),
+          category_name: String(categoryName).trim() || 'عام',
+          name: String(body.name || '').trim(),
+          description: String(body.description || ''),
+          price: Number(body.price) || 0,
+          image_url: String(body.image_url || body.imageUrl || ''),
+          is_available:
+            body.is_available === 0 ||
+            body.is_available === false ||
+            body.isAvailable === false
+              ? 0
+              : 1,
+          source: body.source || 'Manual',
+        },
+        restaurantId,
+      );
+
+      if (!item.name) {
+        sendJson(res, 400, { error: 'Item name is required' });
+        return;
+      }
+
+      items.push(item);
+      writeItems(items);
+      sendJson(res, 201, item);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  const itemMatch = url.pathname.match(/^\/api\/items\/([^/]+)$/);
+  if (itemMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const itemId = decodeURIComponent(itemMatch[1]);
+      const items = readItems();
+      const item = findItemById(items, itemId);
+
+      if (!item) {
+        sendJson(res, 404, { error: 'Item not found' });
+        return;
+      }
+
+      const restaurantId = item.restaurant_id || item.restaurantId || DEFAULT_RESTAURANT_ID;
+      if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      if (req.method === 'DELETE') {
+        writeItems(items.filter((entry) => String(entry.id) !== String(itemId)));
+        sendJson(res, 200, { ok: true, id: itemId });
+        return;
+      }
+
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const categoryName =
+        body.categoryName || body.category_name || item.category_name || 'عام';
+
+      Object.assign(item, {
+        name: String(body.name ?? item.name).trim(),
+        description: String(body.description ?? item.description ?? ''),
+        price: Number(body.price ?? item.price) || 0,
+        category_name: String(categoryName).trim() || 'عام',
+        category_id: Number(body.category_id ?? body.categoryId ?? categoryIdFor(categoryName)),
+        image_url: String(body.image_url ?? body.imageUrl ?? item.image_url ?? ''),
+        is_available:
+          body.is_available === 0 ||
+          body.is_available === false ||
+          body.isAvailable === false
+            ? 0
+            : body.is_available != null || body.isAvailable != null
+              ? 1
+              : item.is_available,
+        source: body.source || item.source || 'Manual',
+      });
+
+      writeItems(items);
+      sendJson(res, 200, item);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  const itemAvailabilityMatch = url.pathname.match(/^\/api\/items\/([^/]+)\/availability$/);
+  if (req.method === 'PATCH' && itemAvailabilityMatch) {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const itemId = decodeURIComponent(itemAvailabilityMatch[1]);
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const items = readItems();
+      const item = findItemById(items, itemId);
+
+      if (!item) {
+        sendJson(res, 404, { error: 'Item not found' });
+        return;
+      }
+
+      const restaurantId = item.restaurant_id || item.restaurantId || DEFAULT_RESTAURANT_ID;
+      if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const nextAvailable =
+        body.is_available ?? body.isAvailable ?? body.available ?? item.is_available;
+      item.is_available =
+        nextAvailable === 0 || nextAvailable === false || nextAvailable === '0' ? 0 : 1;
+
+      writeItems(items);
+      sendJson(res, 200, item);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/orders') {
-    const orders = sortOrdersDesc(readOrders());
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    if (isSuperAdmin(auth) && !url.searchParams.get('restaurant_id')) {
+      sendJson(res, 200, sortOrdersDesc(readOrders()));
+      return;
+    }
+
+    const restaurantId = resolveScopedRestaurantId(req, url, auth);
+    if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+      return;
+    }
+
+    const orders = sortOrdersDesc(filterByRestaurant(readOrders(), restaurantId));
     sendJson(res, 200, orders);
     return;
   }
@@ -509,8 +906,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/orders') {
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurants = readRestaurants();
+      const restaurantId =
+        body.restaurantId ||
+        body.restaurant_id ||
+        resolveRestaurantFromQuery(url, restaurants);
       const id = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const order = normalizeOrder(body, id);
+      const order = normalizeOrder(body, id, restaurantId);
       const orders = readOrders();
       orders.unshift(order);
       writeOrders(orders);
@@ -539,6 +941,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const auth = requireAuth(req, res);
+      if (!auth) return;
+
+      const restaurantId =
+        orders[index].restaurant_id ||
+        orders[index].restaurantId ||
+        DEFAULT_RESTAURANT_ID;
+      if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
       orders[index] = { ...orders[index], status: nextStatus };
       writeOrders(orders);
       sendJson(res, 200, orders[index]);
@@ -549,15 +962,44 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/settings') {
-    sendJson(res, 200, readSettings());
+    const auth = parseAuthHeader(req);
+    const restaurantId = resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: true,
+    });
+
+    if (!restaurantId) {
+      authError(res, 401, 'Restaurant context required');
+      return;
+    }
+
+    if (auth && !canAccessRestaurant(auth, restaurantId)) {
+      authError(res, 403, 'Access denied for this restaurant');
+      return;
+    }
+
+    sendJson(res, 200, readSettings(restaurantId));
     return;
   }
 
   if (req.method === 'PUT' && url.pathname === '/api/settings') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
-      const current = readSettings();
-      const merged = writeSettings({
+      const restaurantId = resolveRestaurantId(
+        auth,
+        body.restaurantId ||
+          body.restaurant_id ||
+          url.searchParams.get('restaurant_id'),
+      );
+
+      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const current = readSettings(restaurantId);
+      const merged = writeSettings(restaurantId, {
         ...current,
         ...body,
         workingHours: Array.isArray(body.workingHours)
@@ -578,6 +1020,7 @@ const server = http.createServer(async (req, res) => {
 ensureDataFile();
 ensureOrdersFile();
 ensureSettingsFile();
+ensureRestaurantsFile();
 ensureUploadDir();
 if (!IS_VERCEL && memoryItems.length === 0) {
   memoryItems = readItems();
@@ -585,7 +1028,10 @@ if (!IS_VERCEL && memoryItems.length === 0) {
 if (!IS_VERCEL && memoryOrders.length === 0) {
   memoryOrders = readOrders();
 }
-memorySettings = readSettings();
+if (!IS_VERCEL && memoryRestaurants.length === 0) {
+  memoryRestaurants = readRestaurants();
+}
+memorySettings = readSettingsMap();
 rebuildCategoryIds(memoryItems);
 
 module.exports = server;

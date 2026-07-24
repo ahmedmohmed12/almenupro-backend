@@ -9,8 +9,10 @@ import '../firebase_options.dart';
 import '../models/order.dart';
 import '../utils/firebase_config.dart';
 import '../utils/image_url.dart';
+import '../services/admin_auth_service.dart';
 import '../services/admin_order_monitor_service.dart';
 import '../services/analytics_demo_service.dart';
+import '../services/api_service.dart';
 import '../services/menu_storage_service.dart';
 import '../services/order_alert_sound_service.dart';
 import '../services/order_browser_notification_service.dart';
@@ -19,6 +21,7 @@ import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
+import '../widgets/admin/admin_super_restaurants_panel.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
 import '../widgets/admin/admin_working_hours_card.dart';
@@ -34,9 +37,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final _ordersPanelKey = GlobalKey<AdminOrdersPanelState>();
 
   bool _isAuthenticated = false;
+  bool _isSuperAdmin = false;
+  bool _isLoggingIn = false;
+  var _loginMode = 0;
+  final _usernameController = TextEditingController();
+  final _slugController = TextEditingController(text: 'molton-cookies');
   final _passwordController = TextEditingController();
-  final String _adminPassword = '123456';
   String? _errorMessage;
+  String? _restaurantLabel;
   int _selectedIndex = 0;
 
   final _whatsappController = TextEditingController();
@@ -45,13 +53,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _bootstrapAuth();
     OrderAlertSoundService.instance.initialize();
+  }
+
+  Future<void> _bootstrapAuth() async {
+    await AdminAuthService.instance.initialize();
+    if (!mounted) return;
+
+    if (AdminAuthService.instance.isLoggedIn) {
+      setState(() {
+        _isAuthenticated = true;
+        _isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
+        _restaurantLabel = AdminAuthService.instance.restaurantName;
+      });
+      await _loadSettings();
+      await _startAdminMonitoring();
+    } else {
+      await _loadSettings();
+    }
   }
 
   @override
   void dispose() {
     AdminOrderMonitorService.instance.stop();
+    _usernameController.dispose();
+    _slugController.dispose();
     _passwordController.dispose();
     _whatsappController.dispose();
     super.dispose();
@@ -95,19 +122,57 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  void _login() {
-    if (_passwordController.text == _adminPassword) {
+  Future<void> _login() async {
+    setState(() {
+      _isLoggingIn = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (_loginMode == 1) {
+        await AdminAuthService.instance.loginSuperAdmin(
+          username: _usernameController.text.trim(),
+          password: _passwordController.text,
+        );
+      } else {
+        await AdminAuthService.instance.loginRestaurantAdmin(
+          restaurantSlug: _slugController.text.trim(),
+          password: _passwordController.text,
+        );
+      }
+
+      if (!mounted) return;
       setState(() {
         _isAuthenticated = true;
-        _errorMessage = null;
+        _isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
+        _restaurantLabel = AdminAuthService.instance.restaurantName;
+        _selectedIndex = AdminSidebar.ordersIndex;
       });
+
       OrderAlertSoundService.instance.unlockFromUserGesture();
-      unawaited(_startAdminMonitoring());
-    } else {
+      await _loadSettings();
+      await _startAdminMonitoring();
+    } catch (error) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'كلمة المرور غير صحيحة!';
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      if (mounted) setState(() => _isLoggingIn = false);
     }
+  }
+
+  Future<void> _logout() async {
+    AdminOrderMonitorService.instance.stop();
+    await AdminAuthService.instance.logout();
+    if (!mounted) return;
+    setState(() {
+      _isAuthenticated = false;
+      _isSuperAdmin = false;
+      _restaurantLabel = null;
+      _passwordController.clear();
+      _selectedIndex = AdminSidebar.ordersIndex;
+    });
   }
 
   Future<void> _startAdminMonitoring() async {
@@ -320,11 +385,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     };
 
                     if (isEditing) {
-                      await MenuStorageService.instance
-                          .updateItem(record.id, itemMap);
+                      if (AdminAuthService.instance.isLoggedIn) {
+                        await ApiService.instance.updateMenuItem(
+                          record.id,
+                          itemMap,
+                        );
+                      } else {
+                        await MenuStorageService.instance
+                            .updateItem(record.id, itemMap);
+                      }
                     } else {
                       itemMap['createdAt'] = DateTime.now().toIso8601String();
-                      await MenuStorageService.instance.addItem(itemMap);
+                      if (AdminAuthService.instance.isLoggedIn) {
+                        await ApiService.instance.createMenuItem(itemMap);
+                      } else {
+                        await MenuStorageService.instance.addItem(itemMap);
+                      }
                     }
 
                     if (context.mounted) {
@@ -377,7 +453,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         false;
 
     if (confirm) {
-      await MenuStorageService.instance.deleteItem(docId);
+      if (AdminAuthService.instance.isLoggedIn) {
+        await ApiService.instance.deleteMenuItem(docId);
+      } else {
+        await MenuStorageService.instance.deleteItem(docId);
+      }
     }
   }
 
@@ -575,7 +655,41 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     'دخول لوحة الإدارة',
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 0, label: Text('مدير مطعم')),
+                      ButtonSegment(value: 1, label: Text('AlMenuPro')),
+                    ],
+                    selected: {_loginMode},
+                    onSelectionChanged: (value) {
+                      setState(() {
+                        _loginMode = value.first;
+                        _errorMessage = null;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  if (_loginMode == 1)
+                    TextField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'اسم المستخدم',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                    )
+                  else
+                    TextField(
+                      controller: _slugController,
+                      decoration: const InputDecoration(
+                        labelText: 'معرف المطعم (slug)',
+                        hintText: 'molton-cookies',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.store),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
@@ -595,11 +709,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6B1124),
                       ),
-                      onPressed: _login,
-                      child: const Text(
-                        'دخول',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
+                      onPressed: _isLoggingIn ? null : _login,
+                      child: _isLoggingIn
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              _loginMode == 1
+                                  ? 'دخول Super Admin'
+                                  : 'دخول لوحة المطعم',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -621,18 +749,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
         body: Row(
           children: [
             AdminSidebar(
+              items: _isSuperAdmin
+                  ? AdminSidebar.superAdminItems
+                  : AdminSidebar.defaultItems,
               selectedIndex: _selectedIndex,
               onItemSelected: (index) {
                 setState(() => _selectedIndex = index);
               },
-              onLogout: () {
-                AdminOrderMonitorService.instance.stop();
-                setState(() {
-                  _isAuthenticated = false;
-                  _passwordController.clear();
-                  _selectedIndex = AdminSidebar.ordersIndex;
-                });
-              },
+              onLogout: _logout,
             ),
             Expanded(
               child: Column(
@@ -666,6 +790,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildActiveTab() {
+    if (_isSuperAdmin) {
+      switch (_selectedIndex) {
+        case AdminSidebar.ordersIndex:
+          return AdminOrdersPanel(key: _ordersPanelKey);
+        case AdminSidebar.menuIndex:
+          return AdminMenuPanel(
+            onAddItem: () => _showItemDialog(),
+            onEditItem: (record) => _showItemDialog(record: record),
+            onDeleteItem: _deleteItem,
+            canImportTalabat: false,
+            canManageItems: false,
+          );
+        case AdminSidebar.restaurantsIndex:
+          return const AdminSuperRestaurantsPanel();
+        case AdminSidebar.analyticsIndex:
+          return _buildAnalyticsTab();
+        case AdminSidebar.settingsIndex:
+        default:
+          return _buildSettingsTab();
+      }
+    }
+
     switch (_selectedIndex) {
       case AdminSidebar.ordersIndex:
         return AdminOrdersPanel(
@@ -681,7 +827,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onAddItem: () => _showItemDialog(),
           onEditItem: (record) => _showItemDialog(record: record),
           onDeleteItem: _deleteItem,
-          onAutofillTalabat: _showAutofillDialog,
+          canImportTalabat: false,
+          canManageItems: true,
         );
     }
   }

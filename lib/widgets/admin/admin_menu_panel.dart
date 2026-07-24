@@ -11,13 +11,17 @@ class AdminMenuPanel extends StatefulWidget {
     required this.onAddItem,
     required this.onEditItem,
     required this.onDeleteItem,
-    required this.onAutofillTalabat,
+    this.onAutofillTalabat,
+    this.canImportTalabat = false,
+    this.canManageItems = true,
   });
 
   final VoidCallback onAddItem;
   final void Function(MenuItemRecord record) onEditItem;
   final void Function(String id) onDeleteItem;
-  final VoidCallback onAutofillTalabat;
+  final VoidCallback? onAutofillTalabat;
+  final bool canImportTalabat;
+  final bool canManageItems;
 
   @override
   State<AdminMenuPanel> createState() => _AdminMenuPanelState();
@@ -95,12 +99,14 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
                 icon: const Icon(Icons.refresh),
                 label: const Text('تحديث من السيرفر'),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: widget.onAutofillTalabat,
-                icon: const Icon(Icons.cloud_download),
-                label: const Text('تعبئة منيو Talabat'),
-              ),
+              if (widget.canImportTalabat && widget.onAutofillTalabat != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: widget.onAutofillTalabat,
+                  icon: const Icon(Icons.cloud_download),
+                  label: const Text('تعبئة منيو Talabat'),
+                ),
+              ],
               const SizedBox(height: 8),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: burgundy),
@@ -134,11 +140,12 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
                     icon: const Icon(Icons.refresh),
                     label: const Text('تحديث من السيرفر'),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onAutofillTalabat,
-                    icon: const Icon(Icons.cloud_download),
-                    label: const Text('تعبئة Talabat'),
-                  ),
+                  if (widget.canImportTalabat && widget.onAutofillTalabat != null)
+                    OutlinedButton.icon(
+                      onPressed: widget.onAutofillTalabat,
+                      icon: const Icon(Icons.cloud_download),
+                      label: const Text('تعبئة Talabat'),
+                    ),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(backgroundColor: burgundy),
                     onPressed: widget.onAddItem,
@@ -331,7 +338,9 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
                 style: TextStyle(color: Colors.white),
               ),
             ),
-            if (showTalabatButton) ...[
+            if (showTalabatButton &&
+                widget.canImportTalabat &&
+                widget.onAutofillTalabat != null) ...[
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: widget.onAutofillTalabat,
@@ -396,6 +405,8 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
             child: Text('السعر', style: headerStyle),
           ),
           const SizedBox(width: 110, child: Text('الحالة', style: headerStyle)),
+          if (widget.canManageItems)
+            const SizedBox(width: 120, child: Text('إجراءات', style: headerStyle)),
         ],
       ),
     );
@@ -431,9 +442,76 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
               visualDensity: VisualDensity.compact,
             ),
           ),
+          if (widget.canManageItems) SizedBox(width: 120, child: _apiItemActions(item)),
         ],
       ),
     );
+  }
+
+  Widget _apiItemActions(MenuItem item) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: item.isAvailable ? 'تعطيل' : 'تفعيل',
+          icon: Icon(
+            item.isAvailable ? Icons.toggle_on : Icons.toggle_off,
+            color: item.isAvailable ? Colors.green : Colors.grey,
+          ),
+          onPressed: () => _toggleAvailability(item),
+        ),
+        IconButton(
+          tooltip: 'حذف',
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () => _deleteApiItem(item),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _toggleAvailability(MenuItem item) async {
+    try {
+      await ApiService.instance.setMenuItemAvailability(
+        item.id.toString(),
+        !item.isAvailable,
+      );
+      await _loadFromApi();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث الحالة: $error')),
+      );
+    }
+  }
+
+  Future<void> _deleteApiItem(MenuItem item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: Text('حذف "${item.name}" من المنيو؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await ApiService.instance.deleteMenuItem(item.id.toString());
+      await _loadFromApi();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر الحذف: $error')),
+      );
+    }
   }
 
   Widget _apiItemCard(MenuItem item) {
@@ -447,10 +525,12 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
         ),
         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${item.categoryName} • ${item.price.toStringAsFixed(3)} د.ك'),
-        trailing: Icon(
-          item.isAvailable ? Icons.check_circle : Icons.cancel,
-          color: item.isAvailable ? Colors.green : Colors.red,
-        ),
+        trailing: widget.canManageItems
+            ? _apiItemActions(item)
+            : Icon(
+                item.isAvailable ? Icons.check_circle : Icons.cancel,
+                color: item.isAvailable ? Colors.green : Colors.red,
+              ),
       ),
     );
   }

@@ -329,8 +329,6 @@ class MenuStorageService {
       await _saveImportMeta(sourceUrl.trim(), _items.length);
     }
 
-    unawaited(ApiService.instance.syncMenuItems(incomingItems));
-
     return MenuSyncResult(
       addedCount: addedCount,
       skippedCount: skippedCount,

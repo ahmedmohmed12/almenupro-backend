@@ -25,6 +25,7 @@ class AdminSidebar extends StatelessWidget {
   static const int menuIndex = 1;
   static const int analyticsIndex = 2;
   static const int settingsIndex = 3;
+  static const int restaurantsIndex = 4;
 
   static const List<AdminSidebarItem> defaultItems = [
     // Must stay first: opens AdminOrdersPanel (new + archived tabs).
@@ -43,6 +44,29 @@ class AdminSidebar extends StatelessWidget {
     AdminSidebarItem(
       icon: Icons.store,
       label: 'إعدادات المحل والواتساب',
+    ),
+  ];
+
+  static const List<AdminSidebarItem> superAdminItems = [
+    AdminSidebarItem(
+      icon: Icons.receipt_long_outlined,
+      label: 'الطلبات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.restaurant_menu,
+      label: 'إدارة المنيو والأصناف',
+    ),
+    AdminSidebarItem(
+      icon: Icons.apartment,
+      label: 'المطاعم والاستيراد',
+    ),
+    AdminSidebarItem(
+      icon: Icons.bar_chart,
+      label: 'التحليلات والمبيعات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.settings,
+      label: 'إعدادات المنصة',
     ),
   ];
 

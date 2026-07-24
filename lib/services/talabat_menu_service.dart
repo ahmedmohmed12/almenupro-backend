@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'menu_sync_service.dart';
+import 'api_service.dart';
 import 'talabat_scraper_client.dart';
 
 bool isWebUrl(String input) {
@@ -14,7 +14,6 @@ bool isTalabatMenuUrl(String input) {
 
 final TalabatScraperClient _scraperClient = TalabatScraperClient();
 
-/// Fetches live menu items (with images) from Talabat via Cloud Functions.
 Future<List<Map<String, dynamic>>> fetchTalabatMenuItems({
   required String url,
 }) async {
@@ -26,11 +25,11 @@ Future<List<Map<String, dynamic>>> fetchTalabatMenuItems({
   return result.items;
 }
 
-/// Processes a Talabat menu URL and syncs items into Firestore.
 Future<void> processAndSaveTalabatMenu({
   required String url,
   required void Function(String message) onProgress,
   required void Function(int added, int skipped, int updated) onComplete,
+  String? restaurantId,
 }) async {
   final normalizedUrl = url.trim();
 
@@ -46,6 +45,8 @@ Future<void> processAndSaveTalabatMenu({
     return;
   }
 
+  final targetRestaurantId = restaurantId ?? ApiService.defaultRestaurantId;
+
   try {
     onProgress('جاري سحب الأصناف والأسعار والوصف والصور من Talabat...');
 
@@ -56,31 +57,42 @@ Future<void> processAndSaveTalabatMenu({
       return;
     }
 
-    final withImages =
-        result.items.where((item) => (item['imageUrl'] ?? '').toString().isNotEmpty).length;
+    final withImages = result.items
+        .where((item) => (item['imageUrl'] ?? '').toString().isNotEmpty)
+        .length;
 
     onProgress(
-      'تم جلب ${result.items.length} صنف ($withImages صورة) — جاري الحفظ السريع...',
+      'تم جلب ${result.items.length} صنف ($withImages صورة) — جاري الحفظ على السيرفر...',
     );
 
-    var totalInMenu = 0;
-    await syncAndAddNewItems(
-      incomingItems: result.items,
-      updateExisting: true,
-      sourceUrl: normalizedUrl,
-      onComplete: (added, skipped, updated) {
-        onComplete(added, skipped, updated);
-        onProgress('تم الحفظ بنجاح!');
-      },
-      onTotalCount: (total) => totalInMenu = total,
+    final apiItems = result.items
+        .map(
+          (item) => {
+            'name': item['name'],
+            'description': item['description'] ?? '',
+            'price': item['price'] ?? 0.0,
+            'categoryName': item['categoryName'] ?? item['category_name'] ?? 'عام',
+            'isAvailable': item['isAvailable'] ?? true,
+            'imageUrl': item['imageUrl'] ?? '',
+            'talabatId': item['talabatId'] ?? item['talabat_id'],
+            'source': item['source'] ?? 'Talabat',
+          },
+        )
+        .toList();
+
+    final synced = await ApiService.instance.syncMenuItems(
+      apiItems,
+      restaurantId: targetRestaurantId,
     );
 
-    if (totalInMenu > 0 && totalInMenu < result.items.length) {
-      onProgress(
-        'تنبيه: وُجد ${result.items.length} صنف في Talabat لكن المنيو المحفوظ يحتوي $totalInMenu. '
-        'أعد التعبئة أو احذف الأصناف القديمة ثم أعد الاستيراد.',
-      );
+    if (!synced) {
+      onProgress('فشل حفظ المنيو على السيرفر. تأكد من صلاحيات Super Admin.');
+      onComplete(0, 0, 0);
+      return;
     }
+
+    onProgress('تم الحفظ بنجاح!');
+    onComplete(result.items.length, 0, 0);
   } on TalabatScrapeException catch (error) {
     onProgress(error.message);
     onComplete(0, 0, 0);
