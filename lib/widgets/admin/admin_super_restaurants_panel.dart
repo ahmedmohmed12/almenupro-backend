@@ -1,12 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-
-
 import '../../models/restaurant.dart';
-
 import '../../services/api_service.dart';
 import '../../services/super_admin_scope_service.dart';
 import '../../services/talabat_menu_service.dart';
+import '../../utils/restaurant_route.dart';
 
 
 
@@ -530,22 +529,22 @@ class _AdminSuperRestaurantsPanelState extends State<AdminSuperRestaurantsPanel>
                         itemBuilder: (context, index) {
 
                           final restaurant = _restaurants[index];
+                          final menuPath = RestaurantRoute.menuPathForSlug(restaurant.slug);
+                          final menuUrl = kIsWeb
+                              ? '${Uri.base.origin}$menuPath'
+                              : menuPath;
 
                           return Card(
-
                             child: ListTile(
-
                               leading: const Icon(Icons.store, color: burgundy),
-
                               title: Text(
-
                                 restaurant.name,
-
                                 style: const TextStyle(fontWeight: FontWeight.bold),
-
                               ),
-
-                              subtitle: Text('slug: ${restaurant.slug} • ${restaurant.id}'),
+                              subtitle: Text(
+                                'slug: ${restaurant.slug}\nرابط العملاء: $menuUrl',
+                              ),
+                              isThreeLine: true,
 
                               trailing: OutlinedButton.icon(
 

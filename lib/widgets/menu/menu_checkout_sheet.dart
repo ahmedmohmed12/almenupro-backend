@@ -3,15 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/customer_restaurant_context.dart';
 import '../../providers/cart_provider.dart';
+import '../../services/api_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/whatsapp_launcher.dart';
 
 class MenuCheckoutSheet extends StatefulWidget {
-  const MenuCheckoutSheet({super.key});
+  const MenuCheckoutSheet({super.key, this.restaurantContext});
 
-  static Future<void> show(BuildContext context) {
+  final CustomerRestaurantContext? restaurantContext;
+
+  static Future<void> show(
+    BuildContext context, {
+    CustomerRestaurantContext? restaurantContext,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -19,7 +26,7 @@ class MenuCheckoutSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const MenuCheckoutSheet(),
+      builder: (_) => MenuCheckoutSheet(restaurantContext: restaurantContext),
     );
   }
 
@@ -35,7 +42,16 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   var _paymentMethod = 'كاش';
   var _submitting = false;
 
-  static const _whatsappNumber = '96594774950';
+  static const _defaultWhatsappNumber = '96594774950';
+
+  String get _restaurantName =>
+      widget.restaurantContext?.name ?? 'Molten Cookies';
+
+  String get _whatsappNumber =>
+      widget.restaurantContext?.whatsappNumber ?? _defaultWhatsappNumber;
+
+  String get _restaurantId =>
+      widget.restaurantContext?.id ?? ApiService.defaultRestaurantId;
 
   @override
   void dispose() {
@@ -66,7 +82,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     }
 
     final message = '''
-🧾 *فاتورة طلب جديدة - Molten Cookies*
+🧾 *فاتورة طلب جديدة - $_restaurantName*
 ----------------------------------
 📌 *رقم الفاتورة:* #$invoiceNumber
 👤 *اسم العميل:* ${_nameController.text.trim()}
@@ -82,7 +98,7 @@ $itemsDetails
 ----------------------------------
 💰 *الإجمالي النهائي:* ${cart.totalPrice.toStringAsFixed(3)} د.ك
 ----------------------------------
-شكراً لطلبكم من مولتن كوكيز! ❤️
+شكراً لطلبكم من $_restaurantName! ❤️
 ''';
 
     final opened = await openWhatsAppChat(
@@ -99,6 +115,7 @@ $itemsDetails
           address: _addressController.text.trim(),
           paymentMethod: _paymentMethod,
           invoiceNumber: invoiceNumber,
+          restaurantId: _restaurantId,
         );
       } catch (error) {
         debugPrint('Order backend sync failed: $error');

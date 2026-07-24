@@ -328,11 +328,25 @@ function requireSuperAdmin(req, res) {
 
 async function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = false } = {}) {
   const restaurants = await readRestaurants();
-  const requested =
-    url.searchParams.get('restaurant_id') ||
-    req.headers['x-restaurant-id'] ||
-    resolveRestaurantFromQuery(url, restaurants);
+  const slugParam =
+    url.searchParams.get('restaurant_slug') || url.searchParams.get('slug');
+  const restaurantIdParam =
+    url.searchParams.get('restaurant_id') || req.headers['x-restaurant-id'];
 
+  if (restaurantIdParam) {
+    return resolveRestaurantId(auth, restaurantIdParam, { allowPublicDefault });
+  }
+
+  if (slugParam) {
+    const match = restaurants.find(
+      (entry) =>
+        String(entry.slug || '').toLowerCase() === String(slugParam).toLowerCase(),
+    );
+    if (!match) return null;
+    return resolveRestaurantId(auth, match.id, { allowPublicDefault });
+  }
+
+  const requested = resolveRestaurantFromQuery(url, restaurants);
   return resolveRestaurantId(auth, requested, { allowPublicDefault });
 }
 
@@ -364,7 +378,8 @@ const server = http.createServer(async (req, res) => {
         health: '/api/health',
         auth: '/api/auth/login',
         restaurants: '/api/restaurants',
-        menu: '/api/items',
+        restaurantPublic: '/api/restaurants/public/{slug}',
+        menu: '/api/items?slug={slug}',
         orders: '/api/orders',
         settings: '/api/settings',
         images: '/menu-images/{filename}',
@@ -427,6 +442,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const publicRestaurantMatch = url.pathname.match(
+    /^\/api\/restaurants\/public\/([^/]+)$/,
+  );
+  if (req.method === 'GET' && publicRestaurantMatch) {
+    const slug = decodeURIComponent(publicRestaurantMatch[1]).trim().toLowerCase();
+    const restaurants = await readRestaurants();
+    const match = restaurants.find(
+      (entry) =>
+        String(entry.slug || '').toLowerCase() === slug &&
+        String(entry.status || 'active') !== 'inactive',
+    );
+
+    if (!match) {
+      sendJson(res, 404, { error: 'Restaurant not found' });
+      return;
+    }
+
+    sendJson(res, 200, sanitizeRestaurant(match));
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/restaurants') {
     const auth = requireSuperAdmin(req, res);
     if (!auth) return;
@@ -476,7 +512,13 @@ const server = http.createServer(async (req, res) => {
     });
 
     if (!restaurantId) {
-      authError(res, 401, 'Restaurant context required');
+      const slugParam =
+        url.searchParams.get('restaurant_slug') || url.searchParams.get('slug');
+      if (slugParam) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+      } else {
+        authError(res, 401, 'Restaurant context required');
+      }
       return;
     }
 
@@ -799,10 +841,23 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
       const restaurants = await readRestaurants();
-      const restaurantId =
+      let restaurantId =
         body.restaurantId ||
         body.restaurant_id ||
         resolveRestaurantFromQuery(url, restaurants);
+
+      if (!restaurantId && (body.restaurantSlug || body.restaurant_slug)) {
+        const slug = String(body.restaurantSlug || body.restaurant_slug).trim();
+        const match = restaurants.find(
+          (entry) => String(entry.slug || '').toLowerCase() === slug.toLowerCase(),
+        );
+        restaurantId = match ? match.id : null;
+      }
+
+      if (!restaurantId) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+        return;
+      }
       const id = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const order = normalizeOrder(body, id, restaurantId);
       const orders = await readOrders();
@@ -865,7 +920,13 @@ const server = http.createServer(async (req, res) => {
     });
 
     if (!restaurantId) {
-      authError(res, 401, 'Restaurant context required');
+      const slugParam =
+        url.searchParams.get('restaurant_slug') || url.searchParams.get('slug');
+      if (slugParam) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+      } else {
+        authError(res, 401, 'Restaurant context required');
+      }
       return;
     }
 

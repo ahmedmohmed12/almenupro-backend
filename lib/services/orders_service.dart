@@ -36,6 +36,7 @@ class OrdersService {
     required String address,
     required String paymentMethod,
     required String invoiceNumber,
+    String restaurantId = ApiService.defaultRestaurantId,
   }) async {
     final order = OrdersDemoService.orderFromCart(
       cartItems: cartItems,
@@ -51,7 +52,10 @@ class OrdersService {
       return;
     }
 
-    final created = await ApiService.instance.createOrder(order);
+    final created = await ApiService.instance.createOrder(
+      order,
+      restaurantId: restaurantId,
+    );
     await OrdersDemoService.registerOrder(created);
     await OrdersDemoService.refreshFromApi();
   }

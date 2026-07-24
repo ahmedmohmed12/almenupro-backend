@@ -16,6 +16,7 @@ import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/configure_url_strategy.dart' show configureUrlStrategy;
 import 'utils/firebase_config.dart';
+import 'utils/restaurant_route.dart';
 
 Future<void> main() async {
   // Flutter Web: usePathUrlStrategy() — see configure_url_strategy_web.dart
@@ -64,7 +65,9 @@ class MyApp extends StatelessWidget {
   }
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    switch (normalizeRoute(settings.name)) {
+    final route = normalizeRoute(settings.name);
+
+    switch (route) {
       case '/admin':
         return MaterialPageRoute(
           settings: settings,
@@ -75,15 +78,14 @@ class MyApp extends StatelessWidget {
           settings: settings,
           builder: (_) => const ClientMenuPage(),
         );
-      case '/':
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const MenuScreen(),
-        );
       default:
+        final slug = RestaurantRoute.parseSlug(
+          route,
+          query: kIsWeb ? Uri.base.queryParameters : null,
+        );
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const MenuScreen(),
+          builder: (_) => MenuScreen(restaurantSlug: slug),
         );
     }
   }

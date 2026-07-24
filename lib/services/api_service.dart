@@ -258,13 +258,45 @@ class ApiService {
 
 
 
-  Future<List<MenuItem>> fetchItems({String? restaurantId}) async {
+  Future<Restaurant> fetchPublicRestaurant(String slug) async {
+    final cleanSlug = slug.trim().toLowerCase();
+    if (cleanSlug.isEmpty) {
+      throw Exception('معرف المطعم غير صالح');
+    }
+
+    final response = await http
+        .get(_uri('/restaurants/public/$cleanSlug'))
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode == 404) {
+      throw Exception('Restaurant not found');
+    }
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل بيانات المطعم (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return Restaurant.fromJson(Map<String, dynamic>.from(decoded));
+  }
+
+
+
+  Future<List<MenuItem>> fetchItems({String? restaurantId, String? slug}) async {
 
     try {
 
-      final query = <String, String>{
-        'restaurant_id': _scopedRestaurantId(restaurantId: restaurantId),
-      };
+      final query = <String, String>{};
+      final cleanSlug = slug?.trim();
+      if (cleanSlug != null && cleanSlug.isNotEmpty) {
+        query['slug'] = cleanSlug.toLowerCase();
+      } else {
+        query['restaurant_id'] = _scopedRestaurantId(restaurantId: restaurantId);
+      }
 
 
 
@@ -275,6 +307,12 @@ class ApiService {
           .timeout(_fetchTimeout);
 
 
+
+      if (response.statusCode == 404 &&
+          cleanSlug != null &&
+          cleanSlug.isNotEmpty) {
+        throw Exception('Restaurant not found');
+      }
 
       if (response.statusCode != 200) {
 
@@ -322,9 +360,8 @@ class ApiService {
 
 
 
-  Future<List<MenuItem>> fetchMenuItems({String? restaurantId}) =>
-
-      fetchItems(restaurantId: restaurantId);
+  Future<List<MenuItem>> fetchMenuItems({String? restaurantId, String? slug}) =>
+      fetchItems(restaurantId: restaurantId, slug: slug);
 
 
 
@@ -486,13 +523,17 @@ class ApiService {
 
 
 
-  Future<RestaurantSettings> fetchSettings({String? restaurantId}) async {
+  Future<RestaurantSettings> fetchSettings({String? restaurantId, String? slug}) async {
 
     try {
 
-      final query = <String, String>{
-        'restaurant_id': _scopedRestaurantId(restaurantId: restaurantId),
-      };
+      final query = <String, String>{};
+      final cleanSlug = slug?.trim();
+      if (cleanSlug != null && cleanSlug.isNotEmpty) {
+        query['slug'] = cleanSlug.toLowerCase();
+      } else {
+        query['restaurant_id'] = _scopedRestaurantId(restaurantId: restaurantId);
+      }
 
       final response = await http
 
@@ -502,10 +543,14 @@ class ApiService {
 
 
 
+      if (response.statusCode == 404 &&
+          cleanSlug != null &&
+          cleanSlug.isNotEmpty) {
+        throw Exception('Restaurant not found');
+      }
+
       if (response.statusCode != 200) {
-
         throw Exception('فشل في تحميل الإعدادات (${response.statusCode})');
-
       }
 
 

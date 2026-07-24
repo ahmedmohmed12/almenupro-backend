@@ -21,5 +21,8 @@ The Node backend (`apiServer.js`) already sends `Access-Control-Allow-Origin: *`
 
 ## Routes
 
-- `/` — customer menu
-- `/admin` — admin dashboard (password: see app code)
+- `/` — default customer menu (Molton Cookies)
+- `/menu/{slug}` — restaurant customer menu (canonical, e.g. `/menu/molton-cookies`)
+- `/{slug}` — short alias (e.g. `/molton-cookies`)
+- `/restaurant/{slug}` — alternate alias
+- `/admin` — admin dashboard

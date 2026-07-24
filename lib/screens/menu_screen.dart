@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/customer_restaurant_context.dart';
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
@@ -9,27 +10,68 @@ import '../widgets/menu/menu_checkout_sheet.dart';
 import '../widgets/network_menu_image.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({super.key});
+  const MenuScreen({super.key, this.restaurantSlug});
+
+  /// When null, loads the default restaurant menu (`/`).
+  final String? restaurantSlug;
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
+class _MenuPageData {
+  const _MenuPageData({
+    required this.items,
+    this.context,
+  });
+
+  final List<MenuItem> items;
+  final CustomerRestaurantContext? context;
+}
+
 class _MenuScreenState extends State<MenuScreen> {
-  late Future<List<MenuItem>> _itemsFuture;
+  late Future<_MenuPageData> _pageFuture;
   String _selectedCategory = 'الكل';
+  CustomerRestaurantContext? _loadedContext;
 
   @override
   void initState() {
     super.initState();
-    _itemsFuture = ApiService.instance.fetchItems();
+    final future = _loadPage();
+    _pageFuture = future;
+    future.then((page) {
+      if (mounted) setState(() => _loadedContext = page.context);
+    });
+  }
+
+  Future<_MenuPageData> _loadPage() async {
+    final slug = widget.restaurantSlug?.trim();
+    if (slug == null || slug.isEmpty) {
+      final items = await ApiService.instance.fetchItems();
+      return _MenuPageData(items: items);
+    }
+
+    final restaurant = await ApiService.instance.fetchPublicRestaurant(slug);
+    final settings = await ApiService.instance.fetchSettings(slug: slug);
+    final items = await ApiService.instance.fetchItems(slug: slug);
+    return _MenuPageData(
+      items: items,
+      context: CustomerRestaurantContext(
+        restaurant: restaurant,
+        settings: settings,
+      ),
+    );
   }
 
   Future<void> _reload() async {
+    final future = _loadPage();
     setState(() {
-      _itemsFuture = ApiService.instance.fetchItems();
+      _pageFuture = future;
     });
-    await _itemsFuture;
+    final page = await future;
+    if (mounted) {
+      setState(() => _loadedContext = page.context);
+    }
   }
 
   void _addToCart(MenuItem item) {
@@ -75,8 +117,8 @@ class _MenuScreenState extends State<MenuScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppTheme.brandBackground,
-        body: FutureBuilder<List<MenuItem>>(
-          future: _itemsFuture,
+        body: FutureBuilder<_MenuPageData>(
+          future: _pageFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -85,13 +127,20 @@ class _MenuScreenState extends State<MenuScreen> {
             }
 
             if (snapshot.hasError) {
+              final message = snapshot.error.toString();
+              final isNotFound = message.contains('404') ||
+                  message.contains('غير موجود') ||
+                  message.contains('Restaurant not found');
               return _ErrorState(
-                message: snapshot.error.toString(),
-                onRetry: _reload,
+                message: isNotFound
+                    ? 'المطعم غير موجود أو الرابط غير صحيح'
+                    : message,
+                onRetry: isNotFound ? null : _reload,
               );
             }
 
-            final items = snapshot.data ?? [];
+            final page = snapshot.data!;
+            final items = page.items;
             if (items.isEmpty) {
               return _ErrorState(
                 message: 'لا توجد أصناف متاحة حالياً',
@@ -101,13 +150,24 @@ class _MenuScreenState extends State<MenuScreen> {
 
             final categories = _categories(items);
             final filtered = _filteredItems(items);
+            final restaurantName =
+                page.context?.name ?? 'Molten Cookies';
+            final restaurantTagline = page.context != null
+                ? 'قائمة الطعام — ${page.context!.name}'
+                : 'قائمة الطعام — ميني بايتس وكوكيز';
 
             return RefreshIndicator(
               color: AppTheme.brandOrange,
               onRefresh: _reload,
               child: CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(child: _MenuHeader(onRefresh: _reload)),
+                  SliverToBoxAdapter(
+                    child: _MenuHeader(
+                      onRefresh: _reload,
+                      restaurantName: restaurantName,
+                      tagline: restaurantTagline,
+                    ),
+                  ),
                   SliverToBoxAdapter(
                     child: _CategoryBar(
                       categories: categories,
@@ -171,7 +231,10 @@ class _MenuScreenState extends State<MenuScreen> {
             : _FloatingCartBar(
                 itemCount: cart.itemCount,
                 totalPrice: cart.totalPrice,
-                onCheckout: () => MenuCheckoutSheet.show(context),
+                onCheckout: () => MenuCheckoutSheet.show(
+                  context,
+                  restaurantContext: _loadedContext,
+                ),
               ),
       ),
     );
@@ -257,9 +320,15 @@ class _FloatingCartBar extends StatelessWidget {
 }
 
 class _MenuHeader extends StatelessWidget {
-  const _MenuHeader({required this.onRefresh});
+  const _MenuHeader({
+    required this.onRefresh,
+    required this.restaurantName,
+    required this.tagline,
+  });
 
   final VoidCallback onRefresh;
+  final String restaurantName;
+  final String tagline;
 
   @override
   Widget build(BuildContext context) {
@@ -290,12 +359,12 @@ class _MenuHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Molten Cookies',
+                    restaurantName,
                     style: TextStyle(
                       color: AppTheme.brandBlack,
                       fontSize: 22,
@@ -304,7 +373,7 @@ class _MenuHeader extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'قائمة الطعام — ميني بايتس وكوكيز',
+                    tagline,
                     style: TextStyle(
                       color: Color(0xFF666666),
                       fontSize: 13,
@@ -536,11 +605,11 @@ class _MenuItemImage extends StatelessWidget {
 class _ErrorState extends StatelessWidget {
   const _ErrorState({
     required this.message,
-    required this.onRetry,
+    this.onRetry,
   });
 
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -562,14 +631,15 @@ class _ErrorState extends StatelessWidget {
               style: const TextStyle(color: AppTheme.brandBlack),
             ),
             const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onRetry,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.brandOrange,
+            if (onRetry != null)
+              FilledButton.icon(
+                onPressed: onRetry,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.brandOrange,
+                ),
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
               ),
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-            ),
           ],
         ),
       ),
