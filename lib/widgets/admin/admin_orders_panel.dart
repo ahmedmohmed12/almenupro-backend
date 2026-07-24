@@ -2,17 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/order.dart';
-import '../../services/order_alert_sound_service.dart';
+import '../../services/admin_order_monitor_service.dart';
 import '../../services/orders_service.dart';
 import 'order_status_chip.dart';
 
 class AdminOrdersPanel extends StatefulWidget {
-  const AdminOrdersPanel({
-    super.key,
-    this.onPendingCountChanged,
-  });
-
-  final ValueChanged<int>? onPendingCountChanged;
+  const AdminOrdersPanel({super.key});
 
   @override
   State<AdminOrdersPanel> createState() => AdminOrdersPanelState();
@@ -21,8 +16,7 @@ class AdminOrdersPanel extends StatefulWidget {
 class AdminOrdersPanelState extends State<AdminOrdersPanel>
     with SingleTickerProviderStateMixin {
   final _ordersService = OrdersService.instance;
-  final Set<String> _knownOrderIds = {};
-  var _initialized = false;
+  final _monitor = AdminOrderMonitorService.instance;
 
   late final TabController _tabController;
 
@@ -43,7 +37,7 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
   }
 
   Future<void> _updateStatus(String orderId, OrderStatus status) async {
-    await OrderAlertSoundService.instance.acknowledgeOrder(orderId);
+    await _monitor.acknowledgeOrder(orderId);
 
     try {
       await _ordersService.updateOrderStatus(orderId, status);
@@ -59,57 +53,8 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
     }
   }
 
-  void _handleOrdersUpdate(List<Order> orders) {
-    final pendingOrders =
-        orders.where((order) => order.status == OrderStatus.pending);
-    final pendingCount = pendingOrders.length;
-    final pendingIds = pendingOrders.map((order) => order.id).toSet();
-    widget.onPendingCountChanged?.call(pendingCount);
-
-    if (!_initialized) {
-      _knownOrderIds
-        ..clear()
-        ..addAll(orders.map((order) => order.id));
-      _initialized = true;
-      return;
-    }
-
-    final newlyDetected = <String>{};
-
-    for (final order in pendingOrders) {
-      if (_knownOrderIds.contains(order.id)) continue;
-
-      newlyDetected.add(order.id);
-      _knownOrderIds.add(order.id);
-
-      if (!mounted) continue;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 4),
-          content: Text(
-            '🔔 طلب جديد #${order.invoiceNumber ?? order.id.substring(0, 6)} '
-            'من ${order.customerName}',
-          ),
-        ),
-      );
-    }
-
-    OrderAlertSoundService.instance.syncPendingAlerts(
-      pendingIds,
-      newlyDetected: newlyDetected,
-    );
-
-    if (mounted) setState(() {});
-
-    _knownOrderIds
-      ..clear()
-      ..addAll(orders.map((order) => order.id));
-  }
-
   Future<void> _stopAlertLoop() async {
-    await OrderAlertSoundService.instance.stopAllAlerts();
-    if (mounted) setState(() {});
+    await _monitor.stopAllAlerts();
   }
 
   List<Order> _activeOrders(List<Order> orders) {
@@ -152,9 +97,6 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
         }
 
         final orders = snapshot.data ?? [];
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handleOrdersUpdate(orders);
-        });
 
         final activeOrders = _activeOrders(orders);
         final archivedOrders = _archivedOrders(orders);
@@ -162,15 +104,19 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _OrdersPageHeader(
-              activeCount: activeOrders.length,
-              archivedCount: archivedOrders.length,
-              pendingCount: orders
-                  .where((order) => order.status == OrderStatus.pending)
-                  .length,
-              isAlertLooping:
-                  OrderAlertSoundService.instance.isAlertLoopActive,
-              onStopAlert: _stopAlertLoop,
+            ValueListenableBuilder<bool>(
+              valueListenable: _monitor.alertLoopActive,
+              builder: (context, isAlertLooping, _) {
+                return _OrdersPageHeader(
+                  activeCount: activeOrders.length,
+                  archivedCount: archivedOrders.length,
+                  pendingCount: orders
+                      .where((order) => order.status == OrderStatus.pending)
+                      .length,
+                  isAlertLooping: isAlertLooping,
+                  onStopAlert: _stopAlertLoop,
+                );
+              },
             ),
             if (_ordersService.isDemoMode) const _DemoOrdersBanner(),
             Material(

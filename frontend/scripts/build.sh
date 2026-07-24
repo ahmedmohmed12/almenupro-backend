@@ -14,7 +14,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.4.1 (looping order alerts)"
+echo "Almenupro frontend build v1.5.0 (background order alerts)"
 
 cd "$ROOT"
 flutter --version

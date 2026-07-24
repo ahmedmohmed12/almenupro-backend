@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/order_alert_sound.dart';
 import '../../services/order_alert_sound_service.dart';
+import '../../services/order_browser_notification_service.dart';
 
 class AdminSoundSettingsCard extends StatefulWidget {
   const AdminSoundSettingsCard({super.key});
@@ -139,6 +140,8 @@ class _AdminSoundSettingsCardState extends State<AdminSoundSettingsCard> {
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            _BrowserNotificationSettingsRow(),
             const SizedBox(height: 20),
             ...OrderAlertSoundType.values.map((type) {
               final isSelected = selectedType == type;
@@ -241,5 +244,77 @@ class _AdminSoundSettingsCardState extends State<AdminSoundSettingsCard> {
       case OrderAlertSoundType.alarm:
         return Icons.campaign_outlined;
     }
+  }
+}
+
+class _BrowserNotificationSettingsRow extends StatefulWidget {
+  const _BrowserNotificationSettingsRow();
+
+  @override
+  State<_BrowserNotificationSettingsRow> createState() =>
+      _BrowserNotificationSettingsRowState();
+}
+
+class _BrowserNotificationSettingsRowState
+    extends State<_BrowserNotificationSettingsRow> {
+  final _notificationService = OrderBrowserNotificationService.instance;
+  String _permission = 'unsupported';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPermission();
+  }
+
+  Future<void> _loadPermission() async {
+    final status = await _notificationService.permissionStatus();
+    if (!mounted) return;
+    setState(() => _permission = status);
+  }
+
+  Future<void> _requestPermission() async {
+    final status = await _notificationService.requestPermission();
+    if (!mounted) return;
+    setState(() => _permission = status);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_notificationService.isSupported) {
+      return Text(
+        'إشعارات المتصفح غير مدعومة على هذا الجهاز.',
+        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+      );
+    }
+
+    final granted = _permission == 'granted';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.desktop_windows_outlined, color: Colors.blue.shade800),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              granted
+                  ? 'إشعارات المتصفح مفعّلة للطلبات الجديدة في الخلفية.'
+                  : 'فعّل إشعارات المتصفح لتصلك الطلبات حتى لو كان التبويب غير نشط.',
+              style: TextStyle(color: Colors.blue.shade900, fontSize: 13),
+            ),
+          ),
+          if (!granted)
+            TextButton(
+              onPressed: _requestPermission,
+              child: const Text('تفعيل'),
+            ),
+        ],
+      ),
+    );
   }
 }

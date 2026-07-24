@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../firebase_options.dart';
+import '../models/order.dart';
 import '../utils/firebase_config.dart';
 import '../utils/image_url.dart';
+import '../services/admin_order_monitor_service.dart';
 import '../services/analytics_demo_service.dart';
 import '../services/menu_storage_service.dart';
 import '../services/order_alert_sound_service.dart';
+import '../services/order_browser_notification_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
@@ -33,7 +39,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   final _whatsappController = TextEditingController();
   bool _isSavingSettings = false;
-  int _pendingOrdersCount = 0;
 
   @override
   void initState() {
@@ -44,6 +49,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   void dispose() {
+    AdminOrderMonitorService.instance.stop();
     _passwordController.dispose();
     _whatsappController.dispose();
     super.dispose();
@@ -118,10 +124,85 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _errorMessage = null;
       });
       OrderAlertSoundService.instance.unlockFromUserGesture();
+      unawaited(_startAdminMonitoring());
     } else {
       setState(() {
         _errorMessage = 'كلمة المرور غير صحيحة!';
       });
+    }
+  }
+
+  Future<void> _startAdminMonitoring() async {
+    final monitor = AdminOrderMonitorService.instance;
+    monitor.onNewPendingOrder = _onNewPendingOrderDetected;
+    await monitor.start();
+    if (!mounted) return;
+    await _maybeRequestBrowserNotifications();
+  }
+
+  void _onNewPendingOrderDetected(Order order) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.green.shade700,
+        duration: const Duration(seconds: 4),
+        content: Text(
+          '🔔 طلب جديد #${order.invoiceNumber ?? order.id.substring(0, 6)} '
+          'من ${order.customerName}',
+        ),
+        action: SnackBarAction(
+          label: 'عرض',
+          textColor: Colors.white,
+          onPressed: () {
+            setState(() => _selectedIndex = AdminSidebar.ordersIndex);
+            _ordersPanelKey.currentState?.selectNewOrdersTab();
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _maybeRequestBrowserNotifications() async {
+    final notificationService = OrderBrowserNotificationService.instance;
+    if (!notificationService.isSupported) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    const promptKey = 'browser_notifications_prompted';
+    final alreadyPrompted = prefs.getBool(promptKey) ?? false;
+    final status = await notificationService.permissionStatus();
+
+    if (status == 'granted') return;
+    if (alreadyPrompted && status == 'denied') return;
+
+    if (!mounted) return;
+
+    final allow = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تفعيل إشعارات الطلبات'),
+        content: const Text(
+          'اسمح بإشعارات المتصفح لتصلك تنبيهات فورية بالطلبات الجديدة '
+          'حتى لو كان تبويب لوحة التحكم في الخلفية.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لاحقاً'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6B1124),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('تفعيل الإشعارات', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    await prefs.setBool(promptKey, true);
+    if (allow == true) {
+      await notificationService.requestPermission();
     }
   }
 
@@ -567,6 +648,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 setState(() => _selectedIndex = index);
               },
               onLogout: () {
+                AdminOrderMonitorService.instance.stop();
                 setState(() {
                   _isAuthenticated = false;
                   _passwordController.clear();
@@ -577,11 +659,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Expanded(
               child: Column(
                 children: [
-                  AdminTopHeader(
-                    pendingOrdersCount: _pendingOrdersCount,
-                    onNotificationsTap: () {
-                      setState(() => _selectedIndex = AdminSidebar.ordersIndex);
-                      _ordersPanelKey.currentState?.selectNewOrdersTab();
+                  ValueListenableBuilder<int>(
+                    valueListenable:
+                        AdminOrderMonitorService.instance.pendingCount,
+                    builder: (context, pendingCount, _) {
+                      return AdminTopHeader(
+                        pendingOrdersCount: pendingCount,
+                        onNotificationsTap: () {
+                          setState(
+                            () => _selectedIndex = AdminSidebar.ordersIndex,
+                          );
+                          _ordersPanelKey.currentState?.selectNewOrdersTab();
+                        },
+                      );
                     },
                   ),
                   Expanded(
@@ -602,11 +692,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case AdminSidebar.ordersIndex:
         return AdminOrdersPanel(
           key: _ordersPanelKey,
-          onPendingCountChanged: (pendingCount) {
-            if (_pendingOrdersCount != pendingCount && mounted) {
-              setState(() => _pendingOrdersCount = pendingCount);
-            }
-          },
         );
       case AdminSidebar.analyticsIndex:
         return _buildAnalyticsTab();

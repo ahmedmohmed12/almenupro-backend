@@ -55,4 +55,9 @@ class OrdersService {
     await OrdersDemoService.registerOrder(created);
     await OrdersDemoService.refreshFromApi();
   }
+
+  Future<void> refreshOrders() async {
+    if (usesFirebase) return;
+    await OrdersDemoService.refreshFromApi();
+  }
 }

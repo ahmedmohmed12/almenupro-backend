@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:html' as html;
 
 import '../models/order_alert_sound.dart';
 
 final _players = <OrderAlertSoundType, html.AudioElement>{};
+Timer? _keepAliveTimer;
+var _keepAliveAttached = false;
 var _audioUnlocked = false;
 var _looping = false;
 OrderAlertSoundType? _loopingType;
@@ -25,13 +28,48 @@ html.AudioElement _playerFor(OrderAlertSoundType type) {
   );
 }
 
+void _attachBackgroundKeepAlive() {
+  if (_keepAliveAttached) return;
+  _keepAliveAttached = true;
+
+  html.document.onVisibilityChange.listen((_) {
+    if (_looping) {
+      unawaited(_resumeLoopIfNeeded());
+    }
+  });
+
+  _keepAliveTimer ??= Timer.periodic(const Duration(seconds: 2), (_) {
+    if (!_looping || _loopingType == null) return;
+    unawaited(_resumeLoopIfNeeded());
+  });
+}
+
+Future<void> _resumeLoopIfNeeded() async {
+  if (!_looping || _loopingType == null) return;
+
+  final player = _playerFor(_loopingType!);
+  player.loop = true;
+
+  if (player.paused || player.ended) {
+    player.currentTime = 0;
+    try {
+      await player.play();
+    } catch (_) {
+      _audioUnlocked = false;
+    }
+  }
+}
+
 Future<void> unlockOrderAlertAudio() async {
+  _attachBackgroundKeepAlive();
+
   for (final type in OrderAlertSoundType.values) {
     _playerFor(type);
   }
 
   try {
     final probe = _playerFor(OrderAlertSoundType.soft);
+    probe.loop = false;
     probe.volume = 0.01;
     await probe.play();
     probe.pause();
@@ -56,7 +94,12 @@ Future<void> playOrderAlertSound(OrderAlertSoundType type) async {
 }
 
 Future<void> startLoopingOrderAlert(OrderAlertSoundType type) async {
-  if (_looping && _loopingType == type) return;
+  _attachBackgroundKeepAlive();
+
+  if (_looping && _loopingType == type) {
+    await _resumeLoopIfNeeded();
+    return;
+  }
 
   await stopOrderAlertLoop();
 
