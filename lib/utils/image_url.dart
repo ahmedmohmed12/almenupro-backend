@@ -39,7 +39,7 @@ String resolveImageUrl(String url) {
 
   final filename = localMenuImageFilename(trimmed);
   if (filename != null && filename.isNotEmpty) {
-    return '${ApiService.baseUrl}/items/image/$filename';
+    return '$menuImageApiOrigin/menu-images/$filename';
   }
 
   if (isLegacyTalabatImageUrl(trimmed)) {
