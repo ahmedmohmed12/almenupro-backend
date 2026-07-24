@@ -19,6 +19,7 @@ import '../services/order_browser_notification_service.dart';
 import '../services/restaurant_settings_service.dart';
 import '../services/super_admin_scope_service.dart';
 import '../services/talabat_menu_service.dart';
+import '../widgets/admin/admin_corner_toast.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
@@ -212,24 +213,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _onNewPendingOrderDetected(Order order) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.green.shade700,
-        duration: const Duration(seconds: 4),
-        content: Text(
-          '🔔 طلب جديد #${order.invoiceNumber ?? order.id.substring(0, 6)} '
-          'من ${order.customerName}',
-        ),
-        action: SnackBarAction(
-          label: 'عرض',
-          textColor: Colors.white,
-          onPressed: () {
-            setState(() => _selectedIndex = AdminSidebar.ordersIndex);
-            _ordersPanelKey.currentState?.selectNewOrdersTab();
-          },
-        ),
-      ),
+    if (!mounted || _isSuperAdmin) return;
+    AdminCornerToast.show(
+      context,
+      '🔔 طلب جديد #${order.invoiceNumber ?? order.id.substring(0, 6)}',
+      duration: const Duration(seconds: 3),
+      maxWidth: 180,
     );
   }
 
@@ -768,58 +757,75 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Listener(
-        onPointerDown: (_) {
-          OrderAlertSoundService.instance.unlockFromUserGesture();
-        },
-        child: Scaffold(
-        backgroundColor: const Color(0xFFF4F6F8),
-        body: Row(
-          children: [
-            AdminSidebar(
-              items: _isSuperAdmin
-                  ? AdminSidebar.superAdminItems
-                  : AdminSidebar.defaultItems,
-              selectedIndex: _selectedIndex,
-              onItemSelected: (index) {
-                setState(() => _selectedIndex = index);
-              },
-              onLogout: _logout,
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  ValueListenableBuilder<int>(
-                    valueListenable:
-                        AdminOrderMonitorService.instance.pendingCount,
-                    builder: (context, pendingCount, _) {
-                      return AdminTopHeader(
-                        isSuperAdmin: _isSuperAdmin,
-                        showOrderNotifications: !_isSuperAdmin,
-                        restaurantLabel: _restaurantLabel,
-                        pendingOrdersCount: pendingCount,
-                        onNotificationsTap: () {
-                          setState(
-                            () => _selectedIndex = AdminSidebar.ordersIndex,
-                          );
-                          _ordersPanelKey.currentState?.selectNewOrdersTab();
-                        },
-                      );
-                    },
+      child: _buildAuthenticatedShell(),
+    );
+  }
+
+  Widget _buildAuthenticatedShell() {
+    final shell = Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
+      body: Row(
+        children: [
+          AdminSidebar(
+            items: _isSuperAdmin
+                ? AdminSidebar.superAdminItems
+                : AdminSidebar.defaultItems,
+            selectedIndex: _selectedIndex,
+            onItemSelected: (index) {
+              setState(() => _selectedIndex = index);
+            },
+            onLogout: _logout,
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                _buildTopHeader(),
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: SuperAdminScopeService.instance,
+                    builder: (context, _) => _buildActiveTab(),
                   ),
-                  Expanded(
-                    child: ListenableBuilder(
-                      listenable: SuperAdminScopeService.instance,
-                      builder: (context, _) => _buildActiveTab(),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      ),
+    );
+
+    if (_isSuperAdmin) return shell;
+
+    return Listener(
+      onPointerDown: (_) {
+        OrderAlertSoundService.instance.unlockFromUserGesture();
+      },
+      child: shell,
+    );
+  }
+
+  Widget _buildTopHeader() {
+    if (_isSuperAdmin) {
+      return AdminTopHeader(
+        isSuperAdmin: true,
+        showOrderNotifications: false,
+        restaurantLabel: _restaurantLabel,
+      );
+    }
+
+    return ValueListenableBuilder<int>(
+      valueListenable: AdminOrderMonitorService.instance.pendingCount,
+      builder: (context, pendingCount, _) {
+        return AdminTopHeader(
+          isSuperAdmin: false,
+          showOrderNotifications: true,
+          restaurantLabel: _restaurantLabel,
+          pendingOrdersCount: pendingCount,
+          onNotificationsTap: () {
+            setState(() => _selectedIndex = AdminSidebar.ordersIndex);
+            _ordersPanelKey.currentState?.selectNewOrdersTab();
+          },
+        );
+      },
     );
   }
 

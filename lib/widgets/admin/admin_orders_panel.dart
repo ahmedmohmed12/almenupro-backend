@@ -5,6 +5,7 @@ import '../../models/order.dart';
 import '../../services/admin_order_monitor_service.dart';
 import '../../services/orders_service.dart';
 import 'order_status_chip.dart';
+import 'admin_corner_toast.dart';
 
 class AdminOrdersPanel extends StatefulWidget {
   const AdminOrdersPanel({super.key});
@@ -42,14 +43,13 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
     try {
       await _ordersService.updateOrderStatus(orderId, status);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم تحديث الحالة: ${status.arabicLabel}')),
+      AdminCornerToast.success(
+        context,
+        'تم: ${status.arabicLabel}',
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحديث الطلب: $error')),
-      );
+      AdminCornerToast.error(context, 'تعذر تحديث الطلب');
     }
   }
 
