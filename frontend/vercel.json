@@ -20,7 +20,7 @@
       ]
     },
     {
-      "source": "/(.*\\.(js|json|wasm|png|jpg|jpeg|webp|svg|ico|woff2|ttf))",
+      "source": "/(.*)\\.(js|json|wasm|png|jpg|jpeg|webp|svg|ico|woff2|ttf|frag)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
