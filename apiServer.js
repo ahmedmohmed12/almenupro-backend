@@ -7,6 +7,25 @@ const {
   ensureUploadDir,
 } = require('./lib/menuImageStorage');
 
+function warmMenuImageBundle() {
+  const roots = [
+    path.join(__dirname, 'uploads', 'menu'),
+    path.join(__dirname, 'public', 'menu-images'),
+  ];
+
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    for (const filename of fs.readdirSync(root)) {
+      if (filename.startsWith('.')) continue;
+      try {
+        fs.readFileSync(path.join(root, filename));
+      } catch (_) {}
+    }
+  }
+}
+
+warmMenuImageBundle();
+
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
 const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
