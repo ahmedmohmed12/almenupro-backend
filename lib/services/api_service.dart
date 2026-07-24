@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/menu_item.dart';
 import '../models/order.dart';
+import '../models/restaurant_settings.dart';
 
 class ApiService {
   ApiService._();
@@ -126,6 +127,57 @@ class ApiService {
       throw Exception('انتهت مهلة الاتصال بالسيرفر');
     } catch (error) {
       throw Exception('خطأ في حفظ الطلب: $error');
+    }
+  }
+
+  Future<RestaurantSettings> fetchSettings() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/settings'))
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) {
+        throw Exception('فشل في تحميل الإعدادات (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+
+      return RestaurantSettings.fromJson(Map<String, dynamic>.from(decoded));
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      throw Exception('خطأ في تحميل الإعدادات: $error');
+    }
+  }
+
+  Future<RestaurantSettings> updateSettings(RestaurantSettings settings) async {
+    try {
+      final payload = settings.copyWith(updatedAt: DateTime.now().toUtc());
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/settings'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(payload.toJson()),
+          )
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) {
+        throw Exception('فشل في حفظ الإعدادات (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        return payload;
+      }
+
+      return RestaurantSettings.fromJson(Map<String, dynamic>.from(decoded));
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      throw Exception('خطأ في حفظ الإعدادات: $error');
     }
   }
 

@@ -14,12 +14,14 @@ import '../services/analytics_demo_service.dart';
 import '../services/menu_storage_service.dart';
 import '../services/order_alert_sound_service.dart';
 import '../services/order_browser_notification_service.dart';
+import '../services/restaurant_settings_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
+import '../widgets/admin/admin_working_hours_card.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -56,25 +58,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _loadSettings() async {
-    if (kIsWeb &&
-        (DefaultFirebaseOptions.web.apiKey.startsWith('YOUR_') ||
-            DefaultFirebaseOptions.web.projectId.startsWith('YOUR_'))) {
-      _whatsappController.text = '96594774950';
-      if (mounted) setState(() {});
-      return;
-    }
-
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('settings')
-          .doc('restaurant_info')
-          .get();
-      if (doc.exists && doc.data() != null) {
-        _whatsappController.text =
-            doc.data()?['whatsappNumber'] as String? ?? '96594774950';
-      } else {
-        _whatsappController.text = '96594774950';
-      }
+      final settings = await RestaurantSettingsService.instance.load();
+      _whatsappController.text = settings.whatsappNumber;
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading settings: $e');
@@ -86,34 +72,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (_whatsappController.text.trim().isEmpty) return;
     setState(() => _isSavingSettings = true);
 
-    if (!isFirebaseConfigured) {
-      setState(() => _isSavingSettings = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'تم حفظ الرقم محلياً. اربط Firebase لمزامنة الإعدادات بين الأجهزة.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    await FirebaseFirestore.instance
-        .collection('settings')
-        .doc('restaurant_info')
-        .set({
-      'whatsappNumber': _whatsappController.text.trim(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    setState(() => _isSavingSettings = false);
-
-    if (mounted) {
+    try {
+      await RestaurantSettingsService.instance
+          .saveWhatsappNumber(_whatsappController.text.trim());
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ رقم الواتساب بنجاح!')),
+        SnackBar(
+          content: Text(
+            isFirebaseConfigured
+                ? 'تم حفظ رقم الواتساب بنجاح!'
+                : 'تم حفظ الرقم على السيرفر. اربط Firebase لمزامنة الإعدادات بين الأجهزة.',
+          ),
+        ),
       );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حفظ رقم الواتساب: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingSettings = false);
     }
   }
 
@@ -772,6 +750,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          const AdminWorkingHoursCard(),
           const SizedBox(height: 20),
           const AdminSoundSettingsCard(),
         ],

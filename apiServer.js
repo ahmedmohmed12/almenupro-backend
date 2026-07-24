@@ -29,6 +29,7 @@ warmMenuImageBundle();
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'menu_items.json');
 const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
+const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
 const IS_VERCEL = Boolean(process.env.VERCEL);
 
 let seedItems = [];
@@ -48,6 +49,14 @@ try {
 
 let memoryItems = [...seedItems];
 let memoryOrders = [...seedOrders];
+let seedSettings = {};
+try {
+  seedSettings = require('./data/settings.json');
+  if (!seedSettings || typeof seedSettings !== 'object') seedSettings = {};
+} catch {
+  seedSettings = {};
+}
+let memorySettings = { ...seedSettings };
 
 const categoryIds = new Map();
 let nextCategoryId = 1;
@@ -199,6 +208,84 @@ function writeOrders(orders) {
   fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
 }
 
+const DEFAULT_WORKING_HOURS = [
+  { weekday: 6, isOpen: true, open: '10:00', close: '22:00' },
+  { weekday: 7, isOpen: true, open: '10:00', close: '22:00' },
+  { weekday: 1, isOpen: true, open: '10:00', close: '22:00' },
+  { weekday: 2, isOpen: true, open: '10:00', close: '22:00' },
+  { weekday: 3, isOpen: true, open: '10:00', close: '22:00' },
+  { weekday: 4, isOpen: true, open: '10:00', close: '22:00' },
+  { weekday: 5, isOpen: true, open: '10:00', close: '23:00' },
+];
+
+function defaultSettings() {
+  return {
+    whatsappNumber: '96594774950',
+    workingHours: DEFAULT_WORKING_HOURS,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function normalizeSettings(raw) {
+  const base = defaultSettings();
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const workingHours = Array.isArray(source.workingHours) && source.workingHours.length
+    ? source.workingHours
+    : base.workingHours;
+
+  return {
+    whatsappNumber: String(source.whatsappNumber || source.whatsapp_number || base.whatsappNumber).trim(),
+    workingHours: workingHours.map((day) => ({
+      weekday: Number(day.weekday) || 6,
+      isOpen: day.isOpen !== false && day.is_open !== false,
+      open: String(day.open || day.openTime || '10:00'),
+      close: String(day.close || day.closeTime || '22:00'),
+    })),
+    updatedAt: source.updatedAt || new Date().toISOString(),
+  };
+}
+
+function ensureSettingsFile() {
+  const dir = path.dirname(SETTINGS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  if (!fs.existsSync(SETTINGS_FILE)) {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(defaultSettings(), null, 2), 'utf8');
+  }
+}
+
+function readSettings() {
+  if (IS_VERCEL) {
+    try {
+      delete require.cache[require.resolve('./data/settings.json')];
+      const fresh = require('./data/settings.json');
+      if (fresh && typeof fresh === 'object') {
+        memorySettings = normalizeSettings(fresh);
+      }
+    } catch (_) {}
+    return normalizeSettings(memorySettings);
+  }
+
+  ensureSettingsFile();
+  const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
+  const parsed = JSON.parse(raw || '{}');
+  memorySettings = normalizeSettings(parsed);
+  return memorySettings;
+}
+
+function writeSettings(settings) {
+  memorySettings = normalizeSettings(settings);
+
+  if (IS_VERCEL) {
+    return memorySettings;
+  }
+
+  ensureSettingsFile();
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(memorySettings, null, 2), 'utf8');
+  return memorySettings;
+}
+
 function normalizeOrder(raw, id) {
   const createdAt = raw.createdAt || new Date().toISOString();
   return {
@@ -318,6 +405,7 @@ const server = http.createServer(async (req, res) => {
         health: '/api/health',
         menu: '/api/items',
         orders: '/api/orders',
+        settings: '/api/settings',
         images: '/menu-images/{filename}',
       },
       frontend: 'https://almenupro-frontend-three.vercel.app',
@@ -460,11 +548,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/settings') {
+    sendJson(res, 200, readSettings());
+    return;
+  }
+
+  if (req.method === 'PUT' && url.pathname === '/api/settings') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const current = readSettings();
+      const merged = writeSettings({
+        ...current,
+        ...body,
+        workingHours: Array.isArray(body.workingHours)
+          ? body.workingHours
+          : current.workingHours,
+        updatedAt: new Date().toISOString(),
+      });
+      sendJson(res, 200, merged);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
   sendJson(res, 404, { error: 'Not found' });
 });
 
 ensureDataFile();
 ensureOrdersFile();
+ensureSettingsFile();
 ensureUploadDir();
 if (!IS_VERCEL && memoryItems.length === 0) {
   memoryItems = readItems();
@@ -472,6 +585,7 @@ if (!IS_VERCEL && memoryItems.length === 0) {
 if (!IS_VERCEL && memoryOrders.length === 0) {
   memoryOrders = readOrders();
 }
+memorySettings = readSettings();
 rebuildCategoryIds(memoryItems);
 
 module.exports = server;
