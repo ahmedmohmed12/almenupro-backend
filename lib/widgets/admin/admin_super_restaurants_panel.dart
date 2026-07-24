@@ -6,6 +6,7 @@ import '../../services/api_service.dart';
 import '../../services/super_admin_scope_service.dart';
 import '../../services/talabat_menu_service.dart';
 import '../../utils/restaurant_route.dart';
+import '../../utils/restaurant_slug.dart';
 
 
 
@@ -46,6 +47,7 @@ class _AdminSuperRestaurantsPanelState extends State<AdminSuperRestaurantsPanel>
   var _creating = false;
 
   String? _errorMessage;
+  StorageHealth? _storageHealth;
 
 
 
@@ -56,7 +58,25 @@ class _AdminSuperRestaurantsPanelState extends State<AdminSuperRestaurantsPanel>
     super.initState();
 
     _loadRestaurants();
+    _loadStorageHealth();
+  }
 
+  Future<void> _loadStorageHealth() async {
+    try {
+      final health = await ApiService.instance.fetchStorageHealth();
+      if (mounted) setState(() => _storageHealth = health);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _storageHealth = const StorageHealth(
+            ok: false,
+            storage: 'unknown',
+            persistent: false,
+            message: 'تعذر التحقق من وضع التخزين',
+          ),
+        );
+      }
+    }
   }
 
 
@@ -110,84 +130,85 @@ class _AdminSuperRestaurantsPanelState extends State<AdminSuperRestaurantsPanel>
 
 
   Future<void> _createRestaurant() async {
-
     final name = _nameController.text.trim();
-
-    final slug = _slugController.text.trim();
-
+    final slug = normalizeRestaurantSlug(
+      _slugController.text,
+      fallbackName: name,
+    );
     final password = _passwordController.text.trim();
 
-
-
     if (name.isEmpty || slug.isEmpty || password.isEmpty) {
-
       ScaffoldMessenger.of(context).showSnackBar(
-
-        const SnackBar(content: Text('يرجى ملء جميع حقول المطعم الجديد')),
-
+        const SnackBar(
+          content: Text(
+            'يرجى إدخال اسم المطعم ومعرف slug بالإنجليزية (مثل bait-amsha) وكلمة المرور',
+          ),
+        ),
       );
-
       return;
-
     }
 
-
+    if (_storageHealth != null && !_storageHealth!.persistent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFC62828),
+          duration: Duration(seconds: 6),
+          content: Text(
+            'لا يمكن حفظ المطاعم حالياً: السيرفر بدون MongoDB. '
+            'أضف MONGODB_URI في Vercel → Settings → Environment Variables ثم Redeploy.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() => _creating = true);
 
-
-
     try {
-
-      await ApiService.instance.createRestaurant(
-
+      final created = await ApiService.instance.createRestaurant(
         name: name,
-
         slug: slug,
-
         adminPassword: password,
-
       );
 
-
-
       _nameController.clear();
-
       _slugController.clear();
-
       _passwordController.clear();
-
-
 
       await _loadRestaurants();
       await SuperAdminScopeService.instance.refreshRestaurants();
 
-
-
       if (!mounted) return;
 
+      final menuPath = RestaurantRoute.menuPathForSlug(created.slug);
+      final menuUrl = kIsWeb ? '${Uri.base.origin}$menuPath' : menuPath;
+
       ScaffoldMessenger.of(context).showSnackBar(
-
-        const SnackBar(content: Text('تم إنشاء المطعم بنجاح')),
-
+        SnackBar(
+          backgroundColor: const Color(0xFF2E7D32),
+          duration: const Duration(seconds: 5),
+          content: Text(
+            'تم حفظ المطعم "${created.name}" بنجاح.\n'
+            'slug: ${created.slug}\n'
+            'رابط العملاء: $menuUrl',
+          ),
+        ),
       );
-
     } catch (error) {
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-
-        SnackBar(content: Text('تعذر إنشاء المطعم: $error')),
-
+        SnackBar(
+          backgroundColor: const Color(0xFFC62828),
+          duration: const Duration(seconds: 6),
+          content: Text(
+            error.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
       );
-
     } finally {
-
       if (mounted) setState(() => _creating = false);
-
     }
-
   }
 
 
@@ -390,6 +411,32 @@ class _AdminSuperRestaurantsPanelState extends State<AdminSuperRestaurantsPanel>
 
           const SizedBox(height: 20),
 
+          if (_storageHealth != null && !_storageHealth!.persistent)
+            Card(
+              color: const Color(0xFFFFEBEE),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFC62828)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'تحذير: التخزين الحالي (${_storageHealth!.storage}) غير دائم. '
+                        'المطاعم الجديدة لن تُحفظ بعد تحديث الصفحة حتى تضيف '
+                        'MONGODB_URI و MONGODB_DB في Vercel وتعيد نشر الباك إند.',
+                        style: const TextStyle(color: Color(0xFF5D1A1A), height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (_storageHealth != null && !_storageHealth!.persistent)
+            const SizedBox(height: 16),
+
           Card(
 
             child: Padding(
@@ -434,9 +481,9 @@ class _AdminSuperRestaurantsPanelState extends State<AdminSuperRestaurantsPanel>
 
                     decoration: const InputDecoration(
 
-                      labelText: 'المعرف (slug) — للدخول',
-
-                      hintText: 'molton-cookies',
+                      labelText: 'المعرف (slug) — للرابط والدخول',
+                      hintText: 'bait-amsha (حروف إنجليزية وأرقام فقط)',
+                      helperText: 'يُستخدم في رابط العملاء: /menu/slug',
 
                       border: OutlineInputBorder(),
 

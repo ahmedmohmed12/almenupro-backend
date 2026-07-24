@@ -55,6 +55,7 @@ const { scrapeTalabatMenu } = require('./lib/talabatScraper');
 const {
   initDataStore,
   usesMongo,
+  getStorageStatus,
   readItems,
   writeItems,
   readOrders,
@@ -485,9 +486,23 @@ const server = http.createServer(async (req, res) => {
       await writeRestaurants(restaurants);
       await writeSettings(record.id, defaultSettingsPayload());
 
-      sendJson(res, 201, sanitizeRestaurant(record));
+      const saved = (await readRestaurants()).find((entry) => entry.id === record.id);
+      if (!saved) {
+        sendJson(res, 500, { error: 'Restaurant was not persisted after save' });
+        return;
+      }
+
+      sendJson(res, 201, {
+        ...sanitizeRestaurant(saved),
+        menuUrl: `/menu/${saved.slug}`,
+        persisted: true,
+      });
     } catch (error) {
-      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+      const statusCode = error.code === 'PERSISTENCE_REQUIRED' ? 503 : 400;
+      sendJson(res, statusCode, {
+        error: error.message || 'Invalid payload',
+        code: error.code || 'CREATE_RESTAURANT_FAILED',
+      });
     }
     return;
   }
@@ -495,10 +510,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/health') {
     const items = await readItems();
     const { resolveImageDiskPath } = require('./lib/menuImageStorage');
+    const storage = getStorageStatus();
     sendJson(res, 200, {
       ok: true,
       service: 'almenupro-api',
-      storage: usesMongo() ? 'mongodb' : IS_VERCEL ? 'ephemeral-json' : 'filesystem',
+      storage: storage.mode,
+      persistent: storage.persistent,
+      persistenceMessage: storage.message,
       items: items.length,
       imagesReady: Boolean(resolveImageDiskPath('1962105681.jpg')),
     });

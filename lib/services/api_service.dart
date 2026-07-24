@@ -238,11 +238,26 @@ class ApiService {
 
 
     if (response.statusCode != 201 && response.statusCode != 200) {
-
-      final body = response.body;
-
-      throw Exception('فشل في إنشاء المطعم (${response.statusCode}) $body');
-
+      String message = 'فشل في إنشاء المطعم (${response.statusCode})';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['error'] != null) {
+          message = decoded['error'].toString();
+        }
+      } catch (_) {
+        if (response.body.isNotEmpty) {
+          message = response.body;
+        }
+      }
+      if (response.statusCode == 503) {
+        throw Exception(
+          'التخزين غير دائم على السيرفر. أضف MONGODB_URI في Vercel ثم أعد النشر.\n$message',
+        );
+      }
+      if (response.statusCode == 409) {
+        throw Exception('معرف المطعم (slug) مستخدم بالفعل');
+      }
+      throw Exception(message);
     }
 
 
@@ -450,23 +465,29 @@ class ApiService {
 
 
   Future<bool> isOnline() async {
-
     try {
-
-      final response = await http
-
-          .get(_uri('/health'))
-
-          .timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
-
+      final health = await fetchStorageHealth();
+      return health.ok;
     } catch (_) {
-
       return false;
+    }
+  }
 
+  Future<StorageHealth> fetchStorageHealth() async {
+    final response = await http
+        .get(_uri('/health'), headers: _publicHeaders)
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في فحص السيرفر (${response.statusCode})');
     }
 
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return StorageHealth.fromJson(Map<String, dynamic>.from(decoded));
   }
 
 
@@ -1065,6 +1086,29 @@ class TalabatImportResult {
   static int _toInt(Object? value) {
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+}
+
+class StorageHealth {
+  const StorageHealth({
+    required this.ok,
+    required this.storage,
+    required this.persistent,
+    this.message,
+  });
+
+  final bool ok;
+  final String storage;
+  final bool persistent;
+  final String? message;
+
+  factory StorageHealth.fromJson(Map<String, dynamic> json) {
+    return StorageHealth(
+      ok: json['ok'] == true,
+      storage: json['storage']?.toString() ?? 'unknown',
+      persistent: json['persistent'] == true,
+      message: json['persistenceMessage']?.toString(),
+    );
   }
 }
 
