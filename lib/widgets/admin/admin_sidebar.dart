@@ -27,6 +27,7 @@ class AdminSidebar extends StatelessWidget {
   static const int settingsIndex = 3;
 
   static const List<AdminSidebarItem> defaultItems = [
+    // Must stay first: opens AdminOrdersPanel (new + archived tabs).
     AdminSidebarItem(
       icon: Icons.receipt_long_outlined,
       label: 'الطلبات',
