@@ -1,1 +1,1 @@
-export 'order_sound_stub.dart' if (dart.library.html) 'order_sound_web.dart';
+export '../services/order_alert_sound_service.dart';

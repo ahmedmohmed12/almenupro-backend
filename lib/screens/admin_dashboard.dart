@@ -7,10 +7,12 @@ import '../utils/firebase_config.dart';
 import '../utils/image_url.dart';
 import '../services/analytics_demo_service.dart';
 import '../services/menu_storage_service.dart';
+import '../services/order_alert_sound_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
+import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -37,6 +39,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     _loadSettings();
+    OrderAlertSoundService.instance.initialize();
   }
 
   @override
@@ -114,6 +117,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _isAuthenticated = true;
         _errorMessage = null;
       });
+      OrderAlertSoundService.instance.unlockFromUserGesture();
     } else {
       setState(() {
         _errorMessage = 'كلمة المرور غير صحيحة!';
@@ -549,7 +553,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
+      child: Listener(
+        onPointerDown: (_) {
+          OrderAlertSoundService.instance.unlockFromUserGesture();
+        },
+        child: Scaffold(
         backgroundColor: const Color(0xFFF4F6F8),
         body: Row(
           children: [
@@ -584,6 +592,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -678,6 +687,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          const AdminSoundSettingsCard(),
         ],
       ),
     );
