@@ -5,7 +5,6 @@
   "buildCommand": "bash scripts/build.sh",
   "outputDirectory": "dist",
   "rewrites": [
-    { "handle": "filesystem" },
     {
       "source": "/(.*)",
       "destination": "/index.html"
