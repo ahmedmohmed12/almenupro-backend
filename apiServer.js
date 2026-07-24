@@ -5,6 +5,7 @@ const {
   persistMenuItemsImages,
   serveMenuImage,
   ensureUploadDir,
+  mapItemsForPublicApi,
 } = require('./lib/menuImageStorage');
 const {
   ROLES,
@@ -81,6 +82,18 @@ function sendJson(res, statusCode, payload) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Restaurant-Id',
   });
   res.end(JSON.stringify(payload));
+}
+
+function requestOrigin(req) {
+  const proto = String(req.headers['x-forwarded-proto'] || 'https')
+    .split(',')[0]
+    .trim();
+  const host = String(
+    req.headers['x-forwarded-host'] || req.headers.host || 'almenupro-backend.vercel.app',
+  )
+    .split(',')[0]
+    .trim();
+  return `${proto}://${host}`;
 }
 
 const ALLOWED_IMAGE_HOSTS = new Set([
@@ -553,7 +566,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const items = filterByRestaurant(await readItems(), restaurantId);
+    const items = mapItemsForPublicApi(
+      filterByRestaurant(await readItems(), restaurantId),
+      requestOrigin(req),
+    );
     rebuildCategoryIds(items);
     sendJson(res, 200, items);
     return;

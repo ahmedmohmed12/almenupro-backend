@@ -24,6 +24,10 @@ bool isLocalMenuImagePath(String url) {
       trimmed.startsWith('/api/uploads/menu/');
 }
 
+bool isBackendImageProxyPath(String url) {
+  return url.trim().contains('/api/image-proxy');
+}
+
 String? localMenuImageFilename(String url) {
   final trimmed = url.trim();
   if (!isLocalMenuImagePath(trimmed)) return null;
@@ -31,11 +35,20 @@ String? localMenuImageFilename(String url) {
   return parts.isEmpty ? null : parts.last;
 }
 
-/// Normalizes menu image paths for display. Prefers locally hosted Almenupro URLs
-/// and ignores legacy Talabat CDN links that should be migrated on the server.
+/// Builds a browser-loadable image URL from API payloads or stored paths.
 String resolveImageUrl(String url) {
   final trimmed = url.trim();
   if (trimmed.isEmpty) return trimmed;
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  if (isBackendImageProxyPath(trimmed)) {
+    return trimmed.startsWith('/')
+        ? '$menuImageApiOrigin$trimmed'
+        : trimmed;
+  }
 
   final filename = localMenuImageFilename(trimmed);
   if (filename != null && filename.isNotEmpty) {
@@ -43,7 +56,7 @@ String resolveImageUrl(String url) {
   }
 
   if (isLegacyTalabatImageUrl(trimmed)) {
-    return '';
+    return '$menuImageApiOrigin/api/image-proxy?url=${Uri.encodeComponent(trimmed)}';
   }
 
   if (trimmed.startsWith('/')) {
@@ -53,11 +66,15 @@ String resolveImageUrl(String url) {
   return trimmed;
 }
 
-/// Used when parsing API payloads — keeps local paths, drops legacy CDN URLs.
+/// Parses API payloads — keeps local paths, proxy paths, and absolute URLs.
 String normalizeMenuImageUrl(Object? raw) {
   final value = (raw ?? '').toString().trim();
   if (value.isEmpty) return '';
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
+  }
   if (isLocalMenuImagePath(value)) return value;
-  if (isLegacyTalabatImageUrl(value)) return '';
+  if (isBackendImageProxyPath(value)) return value;
+  if (isLegacyTalabatImageUrl(value)) return value;
   return value;
 }
