@@ -56,6 +56,17 @@ enum OrderStatus {
         OrderStatus.preparing => OrderStatus.delivered,
         _ => null,
       };
+
+  /// Active orders shown under "الطلبات الجديدة".
+  bool get isActiveForAdmin =>
+      this == OrderStatus.pending ||
+      this == OrderStatus.confirmed ||
+      this == OrderStatus.preparing ||
+      this == OrderStatus.ready;
+
+  /// Completed orders shown under "الطلبات السابقة".
+  bool get isArchivedForAdmin =>
+      this == OrderStatus.delivered || this == OrderStatus.cancelled;
 }
 
 class OrderLineItem {

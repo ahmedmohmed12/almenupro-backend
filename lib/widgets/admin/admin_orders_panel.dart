@@ -15,13 +15,32 @@ class AdminOrdersPanel extends StatefulWidget {
   final ValueChanged<int>? onPendingCountChanged;
 
   @override
-  State<AdminOrdersPanel> createState() => _AdminOrdersPanelState();
+  State<AdminOrdersPanel> createState() => AdminOrdersPanelState();
 }
 
-class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
+class AdminOrdersPanelState extends State<AdminOrdersPanel>
+    with SingleTickerProviderStateMixin {
   final _ordersService = OrdersService.instance;
   final Set<String> _knownOrderIds = {};
   var _initialized = false;
+
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void selectNewOrdersTab() {
+    _tabController.animateTo(0);
+  }
 
   Future<void> _updateStatus(String orderId, OrderStatus status) async {
     try {
@@ -76,6 +95,19 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       ..addAll(orders.map((order) => order.id));
   }
 
+  List<Order> _activeOrders(List<Order> orders) {
+    final active = orders.where((order) => order.status.isActiveForAdmin).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return active;
+  }
+
+  List<Order> _archivedOrders(List<Order> orders) {
+    final archived =
+        orders.where((order) => order.status.isArchivedForAdmin).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return archived;
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('d/M • HH:mm');
@@ -85,11 +117,21 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF6B1124)),
+          );
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('خطأ في تحميل الطلبات: ${snapshot.error}'));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'خطأ في تحميل الطلبات: ${snapshot.error}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
         }
 
         final orders = snapshot.data ?? [];
@@ -97,34 +139,74 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
           _handleOrdersUpdate(orders);
         });
 
-        if (orders.isEmpty) {
-          return const Center(
-            child: Text(
-              'لا توجد طلبات حتى الآن.\n'
-              'ستظهر الطلبات هنا فور إرسال العميل عبر المنيو أو الواتساب.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
-            ),
-          );
-        }
+        final activeOrders = _activeOrders(orders);
+        final archivedOrders = _archivedOrders(orders);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_ordersService.isDemoMode) _DemoOrdersBanner(),
+            _OrdersPageHeader(
+              activeCount: activeOrders.length,
+              archivedCount: archivedOrders.length,
+              pendingCount: orders
+                  .where((order) => order.status == OrderStatus.pending)
+                  .length,
+            ),
+            if (_ordersService.isDemoMode) const _DemoOrdersBanner(),
+            Material(
+              color: Colors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF6B1124),
+                unselectedLabelColor: Colors.grey.shade600,
+                indicatorColor: const Color(0xFFD49A00),
+                indicatorWeight: 3,
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.fiber_new_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text('الطلبات الجديدة (${activeOrders.length})'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.inventory_2_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text('الطلبات السابقة (${archivedOrders.length})'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: orders.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final order = orders[index];
-                  return _AdminOrderCard(
-                    order: order,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _OrdersList(
+                    orders: activeOrders,
                     dateFormat: dateFormat,
+                    emptyTitle: 'لا توجد طلبات جديدة',
+                    emptySubtitle:
+                        'ستظهر الطلبات الواردة هنا فور إرسال العميل عبر المنيو أو الواتساب.',
                     onStatusChanged: _updateStatus,
-                  );
-                },
+                  ),
+                  _OrdersList(
+                    orders: archivedOrders,
+                    dateFormat: dateFormat,
+                    emptyTitle: 'لا توجد طلبات سابقة',
+                    emptySubtitle:
+                        'عند إتمام التوصيل أو إلغاء الطلب، يُحفظ هنا للمراجعة.',
+                    onStatusChanged: _updateStatus,
+                    readOnly: true,
+                  ),
+                ],
               ),
             ),
           ],
@@ -134,11 +216,191 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
   }
 }
 
-class _DemoOrdersBanner extends StatelessWidget {
+class _OrdersPageHeader extends StatelessWidget {
+  const _OrdersPageHeader({
+    required this.activeCount,
+    required this.archivedCount,
+    required this.pendingCount,
+  });
+
+  final int activeCount;
+  final int archivedCount;
+  final int pendingCount;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+      color: const Color(0xFFF4F6F8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'إدارة الطلبات',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF6B1124),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'تابع الطلبات الجديدة واقبلها، ثم راجع الأرشيف المحفوظ.',
+            style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _StatChip(
+                icon: Icons.notifications_active_outlined,
+                label: 'بانتظار القبول',
+                value: '$pendingCount',
+                color: Colors.green.shade700,
+              ),
+              _StatChip(
+                icon: Icons.delivery_dining_outlined,
+                label: 'طلبات نشطة',
+                value: '$activeCount',
+                color: const Color(0xFF6B1124),
+              ),
+              _StatChip(
+                icon: Icons.archive_outlined,
+                label: 'محفوظة',
+                value: '$archivedCount',
+                color: Colors.brown,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrdersList extends StatelessWidget {
+  const _OrdersList({
+    required this.orders,
+    required this.dateFormat,
+    required this.emptyTitle,
+    required this.emptySubtitle,
+    required this.onStatusChanged,
+    this.readOnly = false,
+  });
+
+  final List<Order> orders;
+  final DateFormat dateFormat;
+  final String emptyTitle;
+  final String emptySubtitle;
+  final Future<void> Function(String orderId, OrderStatus status) onStatusChanged;
+  final bool readOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    if (orders.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                readOnly ? Icons.inbox_outlined : Icons.receipt_long_outlined,
+                size: 56,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                emptyTitle,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6B1124),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                emptySubtitle,
+                style: TextStyle(color: Colors.grey.shade600, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: orders.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final order = orders[index];
+        return _AdminOrderCard(
+          order: order,
+          dateFormat: dateFormat,
+          onStatusChanged: onStatusChanged,
+          readOnly: readOnly,
+        );
+      },
+    );
+  }
+}
+
+class _DemoOrdersBanner extends StatelessWidget {
+  const _DemoOrdersBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E7),
@@ -164,8 +426,8 @@ class _DemoOrdersBanner extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'تُعرض طلبات تجريبية لاختبار لوحة التحكم. الطلبات الحقيقية '
-                  'من المنيو تُحفظ تلقائياً على الباك إند. لربط Firebase '
-                  'للتزامن الفوري، حدّث firebase_options.dart.',
+                  'من المنيو تُحفظ تلقائياً على الباك إند. عند إتمام التوصيل '
+                  'ينتقل الطلب تلقائياً إلى تبويب الطلبات السابقة.',
                   style: TextStyle(
                     color: Colors.brown.shade700,
                     height: 1.4,
@@ -185,11 +447,13 @@ class _AdminOrderCard extends StatelessWidget {
     required this.order,
     required this.dateFormat,
     required this.onStatusChanged,
+    this.readOnly = false,
   });
 
   final Order order;
   final DateFormat dateFormat;
   final Future<void> Function(String orderId, OrderStatus status) onStatusChanged;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -199,8 +463,9 @@ class _AdminOrderCard extends StatelessWidget {
               '${item.quantity}x ${item.name} (${item.lineTotal.toStringAsFixed(3)} د.ك)',
         )
         .join('\n');
-    final nextStatus = order.status.nextStatus;
-    final nextLabel = order.status.nextActionLabel;
+    final nextStatus = readOnly ? null : order.status.nextStatus;
+    final nextLabel = readOnly ? null : order.status.nextActionLabel;
+    final paymentLabel = _formatPaymentMethod(order.paymentMethod);
 
     return Card(
       elevation: order.status == OrderStatus.pending ? 4 : 1,
@@ -243,8 +508,7 @@ class _AdminOrderCard extends StatelessWidget {
             const SizedBox(height: 12),
             _InfoRow(icon: Icons.phone, text: order.phone),
             _InfoRow(icon: Icons.location_on, text: order.address),
-            if (order.paymentMethod != null && order.paymentMethod!.isNotEmpty)
-              _InfoRow(icon: Icons.payment, text: order.paymentMethod!),
+            _InfoRow(icon: Icons.payment, text: paymentLabel),
             const SizedBox(height: 10),
             Text(
               itemLines,
@@ -294,6 +558,16 @@ class _AdminOrderCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatPaymentMethod(String? method) {
+    final value = (method ?? '').trim();
+    if (value.isEmpty) return 'طريقة الدفع: غير محددة';
+    if (value.toLowerCase() == 'k-net' || value == 'K-Net') {
+      return 'طريقة الدفع: K-Net';
+    }
+    if (value == 'كاش') return 'طريقة الدفع: كاش (Cash)';
+    return 'طريقة الدفع: $value';
   }
 
   Color _actionColor(OrderStatus status) {

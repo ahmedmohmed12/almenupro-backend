@@ -23,6 +23,10 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   static const _sidebarItems = [
     AdminSidebarItem(
+      icon: Icons.receipt_long_outlined,
+      label: 'الطلبات',
+    ),
+    AdminSidebarItem(
       icon: Icons.restaurant_menu,
       label: 'إدارة المنيو والأصناف',
     ),
@@ -36,6 +40,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   ];
 
+  final _ordersPanelKey = GlobalKey<AdminOrdersPanelState>();
+
   bool _isAuthenticated = false;
   final _passwordController = TextEditingController();
   final String _adminPassword = '123456';
@@ -45,7 +51,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final _whatsappController = TextEditingController();
   bool _isSavingSettings = false;
   int _pendingOrdersCount = 0;
-  var _showOrdersPanel = false;
 
   @override
   void initState() {
@@ -571,17 +576,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
               items: _sidebarItems,
               selectedIndex: _selectedIndex,
               onItemSelected: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                  _showOrdersPanel = false;
-                });
+                setState(() => _selectedIndex = index);
               },
               onLogout: () {
                 setState(() {
                   _isAuthenticated = false;
                   _passwordController.clear();
                   _selectedIndex = 0;
-                  _showOrdersPanel = false;
                 });
               },
             ),
@@ -591,39 +592,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   AdminTopHeader(
                     pendingOrdersCount: _pendingOrdersCount,
                     onNotificationsTap: () {
-                      setState(() => _showOrdersPanel = true);
+                      setState(() => _selectedIndex = 0);
+                      _ordersPanelKey.currentState?.selectNewOrdersTab();
                     },
                   ),
-                  if (_showOrdersPanel)
-                    Material(
-                      color: const Color(0xFF6B1124),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              onPressed: () =>
-                                  setState(() => _showOrdersPanel = false),
-                              icon: const Icon(
-                                Icons.arrow_forward,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const Text(
-                              'الطلبات الواردة',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   Expanded(
                     child: _buildActiveTab(),
                   ),
@@ -637,22 +609,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildActiveTab() {
-    if (_showOrdersPanel) {
-      return AdminOrdersPanel(
-        onPendingCountChanged: (pendingCount) {
-          if (_pendingOrdersCount != pendingCount && mounted) {
-            setState(() => _pendingOrdersCount = pendingCount);
-          }
-        },
-      );
-    }
-
     switch (_selectedIndex) {
-      case 1:
-        return _buildAnalyticsTab();
-      case 2:
-        return _buildSettingsTab();
       case 0:
+        return AdminOrdersPanel(
+          key: _ordersPanelKey,
+          onPendingCountChanged: (pendingCount) {
+            if (_pendingOrdersCount != pendingCount && mounted) {
+              setState(() => _pendingOrdersCount = pendingCount);
+            }
+          },
+        );
+      case 2:
+        return _buildAnalyticsTab();
+      case 3:
+        return _buildSettingsTab();
+      case 1:
       default:
         return AdminMenuPanel(
           onAddItem: () => _showItemDialog(),
