@@ -309,6 +309,23 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '')) {
+    sendJson(res, 200, {
+      ok: true,
+      service: 'almenupro-api',
+      message: 'Almenupro backend is running.',
+      endpoints: {
+        health: '/api/health',
+        menu: '/api/items',
+        orders: '/api/orders',
+        images: '/menu-images/{filename}',
+      },
+      frontend: 'https://almenupro-frontend-three.vercel.app',
+      admin: 'https://almenupro-frontend-three.vercel.app/admin',
+    });
+    return;
+  }
+
   const menuImageMatch = url.pathname.match(/^\/menu-images\/([^/]+)$/);
   if (req.method === 'GET' && menuImageMatch) {
     serveMenuImage(res, decodeURIComponent(menuImageMatch[1]));
