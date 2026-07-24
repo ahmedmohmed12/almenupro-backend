@@ -298,7 +298,13 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
     const items = readItems();
-    sendJson(res, 200, { ok: true, service: 'almenupro-api', items: items.length });
+    const { resolveImageDiskPath } = require('./lib/menuImageStorage');
+    sendJson(res, 200, {
+      ok: true,
+      service: 'almenupro-api',
+      items: items.length,
+      imagesReady: Boolean(resolveImageDiskPath('1962105681.jpg')),
+    });
     return;
   }
 
@@ -309,9 +315,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const itemImageMatch = url.pathname.match(/^\/api\/items\/image\/([^/]+)$/);
+  if (req.method === 'GET' && itemImageMatch) {
+    serveMenuImage(res, decodeURIComponent(itemImageMatch[1]));
+    return;
+  }
+
   const menuImageApiMatch = url.pathname.match(/^\/api\/menu-image\/([^/]+)$/);
   if (req.method === 'GET' && menuImageApiMatch) {
     serveMenuImage(res, decodeURIComponent(menuImageApiMatch[1]));
+    return;
+  }
+
+  const menuImageShortMatch = url.pathname.match(/^\/menu-image\/([^/]+)$/);
+  if (req.method === 'GET' && menuImageShortMatch) {
+    serveMenuImage(res, decodeURIComponent(menuImageShortMatch[1]));
     return;
   }
 
