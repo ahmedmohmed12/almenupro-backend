@@ -12,7 +12,8 @@
           "data/**",
           "uploads/menu/**",
           "public/menu-images/**",
-          "lib/menuImageStorage.js"
+          "lib/menuImageStorage.js",
+          "lib/talabatScraper.js"
         ]
       }
     }

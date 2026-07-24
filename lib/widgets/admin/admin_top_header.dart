@@ -8,12 +8,14 @@ class AdminTopHeader extends StatelessWidget {
     this.pendingOrdersCount = 0,
     this.onNotificationsTap,
     this.isSuperAdmin = false,
+    this.showOrderNotifications = true,
     this.restaurantLabel,
   });
 
   final int pendingOrdersCount;
   final VoidCallback? onNotificationsTap;
   final bool isSuperAdmin;
+  final bool showOrderNotifications;
   final String? restaurantLabel;
 
   static const Color burgundy = Color(0xFF6B1124);
@@ -51,7 +53,7 @@ class AdminTopHeader extends StatelessWidget {
                 ),
                 if (isSuperAdmin)
                   const Text(
-                    'اختر المطعم من القائمة لإدارة المنيو والإعدادات والطلبات',
+                    'اختر المطعم من القائمة لإدارة المنيو والإعدادات',
                     style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
               ],
@@ -61,21 +63,23 @@ class AdminTopHeader extends StatelessWidget {
             const AdminRestaurantSelector(),
             const SizedBox(width: 16),
           ],
-          IconButton(
-            tooltip: 'الطلبات الجديدة',
-            onPressed: onNotificationsTap,
-            icon: Badge(
-              isLabelVisible: pendingOrdersCount > 0,
-              label: Text('$pendingOrdersCount'),
-              backgroundColor: gold,
-              child: const Icon(
-                Icons.notifications_outlined,
-                color: burgundy,
-                size: 28,
+          if (showOrderNotifications) ...[
+            IconButton(
+              tooltip: 'الطلبات الجديدة',
+              onPressed: onNotificationsTap,
+              icon: Badge(
+                isLabelVisible: pendingOrdersCount > 0,
+                label: Text('$pendingOrdersCount'),
+                backgroundColor: gold,
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  color: burgundy,
+                  size: 28,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
           CircleAvatar(
             radius: 22,
             backgroundColor: burgundy.withValues(alpha: 0.12),

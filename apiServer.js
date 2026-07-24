@@ -51,6 +51,7 @@ function warmMenuImageBundle() {
 
 warmMenuImageBundle();
 
+const { scrapeTalabatMenu } = require('./lib/talabatScraper');
 const {
   initDataStore,
   usesMongo,
@@ -258,6 +259,9 @@ function mergeItems(existing, incoming, restaurantId = DEFAULT_RESTAURANT_ID) {
   const byTalabatId = new Map();
   const byId = new Map();
   const byName = new Map();
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
 
   for (const item of scopedExisting) {
     if (item.talabat_id != null) byTalabatId.set(String(item.talabat_id), item);
@@ -269,7 +273,10 @@ function mergeItems(existing, incoming, restaurantId = DEFAULT_RESTAURANT_ID) {
 
   incoming.forEach((raw, index) => {
     const item = normalizeIncoming(raw, index, restaurantId);
-    if (!item.name) return;
+    if (!item.name) {
+      skipped += 1;
+      return;
+    }
 
     const talabatKey = item.talabat_id != null ? String(item.talabat_id) : null;
     let existingItem = talabatKey ? byTalabatId.get(talabatKey) : null;
@@ -281,16 +288,23 @@ function mergeItems(existing, incoming, restaurantId = DEFAULT_RESTAURANT_ID) {
       Object.assign(existingItem, item, { id: existingItem.id });
       if (talabatKey) byTalabatId.set(talabatKey, existingItem);
       byName.set(item.name.toLowerCase(), existingItem);
+      updated += 1;
       return;
     }
 
     merged.push(item);
+    added += 1;
     byId.set(String(item.id), item);
     if (talabatKey) byTalabatId.set(talabatKey, item);
     byName.set(item.name.toLowerCase(), item);
   });
 
-  return [...otherRestaurants, ...merged.filter((item) => item.name)];
+  return {
+    items: [...otherRestaurants, ...merged.filter((item) => item.name)],
+    added,
+    updated,
+    skipped,
+  };
 }
 
 function requireAuth(req, res) {
@@ -536,20 +550,84 @@ const server = http.createServer(async (req, res) => {
         ? await persistMenuItemsImages(normalizedIncoming)
         : normalizedIncoming;
       const existing = await readItems();
-      const merged = mergeItems(existing, preparedIncoming, restaurantId);
-      rebuildCategoryIds(filterByRestaurant(merged, restaurantId));
-      await writeItems(merged);
+      const mergeResult = mergeItems(existing, preparedIncoming, restaurantId);
+      rebuildCategoryIds(filterByRestaurant(mergeResult.items, restaurantId));
+      await writeItems(mergeResult.items);
       sendJson(res, 200, {
         ok: true,
         restaurantId,
-        total: filterByRestaurant(merged, restaurantId).length,
+        total: filterByRestaurant(mergeResult.items, restaurantId).length,
         synced: incoming.length,
+        added: mergeResult.added,
+        updated: mergeResult.updated,
+        skipped: mergeResult.skipped,
         imagesStoredLocally: preparedIncoming.filter((item) =>
           String(item.image_url || '').startsWith('/api/uploads/menu/'),
         ).length,
       });
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/talabat/import') {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const inputUrl = String(body.url || body.menuUrl || '').trim();
+      const downloadImages = body.downloadImages !== false;
+      const restaurantId = String(
+        body.restaurantId || body.restaurant_id || DEFAULT_RESTAURANT_ID,
+      );
+
+      if (!inputUrl) {
+        sendJson(res, 400, { error: 'Missing Talabat menu URL' });
+        return;
+      }
+
+      const restaurants = await readRestaurants();
+      if (!restaurants.some((entry) => entry.id === restaurantId)) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+        return;
+      }
+
+      const scrapeResult = await scrapeTalabatMenu(inputUrl);
+      const incoming = Array.isArray(scrapeResult.items) ? scrapeResult.items : [];
+
+      if (!incoming.length) {
+        sendJson(res, 400, { error: 'No menu items found at this Talabat URL' });
+        return;
+      }
+
+      const normalizedIncoming = incoming.map((raw, index) =>
+        normalizeIncoming(raw, index, restaurantId),
+      );
+      const preparedIncoming = downloadImages
+        ? await persistMenuItemsImages(normalizedIncoming)
+        : normalizedIncoming;
+      const existing = await readItems();
+      const mergeResult = mergeItems(existing, preparedIncoming, restaurantId);
+      rebuildCategoryIds(filterByRestaurant(mergeResult.items, restaurantId));
+      await writeItems(mergeResult.items);
+
+      sendJson(res, 200, {
+        ok: true,
+        menuUrl: scrapeResult.menuUrl,
+        restaurantId,
+        total: filterByRestaurant(mergeResult.items, restaurantId).length,
+        synced: incoming.length,
+        added: mergeResult.added,
+        updated: mergeResult.updated,
+        skipped: mergeResult.skipped,
+        imagesStoredLocally: preparedIncoming.filter((item) =>
+          String(item.image_url || '').startsWith('/api/uploads/menu/'),
+        ).length,
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Talabat import failed' });
     }
     return;
   }
@@ -702,8 +780,8 @@ const server = http.createServer(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
 
-    if (isSuperAdmin(auth) && !url.searchParams.get('restaurant_id') && !req.headers['x-restaurant-id']) {
-      sendJson(res, 200, sortOrdersDesc(await readOrders()));
+    if (isSuperAdmin(auth)) {
+      authError(res, 403, 'Orders are managed by restaurant admins only');
       return;
     }
 
@@ -757,6 +835,11 @@ const server = http.createServer(async (req, res) => {
 
       const auth = requireAuth(req, res);
       if (!auth) return;
+
+      if (isSuperAdmin(auth)) {
+        authError(res, 403, 'Orders are managed by restaurant admins only');
+        return;
+      }
 
       const restaurantId =
         orders[index].restaurant_id ||

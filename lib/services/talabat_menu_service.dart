@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'api_service.dart';
-import 'talabat_scraper_client.dart';
 
 bool isWebUrl(String input) {
   final trimmed = input.trim().toLowerCase();
@@ -10,19 +9,6 @@ bool isWebUrl(String input) {
 
 bool isTalabatMenuUrl(String input) {
   return isWebUrl(input) && input.trim().toLowerCase().contains('talabat');
-}
-
-final TalabatScraperClient _scraperClient = TalabatScraperClient();
-
-Future<List<Map<String, dynamic>>> fetchTalabatMenuItems({
-  required String url,
-}) async {
-  if (!isTalabatMenuUrl(url)) {
-    return [];
-  }
-
-  final result = await _scraperClient.scrapeMenu(url);
-  return result.items;
 }
 
 Future<void> processAndSaveTalabatMenu({
@@ -48,57 +34,27 @@ Future<void> processAndSaveTalabatMenu({
   final targetRestaurantId = restaurantId ?? ApiService.defaultRestaurantId;
 
   try {
-    onProgress('جاري سحب الأصناف والأسعار والوصف والصور من Talabat...');
+    onProgress('جاري سحب الأصناف والأسعار والصور من Talabat على السيرفر...');
 
-    final result = await _scraperClient.scrapeMenu(normalizedUrl);
-    if (result.items.isEmpty) {
+    final result = await ApiService.instance.importTalabatMenu(
+      url: normalizedUrl,
+      restaurantId: targetRestaurantId,
+    );
+
+    if (result.synced == 0) {
       onProgress('لم يتم العثور على أصناف في هذا الرابط');
       onComplete(0, 0, 0);
       return;
     }
 
-    final withImages = result.items
-        .where((item) => (item['imageUrl'] ?? '').toString().isNotEmpty)
-        .length;
-
     onProgress(
-      'تم جلب ${result.items.length} صنف ($withImages صورة) — جاري الحفظ على السيرفر...',
+      'تم الاستيراد: ${result.added} جديد، ${result.updated} محدّث '
+      '(${result.total} صنف في المنيو)',
     );
-
-    final apiItems = result.items
-        .map(
-          (item) => {
-            'name': item['name'],
-            'description': item['description'] ?? '',
-            'price': item['price'] ?? 0.0,
-            'categoryName': item['categoryName'] ?? item['category_name'] ?? 'عام',
-            'isAvailable': item['isAvailable'] ?? true,
-            'imageUrl': item['imageUrl'] ?? '',
-            'talabatId': item['talabatId'] ?? item['talabat_id'],
-            'source': item['source'] ?? 'Talabat',
-          },
-        )
-        .toList();
-
-    final synced = await ApiService.instance.syncMenuItems(
-      apiItems,
-      restaurantId: targetRestaurantId,
-    );
-
-    if (!synced) {
-      onProgress('فشل حفظ المنيو على السيرفر. تأكد من صلاحيات Super Admin.');
-      onComplete(0, 0, 0);
-      return;
-    }
-
-    onProgress('تم الحفظ بنجاح!');
-    onComplete(result.items.length, 0, 0);
-  } on TalabatScrapeException catch (error) {
-    onProgress(error.message);
-    onComplete(0, 0, 0);
+    onComplete(result.added, result.skipped, result.updated);
   } catch (error) {
     debugPrint('Talabat import error: $error');
-    onProgress('تعذر سحب المنيو. تأكد من نشر Cloud Functions');
+    onProgress(error.toString().replaceFirst('Exception: ', ''));
     onComplete(0, 0, 0);
   }
 }

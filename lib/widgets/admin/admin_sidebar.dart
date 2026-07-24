@@ -25,7 +25,12 @@ class AdminSidebar extends StatelessWidget {
   static const int menuIndex = 1;
   static const int analyticsIndex = 2;
   static const int settingsIndex = 3;
-  static const int restaurantsIndex = 4;
+
+  /// Super Admin sidebar — no orders tab (restaurant admins only).
+  static const int superMenuIndex = 0;
+  static const int superRestaurantsIndex = 1;
+  static const int superAnalyticsIndex = 2;
+  static const int superSettingsIndex = 3;
 
   static const List<AdminSidebarItem> defaultItems = [
     // Must stay first: opens AdminOrdersPanel (new + archived tabs).
@@ -48,10 +53,6 @@ class AdminSidebar extends StatelessWidget {
   ];
 
   static const List<AdminSidebarItem> superAdminItems = [
-    AdminSidebarItem(
-      icon: Icons.receipt_long_outlined,
-      label: 'الطلبات',
-    ),
     AdminSidebarItem(
       icon: Icons.restaurant_menu,
       label: 'إدارة المنيو والأصناف',

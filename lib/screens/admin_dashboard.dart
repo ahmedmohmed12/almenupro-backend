@@ -16,7 +16,6 @@ import '../services/api_service.dart';
 import '../services/menu_storage_service.dart';
 import '../services/order_alert_sound_service.dart';
 import '../services/order_browser_notification_service.dart';
-import '../services/orders_demo_service.dart';
 import '../services/restaurant_settings_service.dart';
 import '../services/super_admin_scope_service.dart';
 import '../services/talabat_menu_service.dart';
@@ -71,7 +70,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (!mounted) return;
     setState(() {});
     unawaited(_loadSettings());
-    unawaited(OrdersDemoService.refreshFromApi());
   }
 
   Future<void> _bootstrapAuth() async {
@@ -86,7 +84,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       });
       await _initSuperAdminScope();
       await _loadSettings();
-      await _startAdminMonitoring();
+      if (!AdminAuthService.instance.isSuperAdmin) {
+        await _startAdminMonitoring();
+      }
     } else {
       await _loadSettings();
     }
@@ -165,13 +165,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _isAuthenticated = true;
         _isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
         _restaurantLabel = AdminAuthService.instance.restaurantName;
-        _selectedIndex = AdminSidebar.ordersIndex;
+        _selectedIndex = _isSuperAdmin
+            ? AdminSidebar.superRestaurantsIndex
+            : AdminSidebar.ordersIndex;
       });
 
       OrderAlertSoundService.instance.unlockFromUserGesture();
       await _initSuperAdminScope();
       await _loadSettings();
-      await _startAdminMonitoring();
+      if (!AdminAuthService.instance.isSuperAdmin) {
+        await _startAdminMonitoring();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -198,6 +202,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _startAdminMonitoring() async {
+    if (_isSuperAdmin || AdminAuthService.instance.isSuperAdmin) return;
+
     final monitor = AdminOrderMonitorService.instance;
     monitor.onNewPendingOrder = _onNewPendingOrderDetected;
     await monitor.start();
@@ -789,6 +795,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     builder: (context, pendingCount, _) {
                       return AdminTopHeader(
                         isSuperAdmin: _isSuperAdmin,
+                        showOrderNotifications: !_isSuperAdmin,
                         restaurantLabel: _restaurantLabel,
                         pendingOrdersCount: pendingCount,
                         onNotificationsTap: () {
@@ -819,9 +826,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildActiveTab() {
     if (_isSuperAdmin) {
       switch (_selectedIndex) {
-        case AdminSidebar.ordersIndex:
-          return AdminOrdersPanel(key: _ordersPanelKey);
-        case AdminSidebar.menuIndex:
+        case AdminSidebar.superMenuIndex:
           return AdminMenuPanel(
             key: ValueKey(
               SuperAdminScopeService.instance.selectedRestaurantId ??
@@ -833,11 +838,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             canImportTalabat: false,
             canManageItems: SuperAdminScopeService.instance.hasSelection,
           );
-        case AdminSidebar.restaurantsIndex:
+        case AdminSidebar.superRestaurantsIndex:
           return const AdminSuperRestaurantsPanel();
-        case AdminSidebar.analyticsIndex:
+        case AdminSidebar.superAnalyticsIndex:
           return _buildAnalyticsTab();
-        case AdminSidebar.settingsIndex:
+        case AdminSidebar.superSettingsIndex:
         default:
           return _buildSettingsTab();
       }
@@ -930,8 +935,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 20),
           const AdminWorkingHoursCard(),
-          const SizedBox(height: 20),
-          const AdminSoundSettingsCard(),
+          if (!_isSuperAdmin) ...[
+            const SizedBox(height: 20),
+            const AdminSoundSettingsCard(),
+          ],
         ],
       ),
     );

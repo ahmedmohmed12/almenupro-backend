@@ -356,11 +356,7 @@ class ApiService {
 
       final query = <String, String>{};
 
-      if (AdminAuthService.instance.isSuperAdmin &&
-          SuperAdminScopeService.instance.hasSelection) {
-        query['restaurant_id'] =
-            SuperAdminScopeService.instance.selectedRestaurantId!;
-      } else if (AdminAuthService.instance.restaurantId != null) {
+      if (AdminAuthService.instance.restaurantId != null) {
         query['restaurant_id'] = AdminAuthService.instance.restaurantId!;
       }
 
@@ -648,6 +644,44 @@ class ApiService {
 
 
 
+  Future<TalabatImportResult> importTalabatMenu({
+    required String url,
+    required String restaurantId,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            _uri('/talabat/import'),
+            headers: _jsonHeaders,
+            body: jsonEncode({
+              'url': url,
+              'restaurantId': restaurantId,
+              'downloadImages': true,
+            }),
+          )
+          .timeout(const Duration(seconds: 180));
+
+      final decoded = jsonDecode(response.body);
+      if (response.statusCode != 200) {
+        final message = decoded is Map
+            ? decoded['error']?.toString() ?? 'فشل استيراد المنيو'
+            : 'فشل استيراد المنيو (${response.statusCode})';
+        throw Exception(message);
+      }
+
+      if (decoded is! Map) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+
+      return TalabatImportResult.fromJson(Map<String, dynamic>.from(decoded));
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاستيراد — حاول مرة أخرى');
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception('خطأ في استيراد المنيو: $error');
+    }
+  }
+
   Future<bool> syncMenuItems(
 
     List<Map<String, dynamic>> items, {
@@ -868,6 +902,40 @@ class ApiService {
 
   }
 
+}
+
+class TalabatImportResult {
+  const TalabatImportResult({
+    required this.added,
+    required this.updated,
+    required this.skipped,
+    required this.synced,
+    required this.total,
+    this.menuUrl,
+  });
+
+  final int added;
+  final int updated;
+  final int skipped;
+  final int synced;
+  final int total;
+  final String? menuUrl;
+
+  factory TalabatImportResult.fromJson(Map<String, dynamic> json) {
+    return TalabatImportResult(
+      added: _toInt(json['added']),
+      updated: _toInt(json['updated']),
+      skipped: _toInt(json['skipped']),
+      synced: _toInt(json['synced']),
+      total: _toInt(json['total']),
+      menuUrl: json['menuUrl']?.toString(),
+    );
+  }
+
+  static int _toInt(Object? value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
 }
 
 
