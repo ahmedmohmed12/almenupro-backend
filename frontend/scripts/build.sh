@@ -14,7 +14,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.3.0 (orders sidebar first)"
+echo "Almenupro frontend build v1.3.1 (vercel.json schema fixed)"
 
 cd "$ROOT"
 flutter --version
