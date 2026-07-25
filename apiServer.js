@@ -65,6 +65,8 @@ const {
   writeRestaurants,
   readSettingsMap,
   writeSettingsMap,
+  readDeliveryZones,
+  writeDeliveryZones,
 } = require('./lib/dataStore');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -195,14 +197,65 @@ async function writeSettings(restaurantId, settings) {
 
 function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
   const createdAt = raw.createdAt || new Date().toISOString();
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  const itemsSubtotal = items.reduce(
+    (sum, item) => sum + (Number(item.lineTotal ?? item.line_total) || 0),
+    0,
+  );
+  const subtotal = Number(raw.subtotal ?? raw.sub_total ?? itemsSubtotal) || 0;
+  const deliveryFee = Number(raw.deliveryFee ?? raw.delivery_fee ?? 0) || 0;
+  const totalFromBody = Number(raw.totalPrice ?? raw.total_price ?? 0) || 0;
+  const totalPrice = totalFromBody > 0 ? totalFromBody : subtotal + deliveryFee;
+
+  const addressDetailsRaw = raw.addressDetails || raw.address_details || {};
+  const addressDetails = {
+    block: String(addressDetailsRaw.block || raw.block || '').trim(),
+    street: String(addressDetailsRaw.street || raw.street || '').trim(),
+    avenue: String(addressDetailsRaw.avenue || raw.avenue || '').trim(),
+    houseNumber: String(
+      addressDetailsRaw.houseNumber ||
+        addressDetailsRaw.house_number ||
+        raw.houseNumber ||
+        raw.house_number ||
+        '',
+    ).trim(),
+    floorApartment: String(
+      addressDetailsRaw.floorApartment ||
+        addressDetailsRaw.floor_apartment ||
+        raw.floorApartment ||
+        raw.floor_apartment ||
+        '',
+    ).trim(),
+  };
+
+  let address = String(raw.address || '').trim();
+  if (!address) {
+    const parts = [
+      raw.governorate,
+      raw.areaName || raw.area_name,
+      addressDetails.block ? `قطعة ${addressDetails.block}` : '',
+      addressDetails.street ? `شارع ${addressDetails.street}` : '',
+      addressDetails.avenue ? `جادة ${addressDetails.avenue}` : '',
+      addressDetails.houseNumber ? `مبنى ${addressDetails.houseNumber}` : '',
+      addressDetails.floorApartment ? `طابق/شقة ${addressDetails.floorApartment}` : '',
+    ].filter(Boolean);
+    address = parts.join('، ');
+  }
+
   return ensureRestaurantId(
     {
       id: String(id),
       customerName: String(raw.customerName || raw.customer_name || '').trim(),
       phone: String(raw.phone || '').trim(),
-      address: String(raw.address || '').trim(),
-      items: Array.isArray(raw.items) ? raw.items : [],
-      totalPrice: Number(raw.totalPrice ?? raw.total_price ?? 0) || 0,
+      address,
+      governorate: String(raw.governorate || '').trim(),
+      areaName: String(raw.areaName || raw.area_name || '').trim(),
+      deliveryZoneId: raw.deliveryZoneId?.toString() || raw.delivery_zone_id?.toString() || null,
+      addressDetails,
+      items,
+      subtotal,
+      deliveryFee,
+      totalPrice,
       orderType: String(raw.orderType || raw.order_type || 'Delivery'),
       status: String(raw.status || 'pending'),
       createdAt,
@@ -211,6 +264,31 @@ function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
     },
     raw.restaurant_id || raw.restaurantId || restaurantId,
   );
+}
+
+function normalizeDeliveryZone(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
+  return ensureRestaurantId(
+    {
+      id: String(id),
+      governorate: String(raw.governorate || raw.governorateName || '').trim(),
+      areaName: String(raw.areaName || raw.area_name || '').trim(),
+      deliveryFee: Number(raw.deliveryFee ?? raw.delivery_fee ?? 0) || 0,
+      isActive:
+        raw.isActive === false ||
+        raw.is_active === false ||
+        raw.isActive === 0 ||
+        raw.is_active === 0
+          ? false
+          : true,
+      createdAt: raw.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    restaurantId,
+  );
+}
+
+function findDeliveryZoneById(zones, zoneId) {
+  return zones.find((zone) => String(zone.id) === String(zoneId));
 }
 
 function sortOrdersDesc(orders) {
@@ -854,6 +932,120 @@ const server = http.createServer(async (req, res) => {
 
       await writeItems(items);
       sendJson(res, 200, item);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/delivery-zones') {
+    const auth = parseAuthHeader(req);
+    const restaurants = await readRestaurants();
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: true,
+    });
+
+    if (!restaurantId) {
+      sendJson(res, 404, { error: 'Restaurant not found' });
+      return;
+    }
+
+    const zones = filterByRestaurant(await readDeliveryZones(), restaurantId).filter(
+      (zone) => zone.isActive !== false,
+    );
+    sendJson(res, 200, zones);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/delivery-zones') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurantId = resolveRestaurantId(
+        auth,
+        body.restaurantId ||
+          body.restaurant_id ||
+          req.headers['x-restaurant-id'],
+      );
+
+      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const governorate = String(body.governorate || '').trim();
+      const areaName = String(body.areaName || body.area_name || '').trim();
+      if (!governorate || !areaName) {
+        sendJson(res, 400, { error: 'Governorate and area name are required' });
+        return;
+      }
+
+      const id = `zone_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const zone = normalizeDeliveryZone(body, id, restaurantId);
+      zone.governorate = governorate;
+      zone.areaName = areaName;
+
+      const zones = await readDeliveryZones();
+      zones.push(zone);
+      await writeDeliveryZones(zones);
+      sendJson(res, 201, zone);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  const deliveryZoneMatch = url.pathname.match(/^\/api\/delivery-zones\/([^/]+)$/);
+  if (deliveryZoneMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const zoneId = decodeURIComponent(deliveryZoneMatch[1]);
+      const zones = await readDeliveryZones();
+      const zone = findDeliveryZoneById(zones, zoneId);
+
+      if (!zone) {
+        sendJson(res, 404, { error: 'Delivery zone not found' });
+        return;
+      }
+
+      const restaurantId = zone.restaurant_id || zone.restaurantId || DEFAULT_RESTAURANT_ID;
+      if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      if (req.method === 'DELETE') {
+        await writeDeliveryZones(zones.filter((entry) => String(entry.id) !== String(zoneId)));
+        sendJson(res, 200, { ok: true, id: zoneId });
+        return;
+      }
+
+      const body = JSON.parse((await readBody(req)) || '{}');
+      Object.assign(zone, {
+        governorate: String(body.governorate ?? zone.governorate).trim(),
+        areaName: String(body.areaName ?? body.area_name ?? zone.areaName).trim(),
+        deliveryFee: Number(body.deliveryFee ?? body.delivery_fee ?? zone.deliveryFee) || 0,
+        isActive:
+          body.isActive === false ||
+          body.is_active === false ||
+          body.isActive === 0 ||
+          body.is_active === 0
+            ? false
+            : body.isActive != null || body.is_active != null
+              ? true
+              : zone.isActive !== false,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (!zone.governorate || !zone.areaName) {
+        sendJson(res, 400, { error: 'Governorate and area name are required' });
+        return;
+      }
+
+      await writeDeliveryZones(zones);
+      sendJson(res, 200, zone);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
     }

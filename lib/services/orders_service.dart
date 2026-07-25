@@ -1,4 +1,5 @@
 import '../models/cart_item.dart';
+import '../models/delivery_address_details.dart';
 import '../models/order.dart';
 import '../utils/firebase_config.dart';
 import 'firebase_service.dart';
@@ -37,6 +38,11 @@ class OrdersService {
     required String paymentMethod,
     required String invoiceNumber,
     String restaurantId = ApiService.defaultRestaurantId,
+    double deliveryFee = 0,
+    String? governorate,
+    String? areaName,
+    String? deliveryZoneId,
+    DeliveryAddressDetails addressDetails = const DeliveryAddressDetails(),
   }) async {
     final order = OrdersDemoService.orderFromCart(
       cartItems: cartItems,
@@ -45,6 +51,11 @@ class OrdersService {
       address: address,
       paymentMethod: paymentMethod,
       invoiceNumber: invoiceNumber,
+      deliveryFee: deliveryFee,
+      governorate: governorate,
+      areaName: areaName,
+      deliveryZoneId: deliveryZoneId,
+      addressDetails: addressDetails,
     );
 
     if (usesFirebase) {

@@ -23,14 +23,16 @@ class AdminSidebar extends StatelessWidget {
 
   static const int ordersIndex = 0;
   static const int menuIndex = 1;
-  static const int analyticsIndex = 2;
-  static const int settingsIndex = 3;
+  static const int deliveryZonesIndex = 2;
+  static const int analyticsIndex = 3;
+  static const int settingsIndex = 4;
 
   /// Super Admin sidebar — no orders tab (restaurant admins only).
   static const int superMenuIndex = 0;
   static const int superRestaurantsIndex = 1;
-  static const int superAnalyticsIndex = 2;
-  static const int superSettingsIndex = 3;
+  static const int superDeliveryZonesIndex = 2;
+  static const int superAnalyticsIndex = 3;
+  static const int superSettingsIndex = 4;
 
   static const List<AdminSidebarItem> defaultItems = [
     // Must stay first: opens AdminOrdersPanel (new + archived tabs).
@@ -41,6 +43,10 @@ class AdminSidebar extends StatelessWidget {
     AdminSidebarItem(
       icon: Icons.restaurant_menu,
       label: 'إدارة المنيو والأصناف',
+    ),
+    AdminSidebarItem(
+      icon: Icons.local_shipping_outlined,
+      label: 'مناطق التوصيل ورسومها',
     ),
     AdminSidebarItem(
       icon: Icons.bar_chart,
@@ -60,6 +66,10 @@ class AdminSidebar extends StatelessWidget {
     AdminSidebarItem(
       icon: Icons.apartment,
       label: 'المطاعم والاستيراد',
+    ),
+    AdminSidebarItem(
+      icon: Icons.local_shipping_outlined,
+      label: 'مناطق التوصيل ورسومها',
     ),
     AdminSidebarItem(
       icon: Icons.bar_chart,

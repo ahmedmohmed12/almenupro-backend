@@ -20,6 +20,7 @@ import '../services/restaurant_settings_service.dart';
 import '../services/super_admin_scope_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_corner_toast.dart';
+import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
@@ -883,6 +884,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
         case AdminSidebar.superRestaurantsIndex:
           return const AdminSuperRestaurantsPanel();
+        case AdminSidebar.superDeliveryZonesIndex:
+          return const AdminDeliveryZonesPanel();
         case AdminSidebar.superAnalyticsIndex:
           return _buildAnalyticsTab();
         case AdminSidebar.superSettingsIndex:
@@ -896,6 +899,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return AdminOrdersPanel(
           key: _ordersPanelKey,
         );
+      case AdminSidebar.deliveryZonesIndex:
+        return const AdminDeliveryZonesPanel();
       case AdminSidebar.analyticsIndex:
         return _buildAnalyticsTab();
       case AdminSidebar.settingsIndex:

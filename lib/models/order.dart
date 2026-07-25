@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'cart_item.dart';
+import 'delivery_address_details.dart';
 
 enum OrderType {
   delivery,
@@ -143,6 +144,12 @@ class Order {
     required this.createdAt,
     this.invoiceNumber,
     this.paymentMethod,
+    this.subtotal,
+    this.deliveryFee,
+    this.governorate,
+    this.areaName,
+    this.deliveryZoneId,
+    this.addressDetails = const DeliveryAddressDetails(),
   });
 
   final String id;
@@ -156,6 +163,12 @@ class Order {
   final DateTime createdAt;
   final String? invoiceNumber;
   final String? paymentMethod;
+  final double? subtotal;
+  final double? deliveryFee;
+  final String? governorate;
+  final String? areaName;
+  final String? deliveryZoneId;
+  final DeliveryAddressDetails addressDetails;
 
   factory Order.fromMap(String id, Map<String, dynamic> map) {
     final rawItems = map['items'] as List<dynamic>? ?? [];
@@ -174,6 +187,17 @@ class Order {
       createdAt: _parseDateTime(map['createdAt']),
       invoiceNumber: map['invoiceNumber']?.toString(),
       paymentMethod: map['paymentMethod']?.toString(),
+      subtotal: (map['subtotal'] as num?)?.toDouble(),
+      deliveryFee: (map['deliveryFee'] as num?)?.toDouble() ??
+          (map['delivery_fee'] as num?)?.toDouble(),
+      governorate: map['governorate']?.toString(),
+      areaName: map['areaName']?.toString() ?? map['area_name']?.toString(),
+      deliveryZoneId:
+          map['deliveryZoneId']?.toString() ?? map['delivery_zone_id']?.toString(),
+      addressDetails: DeliveryAddressDetails.fromMap(
+        map['addressDetails'] as Map<String, dynamic>? ??
+            map['address_details'] as Map<String, dynamic>?,
+      ),
     );
   }
 
@@ -181,6 +205,9 @@ class Order {
     OrderStatus? status,
     String? invoiceNumber,
     String? paymentMethod,
+    double? subtotal,
+    double? deliveryFee,
+    double? totalPrice,
   }) {
     return Order(
       id: id,
@@ -188,12 +215,18 @@ class Order {
       phone: phone,
       address: address,
       items: items,
-      totalPrice: totalPrice,
+      totalPrice: totalPrice ?? this.totalPrice,
       orderType: orderType,
       status: status ?? this.status,
       createdAt: createdAt,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      subtotal: subtotal ?? this.subtotal,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      governorate: governorate,
+      areaName: areaName,
+      deliveryZoneId: deliveryZoneId,
+      addressDetails: addressDetails,
     );
   }
 
@@ -207,6 +240,13 @@ class Order {
       'orderType': orderType.label,
       'status': status.name,
       'createdAt': createdAt.toUtc().toIso8601String(),
+      if (subtotal != null) 'subtotal': subtotal,
+      if (deliveryFee != null) 'deliveryFee': deliveryFee,
+      if (governorate != null && governorate!.isNotEmpty) 'governorate': governorate,
+      if (areaName != null && areaName!.isNotEmpty) 'areaName': areaName,
+      if (deliveryZoneId != null && deliveryZoneId!.isNotEmpty)
+        'deliveryZoneId': deliveryZoneId,
+      if (!addressDetails.isEmpty) 'addressDetails': addressDetails.toMap(),
       if (invoiceNumber != null && invoiceNumber!.isNotEmpty)
         'invoiceNumber': invoiceNumber,
       if (paymentMethod != null && paymentMethod!.isNotEmpty)

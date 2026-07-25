@@ -512,6 +512,12 @@ class _AdminOrderCard extends StatelessWidget {
             const SizedBox(height: 12),
             _InfoRow(icon: Icons.phone, text: order.phone),
             _InfoRow(icon: Icons.location_on, text: order.address),
+            if ((order.deliveryFee ?? 0) > 0)
+              _InfoRow(
+                icon: Icons.local_shipping_outlined,
+                text:
+                    'رسوم التوصيل: ${order.deliveryFee!.toStringAsFixed(3)} د.ك',
+              ),
             _InfoRow(icon: Icons.payment, text: paymentLabel),
             const SizedBox(height: 10),
             Text(
@@ -526,6 +532,14 @@ class _AdminOrderCard extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if ((order.subtotal ?? 0) > 0 &&
+                          (order.deliveryFee ?? 0) > 0) ...[
+                        Text(
+                          'المجموع: ${order.subtotal!.toStringAsFixed(3)} + توصيل ${order.deliveryFee!.toStringAsFixed(3)} د.ك',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
                       Text(
                         '${order.totalPrice.toStringAsFixed(3)} د.ك',
                         style: const TextStyle(

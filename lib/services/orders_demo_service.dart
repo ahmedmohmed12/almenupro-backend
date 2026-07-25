@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/cart_item.dart';
+import '../models/delivery_address_details.dart';
 import '../models/menu_item.dart';
 import '../models/order.dart';
 import 'api_service.dart';
@@ -247,9 +248,14 @@ class OrdersDemoService {
     required String address,
     required String paymentMethod,
     required String invoiceNumber,
+    double deliveryFee = 0,
+    String? governorate,
+    String? areaName,
+    String? deliveryZoneId,
+    DeliveryAddressDetails addressDetails = const DeliveryAddressDetails(),
   }) {
     final items = cartItems.map(OrderLineItem.fromCartItem).toList();
-    final total = cartItems.fold<double>(0, (sum, item) => sum + item.totalPrice);
+    final subtotal = cartItems.fold<double>(0, (sum, item) => sum + item.totalPrice);
 
     return Order(
       id: 'pending',
@@ -257,12 +263,18 @@ class OrdersDemoService {
       phone: phone,
       address: address,
       items: items,
-      totalPrice: total,
+      subtotal: subtotal,
+      deliveryFee: deliveryFee,
+      totalPrice: subtotal + deliveryFee,
       orderType: OrderType.delivery,
       status: OrderStatus.pending,
       createdAt: DateTime.now(),
       invoiceNumber: invoiceNumber,
       paymentMethod: paymentMethod,
+      governorate: governorate,
+      areaName: areaName,
+      deliveryZoneId: deliveryZoneId,
+      addressDetails: addressDetails,
     );
   }
 }

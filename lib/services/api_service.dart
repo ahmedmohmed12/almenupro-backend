@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 
 
+import '../models/delivery_zone.dart';
 import '../models/menu_item.dart';
 
 import '../models/order.dart';
@@ -1051,6 +1052,90 @@ class ApiService {
 
     };
 
+  }
+
+  Future<List<DeliveryZone>> fetchDeliveryZones({
+    String? slug,
+    String? restaurantId,
+  }) async {
+    final query = <String, String>{};
+    if (slug != null && slug.trim().isNotEmpty) {
+      query['slug'] = slug.trim();
+    } else {
+      query['restaurantId'] = _scopedRestaurantId(restaurantId: restaurantId);
+    }
+
+    final response = await http
+        .get(_uri('/delivery-zones', query), headers: _jsonHeaders)
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل مناطق التوصيل (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+
+    return decoded
+        .whereType<Map>()
+        .map((raw) => DeliveryZone.fromMap(Map<String, dynamic>.from(raw)))
+        .where((zone) => zone.isActive)
+        .toList();
+  }
+
+  Future<DeliveryZone> createDeliveryZone(DeliveryZone zone) async {
+    final payload = zone.toMap()
+      ..['restaurantId'] = _scopedRestaurantId(restaurantId: zone.restaurantId);
+
+    final response = await http
+        .post(
+          _uri('/delivery-zones'),
+          headers: _jsonHeaders,
+          body: jsonEncode(payload),
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('فشل في إضافة منطقة التوصيل (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return DeliveryZone.fromMap(Map<String, dynamic>.from(decoded));
+  }
+
+  Future<DeliveryZone> updateDeliveryZone(DeliveryZone zone) async {
+    final response = await http
+        .put(
+          _uri('/delivery-zones/${zone.id}'),
+          headers: _jsonHeaders,
+          body: jsonEncode(zone.toMap()),
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحديث منطقة التوصيل (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return DeliveryZone.fromMap(Map<String, dynamic>.from(decoded));
+  }
+
+  Future<void> deleteDeliveryZone(String zoneId) async {
+    final response = await http
+        .delete(_uri('/delivery-zones/$zoneId'), headers: _jsonHeaders)
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في حذف منطقة التوصيل (${response.statusCode})');
+    }
   }
 
 }
