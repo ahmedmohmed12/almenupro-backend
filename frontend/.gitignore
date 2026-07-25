@@ -1,2 +1,4 @@
 # Flutter web build output (generated on Vercel)
 dist/
+.vercel
+.env*
