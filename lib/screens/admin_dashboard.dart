@@ -882,11 +882,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildActiveTab() {
     if (_isSuperAdmin) {
-      const tabCount = 5;
-      return IndexedStack(
-        index: _selectedIndex.clamp(0, tabCount - 1),
-        children: [
-          AdminMenuPanel(
+      switch (_selectedIndex) {
+        case AdminSidebar.superMenuIndex:
+          return AdminMenuPanel(
             key: ValueKey(
               SuperAdminScopeService.instance.selectedRestaurantId ??
                   ApiService.defaultRestaurantId,
@@ -896,32 +894,40 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onDeleteItem: _deleteItem,
             canImportTalabat: false,
             canManageItems: SuperAdminScopeService.instance.hasSelection,
-          ),
-          const AdminSuperRestaurantsPanel(),
-          _buildDeliveryZonesPanel(),
-          _buildAnalyticsTab(),
-          _buildSettingsTab(),
-        ],
-      );
+          );
+        case AdminSidebar.superRestaurantsIndex:
+          return const AdminSuperRestaurantsPanel();
+        case AdminSidebar.superDeliveryZonesIndex:
+          return _buildDeliveryZonesPanel();
+        case AdminSidebar.superAnalyticsIndex:
+          return _buildAnalyticsTab();
+        case AdminSidebar.superSettingsIndex:
+          return _buildSettingsTab();
+        default:
+          return _buildDeliveryZonesPanel();
+      }
     }
 
-    const tabCount = 5;
-    return IndexedStack(
-      index: _selectedIndex.clamp(0, tabCount - 1),
-      children: [
-        AdminOrdersPanel(key: _ordersPanelKey),
-        AdminMenuPanel(
+    switch (_selectedIndex) {
+      case AdminSidebar.ordersIndex:
+        return AdminOrdersPanel(key: _ordersPanelKey);
+      case AdminSidebar.menuIndex:
+        return AdminMenuPanel(
           onAddItem: () => _showItemDialog(),
           onEditItem: (record) => _showItemDialog(record: record),
           onDeleteItem: _deleteItem,
           canImportTalabat: false,
           canManageItems: true,
-        ),
-        _buildDeliveryZonesPanel(),
-        _buildAnalyticsTab(),
-        _buildSettingsTab(),
-      ],
-    );
+        );
+      case AdminSidebar.deliveryZonesIndex:
+        return _buildDeliveryZonesPanel();
+      case AdminSidebar.analyticsIndex:
+        return _buildAnalyticsTab();
+      case AdminSidebar.settingsIndex:
+        return _buildSettingsTab();
+      default:
+        return AdminOrdersPanel(key: _ordersPanelKey);
+    }
   }
 
   Widget _buildSettingsTab() {
