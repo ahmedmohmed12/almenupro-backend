@@ -23,8 +23,17 @@ class WhatsAppOrderMessage {
       final nameAr = item.menuItem.localizedName('ar');
       final nameEn = item.menuItem.localizedName('en');
       final lineTotal = item.totalPrice.toStringAsFixed(3);
+      final addonsAr = item.selectedOptions
+          .map((option) => '   ↳ ${option.group}: ${option.name}')
+          .join('\n');
+      final addonsEn = item.selectedOptions
+          .map((option) => '   ↳ ${option.group}: ${option.name}')
+          .join('\n');
+
       itemsAr.writeln('• $nameAr x${item.quantity} ($lineTotal د.ك)');
+      if (addonsAr.isNotEmpty) itemsAr.writeln(addonsAr);
       itemsEn.writeln('• $nameEn x${item.quantity} ($lineTotal KWD)');
+      if (addonsEn.isNotEmpty) itemsEn.writeln(addonsEn);
     }
 
     final paymentAr = paymentMethod == 'K-Net' ? 'K-Net' : 'كاش';

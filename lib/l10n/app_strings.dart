@@ -35,6 +35,22 @@ class AppStrings {
       isArabic ? 'تمت إضافة "$itemName" إلى السلة' : '"$itemName" added to cart';
   String get continueOrder => isArabic ? 'متابعة الطلب' : 'Checkout';
   String get currency => isArabic ? 'د.ك' : 'KWD';
+  String get cancel => isArabic ? 'إلغاء' : 'Cancel';
+  String get addToCart => isArabic ? 'إضافة إلى السلة' : 'Add to cart';
+  String get freeAddon => isArabic ? 'مجاني' : 'Free';
+  String get noAddonSelected => isArabic ? 'بدون' : 'None';
+  String get specialNotesLabel =>
+      isArabic ? 'ملاحظات خاصة (اختياري)' : 'Special notes (optional)';
+  String get specialNotesHint => isArabic
+      ? 'مثال: بدون بصل، صوص إضافي...'
+      : 'Example: no onions, extra sauce...';
+  String basePriceLabel(String price) =>
+      isArabic ? 'السعر الأساسي: $price د.ك' : 'Base price: $price KWD';
+  String totalWithAddons(String total) =>
+      isArabic ? 'الإجمالي: $total د.ك' : 'Total: $total KWD';
+  String requiredAddonGroup(String groupName) => isArabic
+      ? 'يرجى اختيار خيار من مجموعة "$groupName"'
+      : 'Please choose an option from "$groupName"';
 
   String get checkoutTitle => isArabic ? 'إتمام الطلب' : 'Complete Order';
   String get customerName => isArabic ? 'اسم العميل' : 'Customer name';

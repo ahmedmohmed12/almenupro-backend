@@ -1142,6 +1142,12 @@ class ApiService {
         'display_order':
             (data['displayOrder'] ?? data['display_order'] as num?)?.toInt() ?? 0,
 
+      if (data['options'] != null)
+        'options': (data['options'] as List<dynamic>? ?? [])
+            .whereType<Map>()
+            .map((option) => Map<String, dynamic>.from(option))
+            .toList(),
+
       'source': data['source'] ?? 'Manual',
 
     };

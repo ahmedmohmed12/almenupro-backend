@@ -25,6 +25,7 @@ import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_corner_toast.dart';
 import '../widgets/admin/admin_pos_panel.dart';
 import '../widgets/admin/admin_delivery_zones_panel.dart';
+import '../widgets/admin/admin_item_addons_editor.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_customers_panel.dart';
@@ -362,6 +363,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
       text: normalizeMenuImageUrl(data?['imageUrl'] as String?),
     );
     var isAvailable = data?['isAvailable'] as bool? ?? true;
+    var addonOptions = (data?['options'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .toList();
 
     await showDialog<void>(
       context: context,
@@ -451,6 +456,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       onChanged: (val) =>
                           setDialogState(() => isAvailable = val),
                     ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    AdminItemAddonsEditor(
+                      options: addonOptions,
+                      onChanged: (next) =>
+                          setDialogState(() => addonOptions = next),
+                    ),
                   ],
                 ),
               ),
@@ -492,7 +505,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       'categoryName': categoryController.text.trim(),
                       'categoryId': data?['categoryId'] ?? '',
                       'imageUrl': normalizeMenuImageUrl(imageUrlController.text.trim()),
-                      'options': data?['options'] ?? <dynamic>[],
+                      'options': addonOptions
+                          .where(
+                            (option) =>
+                                (option['name']?.toString().trim().isNotEmpty ??
+                                    false),
+                          )
+                          .map((option) => Map<String, dynamic>.from(option))
+                          .toList(),
                       'isAvailable': isAvailable,
                       if (data?['displayOrder'] != null)
                         'displayOrder': data!['displayOrder'],

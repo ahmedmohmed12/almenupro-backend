@@ -20,6 +20,7 @@ import '../../services/pos_print_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/pos_receipt_html.dart';
 import '../../utils/whatsapp_phone.dart';
+import '../menu/customization_dialog.dart';
 import '../network_menu_image.dart';
 
 class AdminPosPanel extends StatefulWidget {
@@ -356,9 +357,26 @@ class _AdminPosPanelState extends State<AdminPosPanel> {
     setState(() {});
   }
 
+  Future<void> _handleMenuItemTap(MenuItem item) async {
+    if (item.hasCustomizations) {
+      await showCustomizationDialog(
+        context,
+        item,
+        onAdd: (cartItem) {
+          setState(() => _cart.add(cartItem));
+        },
+      );
+      return;
+    }
+    _addToCart(item);
+  }
+
   void _addToCart(MenuItem item) {
     setState(() {
-      final index = _cart.indexWhere((entry) => entry.menuItem.id == item.id);
+      final index = _cart.indexWhere(
+        (entry) =>
+            entry.menuItem.id == item.id && entry.selectedOptions.isEmpty,
+      );
       if (index >= 0) {
         final existing = _cart[index];
         _cart[index] = existing.copyWith(quantity: existing.quantity + 1);
@@ -631,7 +649,7 @@ class _AdminPosPanelState extends State<AdminPosPanel> {
                     final item = menuItems[index];
                     return _PosMenuTile(
                       item: item,
-                      onTap: () => _addToCart(item),
+                      onTap: () => unawaited(_handleMenuItemTap(item)),
                     );
                   },
                 ),
@@ -841,12 +859,25 @@ class _AdminPosPanelState extends State<AdminPosPanel> {
               )
             else
               ..._cart.map(
-                (item) => Card(
-                  child: ListTile(
-                    title: Text(item.menuItem.name),
-                    subtitle: Text(
-                      '${item.unitPrice.toStringAsFixed(3)} × ${item.quantity}',
-                    ),
+                (item) {
+                  final addons = item.selectedOptions
+                      .map(
+                        (option) =>
+                            '${option.group}: ${option.name} (+${option.price.toStringAsFixed(3)} د.ك)',
+                      )
+                      .join('\n');
+
+                  return Card(
+                    child: ListTile(
+                      title: Text(item.menuItem.name),
+                      subtitle: Text(
+                        [
+                          '${item.unitPrice.toStringAsFixed(3)} × ${item.quantity}',
+                          if (addons.isNotEmpty) addons,
+                          if (item.specialNotes?.trim().isNotEmpty ?? false)
+                            'ملاحظة: ${item.specialNotes!.trim()}',
+                        ].join('\n'),
+                      ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -864,7 +895,8 @@ class _AdminPosPanelState extends State<AdminPosPanel> {
                       ],
                     ),
                   ),
-                ),
+                );
+                },
               ),
             const SizedBox(height: 8),
             _TotalRow(label: 'المجموع الفرعي', value: _subtotal),

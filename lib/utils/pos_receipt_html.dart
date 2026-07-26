@@ -16,12 +16,24 @@ class PosReceiptHtml {
         : 'فاتورة العميل / Customer Receipt';
     final rows = order.items
         .map(
-          (item) => '''
+          (item) {
+            final addons = item.selectedOptions
+                .map(
+                  (option) =>
+                      '<div class="addon">+ ${_escape(option.group)}: ${_escape(option.name)} (${option.price.toStringAsFixed(3)} د.ك)</div>',
+                )
+                .join('');
+            final notes = item.specialNotes?.trim().isNotEmpty ?? false
+                ? '<div class="addon">ملاحظة: ${_escape(item.specialNotes!.trim())}</div>'
+                : '';
+
+            return '''
         <tr>
           <td>${item.quantity}x</td>
-          <td>${_escape(item.name)}</td>
+          <td>${_escape(item.name)}$addons$notes</td>
           <td>${item.lineTotal.toStringAsFixed(3)}</td>
-        </tr>''',
+        </tr>''';
+          },
         )
         .join();
 
@@ -49,6 +61,7 @@ class PosReceiptHtml {
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     th, td { padding: 4px 2px; border-bottom: 1px dashed #ccc; text-align: right; }
     th { font-size: 11px; }
+    .addon { font-size: 10px; color: #555; margin-top: 2px; }
     .totals { margin-top: 10px; line-height: 1.6; }
     .grand { font-size: 14px; font-weight: bold; margin-top: 6px; }
     .footer { margin-top: 12px; text-align: center; font-size: 11px; color: #666; }

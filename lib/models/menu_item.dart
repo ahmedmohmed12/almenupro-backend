@@ -5,33 +5,77 @@ class MenuOption {
     required this.id,
     required this.name,
     required this.group,
+    this.nameAr = '',
+    this.nameEn = '',
     this.price = 0,
     this.isRequired = false,
+    this.groupRequired = false,
+    this.allowMultiple = false,
+    this.isAvailable = true,
   });
 
   final String id;
   final String name;
+  final String nameAr;
+  final String nameEn;
   final String group;
   final double price;
+  /// Legacy alias — prefer [groupRequired].
   final bool isRequired;
+  final bool groupRequired;
+  final bool allowMultiple;
+  final bool isAvailable;
+
+  bool get isGroupRequired => groupRequired || isRequired;
+
+  String localizedName(String localeCode) {
+    if (localeCode.startsWith('en')) {
+      if (nameEn.trim().isNotEmpty) return nameEn.trim();
+      if (nameAr.trim().isNotEmpty) return nameAr.trim();
+      return name;
+    }
+    if (nameAr.trim().isNotEmpty) return nameAr.trim();
+    if (nameEn.trim().isNotEmpty) return nameEn.trim();
+    return name;
+  }
 
   factory MenuOption.fromMap(Map<String, dynamic> map) {
+    final groupRequired = map['groupRequired'] == true ||
+        map['group_required'] == true ||
+        map['isRequired'] == true;
+    final isAvailable = !(map['is_available'] == 0 ||
+        map['is_available'] == false ||
+        map['isAvailable'] == false);
+
     return MenuOption(
-      id: map['id'] as String? ?? '',
-      name: map['name'] as String? ?? '',
-      group: map['group'] as String? ?? 'Options',
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      nameAr: map['name_ar']?.toString() ?? map['nameAr']?.toString() ?? '',
+      nameEn: map['name_en']?.toString() ?? map['nameEn']?.toString() ?? '',
+      group: map['group']?.toString() ?? 'إضافات',
       price: (map['price'] as num?)?.toDouble() ?? 0,
-      isRequired: map['isRequired'] as bool? ?? false,
+      isRequired: groupRequired,
+      groupRequired: groupRequired,
+      allowMultiple:
+          map['allowMultiple'] == true || map['allow_multiple'] == true,
+      isAvailable: isAvailable,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'name': name,
+      'name': nameAr.isNotEmpty ? nameAr : name,
+      if (nameAr.isNotEmpty) 'name_ar': nameAr,
+      if (nameEn.isNotEmpty) 'name_en': nameEn,
       'group': group,
       'price': price,
-      'isRequired': isRequired,
+      'groupRequired': isGroupRequired,
+      'group_required': isGroupRequired,
+      'allowMultiple': allowMultiple,
+      'allow_multiple': allowMultiple,
+      'isAvailable': isAvailable,
+      'is_available': isAvailable ? 1 : 0,
     };
   }
 }
@@ -72,6 +116,12 @@ class MenuItem {
     this.displayOrder = 0,
     this.options = const [],
   });
+
+  bool get hasCustomizations =>
+      options.any((option) => option.isAvailable);
+
+  List<MenuOption> get availableOptions =>
+      options.where((option) => option.isAvailable).toList();
 
   String localizedName(String localeCode) {
     if (localeCode.startsWith('en')) {

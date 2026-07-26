@@ -612,14 +612,27 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     children: [
                       ...cart.items.map(
-                        (item) => ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            item.menuItem.localizedName(locale.localeCode),
-                          ),
-                          subtitle: Text(
-                            '${item.unitPrice.toStringAsFixed(3)} ${strings.currency}',
-                          ),
+                        (item) {
+                          final addons = item.selectedOptions
+                              .map(
+                                (option) =>
+                                    '${option.group}: ${option.name} (+${option.price.toStringAsFixed(3)} ${strings.currency})',
+                              )
+                              .join(' • ');
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              item.menuItem.localizedName(locale.localeCode),
+                            ),
+                            subtitle: Text(
+                              [
+                                '${item.unitPrice.toStringAsFixed(3)} ${strings.currency}',
+                                if (addons.isNotEmpty) addons,
+                                if (item.specialNotes?.trim().isNotEmpty ?? false)
+                                  item.specialNotes!.trim(),
+                              ].join('\n'),
+                            ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -640,7 +653,8 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                               ),
                             ],
                           ),
-                        ),
+                        );
+                        },
                       ),
                       const Divider(height: 32),
                       if (_loadingWhatsapp)

@@ -379,6 +379,48 @@ function normalizeBilingualText(raw = {}) {
   return { name_ar: nameAr, name_en: nameEn, description_ar: descriptionAr, description_en: descriptionEn, name, description };
 }
 
+function normalizeMenuOptions(raw) {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((opt, index) => {
+      const nameAr = String(opt.name_ar ?? opt.nameAr ?? opt.name ?? '').trim();
+      const nameEn = String(opt.name_en ?? opt.nameEn ?? '').trim();
+      const name = nameAr || nameEn || String(opt.name ?? '').trim();
+      const groupRequired = !!(
+        opt.group_required ??
+        opt.groupRequired ??
+        opt.isRequired
+      );
+
+      return {
+        id: String(opt.id || `addon_${index + 1}_${Date.now()}`),
+        name,
+        name_ar: nameAr,
+        name_en: nameEn,
+        group: String(opt.group || 'إضافات').trim() || 'إضافات',
+        price: Number(opt.price) || 0,
+        group_required: groupRequired,
+        groupRequired,
+        isRequired: groupRequired,
+        allow_multiple: !!(opt.allow_multiple ?? opt.allowMultiple),
+        allowMultiple: !!(opt.allow_multiple ?? opt.allowMultiple),
+        is_available:
+          opt.is_available === 0 ||
+          opt.is_available === false ||
+          opt.isAvailable === false
+            ? 0
+            : 1,
+        isAvailable: !(
+          opt.is_available === 0 ||
+          opt.is_available === false ||
+          opt.isAvailable === false
+        ),
+      };
+    })
+    .filter((opt) => opt.name);
+}
+
 function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
   const categoryName =
     raw.category_name || raw.categoryName || raw.category || 'عام';
@@ -405,6 +447,7 @@ function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
       talabat_id: talabatId,
       source: raw.source || 'Talabat',
       display_order: Number(raw.display_order ?? raw.displayOrder ?? 0) || 0,
+      ...(raw.options != null ? { options: normalizeMenuOptions(raw.options) } : {}),
     },
     restaurantId,
   );
@@ -996,6 +1039,7 @@ const server = http.createServer(async (req, res) => {
           display_order:
             Number(body.display_order ?? body.displayOrder) ||
             maxDisplayOrder(scoped) + 1,
+          options: normalizeMenuOptions(body.options),
         },
         restaurantId,
       );
@@ -1124,6 +1168,10 @@ const server = http.createServer(async (req, res) => {
             ? Number(body.display_order ?? body.displayOrder) || 0
             : itemDisplayOrder(item, 0),
       });
+
+      if (body.options != null) {
+        item.options = normalizeMenuOptions(body.options);
+      }
 
       await writeItems(items);
       sendJson(res, 200, item);

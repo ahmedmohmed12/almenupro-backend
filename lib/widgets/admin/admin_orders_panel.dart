@@ -463,8 +463,14 @@ class _AdminOrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final itemLines = order.items
         .map(
-          (item) =>
-              '${item.quantity}x ${item.name} (${item.lineTotal.toStringAsFixed(3)} د.ك)',
+          (item) {
+            final addons = item.selectedOptions
+                .map((option) => '  + ${option.group}: ${option.name}')
+                .join('\n');
+            final base =
+                '${item.quantity}x ${item.name} (${item.lineTotal.toStringAsFixed(3)} د.ك)';
+            return addons.isEmpty ? base : '$base\n$addons';
+          },
         )
         .join('\n');
     final nextStatus = readOnly ? null : order.status.nextStatus;

@@ -9,6 +9,7 @@ import '../providers/cart_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/menu/customization_dialog.dart';
 import '../widgets/menu/menu_checkout_sheet.dart';
 import '../widgets/menu/mobile/menu_mobile_experience.dart';
 import '../widgets/network_menu_image.dart';
@@ -191,9 +192,15 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
-  void _addToCart(MenuItem item) {
+  Future<void> _addToCart(MenuItem item) async {
     final strings = AppStrings.of(context);
     final locale = context.read<LocaleProvider>().localeCode;
+
+    if (item.hasCustomizations) {
+      await showCustomizationDialog(context, item);
+      return;
+    }
+
     context.read<CartProvider>().addMenuItem(item);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
