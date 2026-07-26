@@ -124,7 +124,9 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   bool _useMobileLayout(BuildContext context) {
-    return MediaQuery.sizeOf(context).width < 900;
+    final size = MediaQuery.sizeOf(context);
+    // Phone/narrow viewports — also catches mobile web without viewport meta.
+    return size.width < 900 || size.shortestSide < 600;
   }
 
   int _gridColumns(double width) {
