@@ -62,6 +62,12 @@ class AppStrings {
   String get fillRequiredFields => isArabic
       ? 'يرجى تعبئة جميع الحقول الإجبارية (الاسم، الهاتف، العنوان، القطعة، الشارع، والمنزل)'
       : 'Please fill all required fields (name, phone, area, block, street, and house)';
+  String get profileLoaded => isArabic
+      ? 'تم استرجاع بياناتك السابقة تلقائياً'
+      : 'Your saved details were loaded automatically';
+  String get lookingUpProfile => isArabic
+      ? 'جاري البحث عن بياناتك...'
+      : 'Looking up your saved details...';
   String get orderSubmitFailed => isArabic
       ? 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.'
       : 'Could not send the order. Please try again.';

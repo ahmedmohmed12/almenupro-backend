@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 
 
+import '../models/customer_checkout_profile.dart';
 import '../models/delivery_zone.dart';
 import '../models/menu_item.dart';
 
@@ -1101,6 +1102,45 @@ class ApiService {
         .map((raw) => DeliveryZone.fromMap(Map<String, dynamic>.from(raw)))
         .where((zone) => zone.isActive)
         .toList();
+  }
+
+  Future<CustomerCheckoutProfile?> fetchCustomerCheckoutProfile({
+    required String phone,
+    String? restaurantId,
+    String? slug,
+  }) async {
+    final normalizedPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (normalizedPhone.length < 8) return null;
+
+    final query = <String, String>{'phone': normalizedPhone};
+    if (slug != null && slug.trim().isNotEmpty) {
+      query['slug'] = slug.trim();
+    } else {
+      query['restaurantId'] = _scopedRestaurantId(restaurantId: restaurantId);
+    }
+
+    try {
+      final response = await http
+          .get(_uri('/customers/lookup', query), headers: _publicHeaders)
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode == 404) return null;
+      if (response.statusCode != 200) return null;
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return null;
+
+      final profileRaw = decoded['profile'];
+      if (profileRaw is! Map) return null;
+
+      final profile = CustomerCheckoutProfile.fromMap(
+        Map<String, dynamic>.from(profileRaw),
+      );
+      return profile.hasUsableData ? profile : null;
+    } catch (error) {
+      debugPrint('Customer lookup failed: $error');
+      return null;
+    }
   }
 
   Future<DeliveryZone> createDeliveryZone(DeliveryZone zone) async {

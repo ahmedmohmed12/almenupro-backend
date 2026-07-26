@@ -5,16 +5,19 @@ import 'package:provider/provider.dart';
 
 import '../../data/kuwait_governorates.dart';
 import '../../l10n/app_strings.dart';
+import '../../models/customer_checkout_profile.dart';
 import '../../models/customer_restaurant_context.dart';
 import '../../models/delivery_address_details.dart';
 import '../../models/delivery_zone.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/customer_checkout_cache_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/whatsapp_launcher.dart';
 import '../../utils/whatsapp_order_message.dart';
+import '../../utils/whatsapp_phone.dart';
 
 class MenuCheckoutSheet extends StatefulWidget {
   const MenuCheckoutSheet({super.key, this.restaurantContext});
@@ -62,6 +65,11 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   var _paymentMethod = 'كاش';
   var _submitting = false;
   var _loadingZones = true;
+  var _lookupInProgress = false;
+  var _profileAutofilled = false;
+
+  Timer? _lookupDebounce;
+  String? _lastLookupPhone;
 
   List<DeliveryZone> _zones = [];
   String? _selectedGovernorate;
@@ -208,7 +216,146 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadDeliveryZones());
+    _phoneController.addListener(_onPhoneChanged);
+    unawaited(_bootstrapCheckout());
+  }
+
+  Future<void> _bootstrapCheckout() async {
+    await _loadDeliveryZones();
+    final lastPhone =
+        await CustomerCheckoutCacheService.instance.loadLastPhone(_restaurantId);
+    if (!mounted || lastPhone == null || lastPhone.trim().isEmpty) return;
+    if (_phoneController.text.trim().isNotEmpty) return;
+    _phoneController.text = lastPhone.trim();
+  }
+
+  void _onPhoneChanged() {
+    final digits = WhatsAppPhone.digitsOnly(_phoneController.text);
+    if (digits.length < 8) {
+      _lookupDebounce?.cancel();
+      if (_profileAutofilled) {
+        setState(() => _profileAutofilled = false);
+      }
+      return;
+    }
+
+    if (digits == _lastLookupPhone && _profileAutofilled) return;
+
+    _lookupDebounce?.cancel();
+    _lookupDebounce = Timer(const Duration(milliseconds: 600), () {
+      unawaited(_lookupCustomerProfile(digits));
+    });
+  }
+
+  Future<void> _lookupCustomerProfile(String normalizedPhone) async {
+    if (_lookupInProgress && _lastLookupPhone == normalizedPhone) return;
+
+    if (!mounted) return;
+    setState(() {
+      _lookupInProgress = true;
+      _lastLookupPhone = normalizedPhone;
+    });
+
+    try {
+      var profile = await CustomerCheckoutCacheService.instance.loadProfile(
+        _restaurantId,
+        normalizedPhone,
+      );
+
+      profile ??= await ApiService.instance.fetchCustomerCheckoutProfile(
+        phone: normalizedPhone,
+        restaurantId: _restaurantId,
+        slug: _restaurantSlug,
+      );
+
+      if (profile != null && profile.hasUsableData) {
+        await CustomerCheckoutCacheService.instance.saveProfile(
+          _restaurantId,
+          profile,
+        );
+      }
+
+      if (!mounted || profile == null || !profile.hasUsableData) return;
+
+      final resolvedProfile = profile;
+      setState(() => _applyProfile(resolvedProfile));
+      _showFeedback(AppStrings.of(context).profileLoaded);
+    } finally {
+      if (mounted) {
+        setState(() => _lookupInProgress = false);
+      }
+    }
+  }
+
+  void _applyProfile(CustomerCheckoutProfile profile) {
+    if (profile.customerName.trim().isNotEmpty) {
+      _nameController.text = profile.customerName.trim();
+    }
+
+    _blockController.text = profile.addressDetails.block;
+    _streetController.text = profile.addressDetails.street;
+    _avenueController.text = profile.addressDetails.avenue;
+    _houseController.text = profile.addressDetails.houseNumber;
+    _floorController.text = profile.addressDetails.floorApartment;
+
+    if (profile.governorate.trim().isNotEmpty) {
+      _selectedGovernorate = profile.governorate.trim();
+    }
+
+    DeliveryZone? matchedZone;
+    final zoneId = profile.deliveryZoneId?.trim();
+    if (zoneId != null && zoneId.isNotEmpty) {
+      for (final zone in _zones) {
+        if (zone.id == zoneId) {
+          matchedZone = zone;
+          break;
+        }
+      }
+    }
+
+    if (matchedZone == null && profile.areaName.trim().isNotEmpty) {
+      for (final zone in _zones) {
+        final sameArea = zone.areaName.trim() == profile.areaName.trim();
+        final sameGov = profile.governorate.isEmpty ||
+            zone.governorate.trim() == profile.governorate.trim();
+        if (sameArea && sameGov) {
+          matchedZone = zone;
+          break;
+        }
+      }
+    }
+
+    if (matchedZone != null) {
+      _selectedGovernorate = matchedZone.governorate;
+      _selectedZone = matchedZone;
+    } else {
+      _syncDefaultArea();
+    }
+
+    if (profile.paymentMethod.trim().isNotEmpty) {
+      _paymentMethod = profile.paymentMethod.trim();
+    }
+
+    _profileAutofilled = true;
+  }
+
+  CustomerCheckoutProfile _currentProfile() {
+    return CustomerCheckoutProfile(
+      phone: _phoneController.text.trim(),
+      customerName: _nameController.text.trim(),
+      governorate: _selectedZone?.governorate ?? _selectedGovernorate ?? '',
+      areaName: _selectedZone?.areaName ?? '',
+      deliveryZoneId: _selectedZone?.id,
+      addressDetails: _addressDetails,
+      paymentMethod: _paymentMethod,
+    );
+  }
+
+  Future<void> _persistProfile() async {
+    await CustomerCheckoutCacheService.instance.saveProfile(
+      _restaurantId,
+      _currentProfile(),
+    );
   }
 
   Future<void> _loadDeliveryZones() async {
@@ -242,6 +389,8 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 
   @override
   void dispose() {
+    _lookupDebounce?.cancel();
+    _phoneController.removeListener(_onPhoneChanged);
     _nameController.dispose();
     _phoneController.dispose();
     _blockController.dispose();
@@ -314,6 +463,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
             deliveryZoneId: _selectedZone?.id,
             addressDetails: _addressDetails,
           );
+          await _persistProfile();
         } catch (error) {
           debugPrint('Order backend sync failed: $error');
         }
@@ -471,13 +621,32 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       ),
                       const Divider(height: 32),
                       TextFormField(
-                        controller: _nameController,
-                        focusNode: _nameFocus,
+                        controller: _phoneController,
+                        focusNode: _phoneFocus,
+                        autofocus: true,
+                        keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_phoneFocus),
+                        onFieldSubmitted: (_) => _focusNext(_nameFocus),
                         decoration: InputDecoration(
-                          labelText: strings.customerName,
+                          labelText: strings.phone,
                           border: const OutlineInputBorder(),
+                          suffixIcon: _lookupInProgress
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                )
+                              : _profileAutofilled
+                                  ? const Icon(
+                                      Icons.check_circle,
+                                      color: AppTheme.brandOrange,
+                                    )
+                                  : null,
+                          helperText:
+                              _lookupInProgress ? strings.lookingUpProfile : null,
                         ),
                         validator: (value) => value == null || value.trim().isEmpty
                             ? strings.required
@@ -485,13 +654,12 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
-                        controller: _phoneController,
-                        focusNode: _phoneFocus,
-                        keyboardType: TextInputType.phone,
+                        controller: _nameController,
+                        focusNode: _nameFocus,
                         textInputAction: TextInputAction.next,
                         onFieldSubmitted: (_) => _focusNext(_blockFocus),
                         decoration: InputDecoration(
-                          labelText: strings.phone,
+                          labelText: strings.customerName,
                           border: const OutlineInputBorder(),
                         ),
                         validator: (value) => value == null || value.trim().isEmpty

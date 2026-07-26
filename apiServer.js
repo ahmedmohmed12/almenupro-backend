@@ -309,6 +309,33 @@ function sortOrdersDesc(orders) {
   });
 }
 
+function normalizePhoneDigits(raw) {
+  return String(raw || '').replace(/\D/g, '');
+}
+
+function phonesMatch(storedPhone, lookupPhone) {
+  const stored = normalizePhoneDigits(storedPhone);
+  const lookup = normalizePhoneDigits(lookupPhone);
+  if (!stored || !lookup) return false;
+  if (stored === lookup) return true;
+  if (stored.length >= 8 && lookup.length >= 8) {
+    return stored.slice(-8) === lookup.slice(-8);
+  }
+  return false;
+}
+
+function customerProfileFromOrder(order) {
+  return {
+    customerName: order.customerName || '',
+    phone: order.phone || '',
+    governorate: order.governorate || '',
+    areaName: order.areaName || '',
+    deliveryZoneId: order.deliveryZoneId || null,
+    addressDetails: order.addressDetails || {},
+    paymentMethod: order.paymentMethod || 'كاش',
+  };
+}
+
 function categoryIdFor(name) {
   const key = String(name || 'عام').trim() || 'عام';
   if (!categoryIds.has(key)) {
@@ -501,6 +528,7 @@ const server = http.createServer(async (req, res) => {
         restaurantPublic: '/api/restaurants/public',
         restaurantBySlug: '/api/restaurants/public/{slug}',
         menu: '/api/items?slug={slug}',
+        customerLookup: '/api/customers/lookup?phone={phone}&slug={slug}',
         orders: '/api/orders',
         settings: '/api/settings',
         images: '/menu-images/{filename}',
@@ -1124,6 +1152,55 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, zone);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/customers/lookup') {
+    try {
+      const phone = url.searchParams.get('phone');
+      const normalizedPhone = normalizePhoneDigits(phone);
+      if (!normalizedPhone || normalizedPhone.length < 8) {
+        sendJson(res, 400, { error: 'Invalid phone number' });
+        return;
+      }
+
+      const restaurants = await readRestaurants();
+      let restaurantId = resolveRestaurantFromQuery(url, restaurants);
+      if (!restaurantId) {
+        const slug = String(
+          url.searchParams.get('slug') || url.searchParams.get('restaurant_slug') || '',
+        )
+          .trim()
+          .toLowerCase();
+        if (slug) {
+          const match = restaurants.find(
+            (entry) => String(entry.slug || '').toLowerCase() === slug,
+          );
+          restaurantId = match ? match.id : null;
+        }
+      }
+
+      if (!restaurantId) {
+        sendJson(res, 400, { error: 'Restaurant not found' });
+        return;
+      }
+
+      const orders = sortOrdersDesc(
+        filterByRestaurant(await readOrders(), restaurantId),
+      );
+      const match = orders.find((order) => phonesMatch(order.phone, normalizedPhone));
+      if (!match) {
+        sendJson(res, 404, { found: false });
+        return;
+      }
+
+      sendJson(res, 200, {
+        found: true,
+        profile: customerProfileFromOrder(match),
+      });
+    } catch (error) {
+      sendJson(res, 500, { error: error.message || 'Lookup failed' });
     }
     return;
   }
