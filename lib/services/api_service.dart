@@ -64,7 +64,8 @@ class ApiService {
 
 
 
-  static const Duration _fetchTimeout = Duration(seconds: 15);
+  static const Duration _fetchTimeout = Duration(seconds: 30);
+  static const Duration _writeTimeout = Duration(seconds: 60);
 
 
 
@@ -721,7 +722,7 @@ class ApiService {
 
           )
 
-          .timeout(_fetchTimeout);
+          .timeout(_writeTimeout);
 
 
 
@@ -903,7 +904,7 @@ class ApiService {
 
         )
 
-        .timeout(_fetchTimeout);
+        .timeout(_writeTimeout);
 
 
 
@@ -945,7 +946,7 @@ class ApiService {
 
         )
 
-        .timeout(_fetchTimeout);
+        .timeout(_writeTimeout);
 
 
 

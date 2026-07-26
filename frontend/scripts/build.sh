@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.13.4 (bilingual migration audit)"
+echo "Almenupro frontend build v1.13.5 (timeout and migration perf fix)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=bilingual-audit-v1.13.4
+  --dart-define=BUILD_FEATURE=timeout-fix-v1.13.5
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"

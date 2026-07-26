@@ -74,7 +74,8 @@ const {
   writeSettingsMap,
   readDeliveryZones,
   writeDeliveryZones,
-  ensureBilingualMenuItems,
+  ensureBilingualMenuItemsFast,
+  ensureBilingualMenuItemsWithAutoTranslate,
 } = require('./lib/dataStore');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -883,8 +884,10 @@ const server = http.createServer(async (req, res) => {
 
       const items = await readItems();
       const scoped = filterByRestaurant(items, restaurantId);
-      const category = await ensureAutoTranslatedCategory(body);
-      const bilingual = await ensureAutoTranslatedBilingual(body);
+      const [category, bilingual] = await Promise.all([
+        ensureAutoTranslatedCategory(body),
+        ensureAutoTranslatedBilingual(body),
+      ]);
       const item = ensureRestaurantId(
         {
           id: nextNumericItemId(scoped),
@@ -945,8 +948,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       const body = JSON.parse((await readBody(req)) || '{}');
-      const category = await ensureAutoTranslatedCategory(body, item);
-      const bilingual = await ensureAutoTranslatedBilingual({ ...item, ...body });
+      const [category, bilingual] = await Promise.all([
+        ensureAutoTranslatedCategory(body, item),
+        ensureAutoTranslatedBilingual({ ...item, ...body }),
+      ]);
 
       Object.assign(item, {
         ...bilingual,
@@ -1286,12 +1291,12 @@ storeReady = storeReady.then(async () => {
   const items = await readItems();
   rebuildCategoryIds(items);
   try {
-    const result = await ensureBilingualMenuItems();
+    const result = await ensureBilingualMenuItemsFast();
     if (result.updated > 0) {
-      console.log(`Bilingual menu migration: updated ${result.updated}/${result.total} items`);
+      console.log(`Bilingual menu normalize: updated ${result.updated}/${result.total} items`);
     }
   } catch (error) {
-    console.warn('Bilingual menu migration skipped:', error.message || error);
+    console.warn('Bilingual menu normalize skipped:', error.message || error);
   }
 });
 
