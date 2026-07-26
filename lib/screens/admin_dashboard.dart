@@ -9,6 +9,7 @@ import '../firebase_options.dart';
 import '../models/order.dart';
 import '../utils/firebase_config.dart';
 import '../utils/image_url.dart';
+import '../utils/whatsapp_phone.dart';
 import '../services/admin_auth_service.dart';
 import '../services/admin_order_monitor_service.dart';
 import '../services/analytics_demo_service.dart';
@@ -52,6 +53,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
 
   final _whatsappController = TextEditingController();
+  String _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;
   bool _isSavingSettings = false;
 
   @override
@@ -71,6 +73,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _onSuperAdminScopeChanged() {
     if (!mounted) return;
+    RestaurantSettingsService.instance.clearCache();
     setState(() {});
     unawaited(_loadSettings());
   }
@@ -108,29 +111,47 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _loadSettings() async {
     try {
-      final settings = await RestaurantSettingsService.instance.load();
-      _whatsappController.text = settings.whatsappNumber;
+      final restaurantId = SuperAdminScopeService.instance.effectiveRestaurantId;
+      final settings = await RestaurantSettingsService.instance.load(
+        restaurantId: restaurantId,
+      );
+      _whatsappCountryCode = settings.whatsappCountryCode;
+      _whatsappController.text = settings.whatsappPhone;
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading settings: $e');
-      _whatsappController.text = '96594774950';
+      _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;
+      _whatsappController.clear();
     }
   }
 
   Future<void> _saveWhatsappNumber() async {
-    if (_whatsappController.text.trim().isEmpty) return;
+    if (_whatsappController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى إدخال رقم الواتساب')),
+      );
+      return;
+    }
     setState(() => _isSavingSettings = true);
 
     try {
-      await RestaurantSettingsService.instance
-          .saveWhatsappNumber(_whatsappController.text.trim());
+      final restaurantId = SuperAdminScopeService.instance.effectiveRestaurantId;
+      await RestaurantSettingsService.instance.saveWhatsappNumber(
+        countryCode: _whatsappCountryCode,
+        phone: _whatsappController.text.trim(),
+        restaurantId: restaurantId,
+      );
       if (!mounted) return;
+      final display = WhatsAppPhone.formatDisplay(
+        _whatsappCountryCode,
+        _whatsappController.text.trim(),
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isFirebaseConfigured
-                ? 'تم حفظ رقم الواتساب بنجاح!'
-                : 'تم حفظ الرقم على السيرفر. اربط Firebase لمزامنة الإعدادات بين الأجهزة.',
+                ? 'تم حفظ رقم الواتساب ($display) بنجاح!'
+                : 'تم حفظ الرقم ($display) على السيرفر.',
           ),
         ),
       );
@@ -976,13 +997,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildSettingsTab() {
+    final scope = SuperAdminScopeService.instance;
+    final restaurantLabel = _isSuperAdmin
+        ? (scope.selectedRestaurantName ?? '—')
+        : (_restaurantLabel ?? 'المطعم');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'إعدادات المحل والواتساب',
+            'إعدادات المطعم — رقم الواتساب',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -990,9 +1016,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'حدد رقم الهاتف الذي تود أن يستقبل طلبات وفواتير العملاء عبر الواتساب مباشرة:',
+          Text(
+            _isSuperAdmin
+                ? 'المطعم الحالي: $restaurantLabel — حدد رقم الواتساب الذي يستقبل طلبات هذا المطعم:'
+                : 'حدد رقم الواتساب الذي يستقبل طلبات وفواتير عملاء مطعمك:',
           ),
+          if (_isSuperAdmin && !scope.hasSelection) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'اختر مطعماً من قائمة «المطاعم» أولاً لضبط رقم الواتساب الخاص به.',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ],
           const SizedBox(height: 20),
           Card(
             child: Padding(
@@ -1000,15 +1035,66 @@ class _AdminDashboardState extends State<AdminDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: _whatsappController,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'رقم الواتساب بالصيغة الدولية (بدون +)',
-                      hintText: 'مثال: 96594774950',
-                      prefixIcon: Icon(Icons.phone, color: Colors.green),
-                      border: OutlineInputBorder(),
+                  const Text(
+                    'رقم الواتساب لاستقبال الطلبات',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 150,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _whatsappCountryCode,
+                          decoration: const InputDecoration(
+                            labelText: 'مفتاح الدولة',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 14,
+                            ),
+                          ),
+                          items: WhatsAppPhone.countryCodes
+                              .map(
+                                (entry) => DropdownMenuItem(
+                                  value: entry.$1,
+                                  child: Text(entry.$2),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (_isSuperAdmin && !scope.hasSelection)
+                              ? null
+                              : (value) {
+                                  if (value == null) return;
+                                  setState(() => _whatsappCountryCode = value);
+                                },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _whatsappController,
+                          enabled: !_isSuperAdmin || scope.hasSelection,
+                          keyboardType: TextInputType.phone,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'رقم الواتساب',
+                            hintText: 'مثال: 94774950',
+                            prefixIcon: Icon(Icons.phone, color: Colors.green),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'سيُستخدم الرقم: ${WhatsAppPhone.formatDisplay(_whatsappCountryCode, _whatsappController.text)}',
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                   ),
                   const SizedBox(height: 15),
                   SizedBox(
@@ -1017,8 +1103,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.brown,
                       ),
-                      onPressed:
-                          _isSavingSettings ? null : _saveWhatsappNumber,
+                      onPressed: (_isSavingSettings ||
+                              (_isSuperAdmin && !scope.hasSelection))
+                          ? null
+                          : _saveWhatsappNumber,
                       icon: _isSavingSettings
                           ? const SizedBox(
                               width: 20,

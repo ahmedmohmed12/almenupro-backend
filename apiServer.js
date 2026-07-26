@@ -54,6 +54,7 @@ warmMenuImageBundle();
 
 const { scrapeTalabatMenu } = require('./lib/talabatScraper');
 const { translateCategoryName } = require('./lib/bilingualMenu');
+const { normalizeWhatsappSettings } = require('./lib/whatsappPhone');
 const {
   initDataStore,
   usesMongo,
@@ -168,9 +169,10 @@ function normalizeSettings(raw) {
   const workingHours = Array.isArray(source.workingHours) && source.workingHours.length
     ? source.workingHours
     : base.workingHours;
+  const whatsapp = normalizeWhatsappSettings(source);
 
   return {
-    whatsappNumber: String(source.whatsappNumber || source.whatsapp_number || base.whatsappNumber).trim(),
+    ...whatsapp,
     workingHours: workingHours.map((day) => ({
       weekday: Number(day.weekday) || 6,
       isOpen: day.isOpen !== false && day.is_open !== false,

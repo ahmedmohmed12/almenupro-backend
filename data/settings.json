@@ -1,6 +1,8 @@
 {
   "byRestaurant": {
     "rest_molton": {
+      "whatsappCountryCode": "965",
+      "whatsappPhone": "94774950",
       "whatsappNumber": "96594774950",
       "workingHours": [
         { "weekday": 6, "isOpen": true, "open": "10:00", "close": "22:00" },

@@ -688,7 +688,10 @@ class ApiService {
 
 
 
-  Future<RestaurantSettings> updateSettings(RestaurantSettings settings) async {
+  Future<RestaurantSettings> updateSettings(
+    RestaurantSettings settings, {
+    String? restaurantId,
+  }) async {
 
     try {
 
@@ -696,12 +699,12 @@ class ApiService {
 
       final body = payload.toJson();
 
-      final restaurantId = AdminAuthService.instance.restaurantId;
+      body['restaurantId'] =
+          restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
 
-      if (restaurantId != null) {
-
-        body['restaurantId'] = restaurantId;
-
+      final authRestaurantId = AdminAuthService.instance.restaurantId;
+      if (authRestaurantId != null) {
+        body['restaurantId'] = authRestaurantId;
       }
 
 

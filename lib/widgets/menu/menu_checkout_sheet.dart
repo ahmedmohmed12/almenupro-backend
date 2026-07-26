@@ -58,13 +58,11 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   String? _selectedGovernorate;
   DeliveryZone? _selectedZone;
 
-  static const _defaultWhatsappNumber = '96594774950';
-
   String get _restaurantName =>
       widget.restaurantContext?.name ?? 'Molten Cookies';
 
   String get _whatsappNumber =>
-      widget.restaurantContext?.whatsappNumber ?? _defaultWhatsappNumber;
+      widget.restaurantContext?.whatsappNumber ?? '';
 
   String get _restaurantId =>
       widget.restaurantContext?.id ?? ApiService.defaultRestaurantId;
@@ -157,6 +155,18 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     if (_zones.isNotEmpty && _selectedZone == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(strings.selectGovernorateAndArea)),
+      );
+      return;
+    }
+    if (_whatsappNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            strings.isArabic
+                ? 'لم يُعيَّن رقم واتساب لهذا المطعم بعد. يرجى التواصل مع المطعم.'
+                : 'This restaurant has no WhatsApp number configured yet.',
+          ),
+        ),
       );
       return;
     }
