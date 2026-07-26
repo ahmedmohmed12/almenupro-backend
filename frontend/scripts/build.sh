@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.13.5 (timeout and migration perf fix)"
+echo "Almenupro frontend build v1.14.0 (mobile menu UI)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=timeout-fix-v1.13.5
+  --dart-define=BUILD_FEATURE=mobile-menu-v1.14.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -36,8 +36,8 @@ cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.13.4-bilingual-audit-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["bilingual-audit","auto-translate","restaurant-whatsapp","bilingual"]}\n' "$BUILD_ID" \
+BUILD_ID="1.14.0-mobile-menu-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["mobile-menu","bilingual","auto-translate"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 echo "Frontend build copied to frontend/dist ($BUILD_ID)"

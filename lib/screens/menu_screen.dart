@@ -9,6 +9,7 @@ import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/menu/menu_checkout_sheet.dart';
+import '../widgets/menu/mobile/menu_mobile_experience.dart';
 import '../widgets/network_menu_image.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -103,6 +104,29 @@ class _MenuScreenState extends State<MenuScreen> {
     return categories.toList();
   }
 
+  String _heroImageUrl(List<MenuItem> items) {
+    for (final item in items) {
+      if (item.imageUrl.trim().isNotEmpty) return item.imageUrl;
+    }
+    return '';
+  }
+
+  String _categoryTags(List<MenuItem> items, String localeCode, AppStrings strings) {
+    final names = <String>{};
+    for (final item in items) {
+      final label = item.localizedCategoryName(localeCode).trim();
+      if (label.isNotEmpty) names.add(label);
+    }
+    if (names.isEmpty) {
+      return strings.isArabic ? 'مأكولات، مشروبات، كويتي' : 'Food, Drinks, Kuwaiti';
+    }
+    return names.take(4).join(strings.isArabic ? '، ' : ', ');
+  }
+
+  bool _useMobileLayout(BuildContext context) {
+    return MediaQuery.sizeOf(context).width < 900;
+  }
+
   int _gridColumns(double width) {
     if (width >= 1200) return 4;
     if (width >= 900) return 3;
@@ -171,6 +195,25 @@ class _MenuScreenState extends State<MenuScreen> {
             final restaurantTagline = page.context != null
                 ? strings.menuTaglineFor(page.context!.name)
                 : strings.defaultTagline;
+
+            if (_useMobileLayout(context)) {
+              return MenuMobileExperience(
+                restaurantName: restaurantName,
+                heroImageUrl: _heroImageUrl(items),
+                categoryTags: _categoryTags(items, locale.localeCode, strings),
+                categories: categories,
+                items: filtered,
+                allItems: items,
+                localeCode: locale.localeCode,
+                strings: strings,
+                selectedCategory: effectiveCategory,
+                onCategorySelected: (value) {
+                  setState(() => _selectedCategory = value);
+                },
+                onAddToCart: _addToCart,
+                onRefresh: _reload,
+              );
+            }
 
             return RefreshIndicator(
               color: AppTheme.brandOrange,
