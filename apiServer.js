@@ -56,6 +56,10 @@ const { scrapeTalabatMenu } = require('./lib/talabatScraper');
 const { translateCategoryName } = require('./lib/bilingualMenu');
 const { normalizeWhatsappSettings } = require('./lib/whatsappPhone');
 const {
+  ensureAutoTranslatedBilingual,
+  ensureAutoTranslatedCategory,
+} = require('./lib/autoTranslate');
+const {
   initDataStore,
   usesMongo,
   getStorageStatus,
@@ -835,18 +839,13 @@ const server = http.createServer(async (req, res) => {
 
       const items = await readItems();
       const scoped = filterByRestaurant(items, restaurantId);
-      const categoryName = body.categoryName || body.category_name || 'عام';
-      const categoryNameEn =
-        String(body.category_name_en ?? body.categoryNameEn ?? '').trim() ||
-        translateCategoryName(categoryName);
-      const bilingual = normalizeBilingualText(body);
+      const category = await ensureAutoTranslatedCategory(body);
+      const bilingual = await ensureAutoTranslatedBilingual(body);
       const item = ensureRestaurantId(
         {
           id: nextNumericItemId(scoped),
-          category_id: categoryIdFor(categoryName),
-          category_name: String(categoryName).trim() || 'عام',
-          category_name_en: categoryNameEn,
-          categoryNameEn: categoryNameEn,
+          category_id: categoryIdFor(category.category_name),
+          ...category,
           ...bilingual,
           price: Number(body.price) || 0,
           image_url: String(body.image_url || body.imageUrl || ''),
@@ -902,25 +901,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       const body = JSON.parse((await readBody(req)) || '{}');
-      const categoryName =
-        body.categoryName || body.category_name || item.category_name || 'عام';
-      const categoryNameEn =
-        String(
-          body.category_name_en ??
-            body.categoryNameEn ??
-            item.category_name_en ??
-            item.categoryNameEn ??
-            '',
-        ).trim() || translateCategoryName(categoryName);
-      const bilingual = normalizeBilingualText({ ...item, ...body });
+      const category = await ensureAutoTranslatedCategory(body, item);
+      const bilingual = await ensureAutoTranslatedBilingual({ ...item, ...body });
 
       Object.assign(item, {
         ...bilingual,
+        ...category,
         price: Number(body.price ?? item.price) || 0,
-        category_name: String(categoryName).trim() || 'عام',
-        category_name_en: categoryNameEn,
-        categoryNameEn: categoryNameEn,
-        category_id: Number(body.category_id ?? body.categoryId ?? categoryIdFor(categoryName)),
+        category_id: Number(
+          body.category_id ?? body.categoryId ?? categoryIdFor(category.category_name),
+        ),
         image_url: String(body.image_url ?? body.imageUrl ?? item.image_url ?? ''),
         is_available:
           body.is_available === 0 ||

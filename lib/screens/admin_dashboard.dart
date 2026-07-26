@@ -355,11 +355,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Text(
+                      'أدخل الاسم والوصف بلغة واحدة — الترجمة للغة الأخرى تتم تلقائياً عند الحفظ.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(
                         labelText: 'اسم الصنف (عربي)',
+                        helperText: 'يُترجم تلقائياً للإنجليزية إذا تُرك الحقل الإنجليزي فارغاً',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -367,7 +374,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     TextField(
                       controller: nameEnController,
                       decoration: const InputDecoration(
-                        labelText: 'Item name (English)',
+                        labelText: 'Item name (English) — اختياري',
+                        helperText: 'أو أدخل الإنجليزية فقط لترجمة العربية تلقائياً',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -377,6 +385,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       maxLines: 2,
                       decoration: const InputDecoration(
                         labelText: 'الوصف (عربي)',
+                        helperText: 'يُترجم تلقائياً عند الحفظ',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -385,7 +394,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       controller: descEnController,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText: 'Description (English)',
+                        labelText: 'Description (English) — optional',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -494,8 +503,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         SnackBar(
                           content: Text(
                             isEditing
-                                ? 'تم حفظ التعديلات في المنيو'
-                                : 'تمت إضافة الصنف وحفظه',
+                                ? 'تم حفظ الصنف مع الترجمة التلقائية'
+                                : 'تمت إضافة الصنف مع الترجمة التلقائية',
                           ),
                         ),
                       );
