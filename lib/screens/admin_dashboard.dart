@@ -873,7 +873,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Navigator.of(context).maybePop();
           }
         },
-        onLogout: _logout,
         width: inDrawer ? 280 : AdminSidebar.expandedWidth,
         enableCollapse: !inDrawer,
       );
@@ -943,6 +942,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         showOrderNotifications: false,
         restaurantLabel: _restaurantLabel,
         onMenuTap: onMenuTap,
+        onLogout: _logout,
       );
     }
 
@@ -955,6 +955,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           restaurantLabel: _restaurantLabel,
           pendingOrdersCount: pendingCount,
           onMenuTap: onMenuTap,
+          onLogout: _logout,
           onNotificationsTap: () {
             setState(() => _selectedIndex = AdminSidebar.ordersIndex);
             _ordersPanelKey.currentState?.selectNewOrdersTab();

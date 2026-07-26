@@ -12,6 +12,7 @@ class AdminTopHeader extends StatelessWidget {
     this.showOrderNotifications = true,
     this.restaurantLabel,
     this.onMenuTap,
+    this.onLogout,
   });
 
   final int pendingOrdersCount;
@@ -20,6 +21,7 @@ class AdminTopHeader extends StatelessWidget {
   final bool showOrderNotifications;
   final String? restaurantLabel;
   final VoidCallback? onMenuTap;
+  final VoidCallback? onLogout;
 
   static const Color burgundy = Color(0xFF6B1124);
   static const Color gold = Color(0xFFD49A00);
@@ -147,15 +149,49 @@ class AdminTopHeader extends StatelessWidget {
         ),
         if (!compact) const SizedBox(width: 8),
       ],
-      CircleAvatar(
-        radius: compact ? 18 : 22,
-        backgroundColor: burgundy.withValues(alpha: 0.12),
-        child: Icon(
-          Icons.person,
-          color: burgundy,
-          size: compact ? 22 : 26,
-        ),
-      ),
+      _buildProfileMenu(compact: compact),
     ];
+  }
+
+  Widget _buildProfileMenu({required bool compact}) {
+    final avatar = CircleAvatar(
+      radius: compact ? 18 : 22,
+      backgroundColor: burgundy.withValues(alpha: 0.12),
+      child: Icon(
+        Icons.person,
+        color: burgundy,
+        size: compact ? 22 : 26,
+      ),
+    );
+
+    if (onLogout == null) return avatar;
+
+    return PopupMenuButton<String>(
+      tooltip: 'الحساب',
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (value) {
+        if (value == 'logout') onLogout?.call();
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red.shade700, size: 20),
+              const SizedBox(width: 12),
+              Text(
+                'تسجيل الخروج',
+                style: TextStyle(
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: avatar,
+    );
   }
 }

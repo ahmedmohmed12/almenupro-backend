@@ -18,7 +18,6 @@ class AdminSidebar extends StatefulWidget {
     this.items = defaultItems,
     required this.selectedIndex,
     required this.onItemSelected,
-    required this.onLogout,
     this.width = expandedWidth,
     this.enableCollapse = true,
   });
@@ -104,7 +103,6 @@ class AdminSidebar extends StatefulWidget {
   final List<AdminSidebarItem> items;
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
-  final VoidCallback onLogout;
   final double width;
   final bool enableCollapse;
 
@@ -183,7 +181,6 @@ class _AdminSidebarState extends State<AdminSidebar> {
             const SizedBox(height: 12),
             Expanded(child: _buildNavList()),
             if (widget.enableCollapse) _buildCollapseToggle(),
-            _buildLogoutButton(),
           ],
         ),
       ),
@@ -373,46 +370,6 @@ class _AdminSidebarState extends State<AdminSidebar> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return Padding(
-      padding: EdgeInsets.all(_isCollapsed ? 10 : 16),
-      child: _isCollapsed
-          ? Tooltip(
-              message: 'تسجيل الخروج',
-              child: IconButton(
-                style: IconButton.styleFrom(
-                  foregroundColor: Colors.red.shade300,
-                  side: BorderSide(color: Colors.red.shade400),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: widget.onLogout,
-                icon: const Icon(Icons.logout, size: 22),
-              ),
-            )
-          : SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade300,
-                  side: BorderSide(color: Colors.red.shade400),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: widget.onLogout,
-                icon: const Icon(Icons.logout, size: 20),
-                label: const Text(
-                  'تسجيل الخروج',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
     );
   }
 }
