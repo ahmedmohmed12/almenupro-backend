@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.16.1 (whatsapp checkout fix)"
+echo "Almenupro frontend build v1.16.2 (whatsapp admin banner + settings)"
 
 cd "$ROOT"
 flutter --version

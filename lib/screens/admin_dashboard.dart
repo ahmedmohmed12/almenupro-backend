@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../firebase_options.dart';
 import '../models/order.dart';
+import '../models/restaurant_settings.dart';
 import '../utils/firebase_config.dart';
 import '../utils/image_url.dart';
 import '../utils/whatsapp_phone.dart';
@@ -56,6 +57,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final _whatsappController = TextEditingController();
   String _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;
   bool _isSavingSettings = false;
+  RestaurantSettings? _loadedSettings;
+
+  bool get _whatsappConfigured => _loadedSettings?.hasWhatsappNumber ?? false;
+
+  bool get _shouldShowWhatsappBanner {
+    if (_isSuperAdmin && !SuperAdminScopeService.instance.hasSelection) {
+      return false;
+    }
+    return !_whatsappConfigured;
+  }
 
   @override
   void initState() {
@@ -116,13 +127,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final settings = await RestaurantSettingsService.instance.load(
         restaurantId: restaurantId,
       );
+      _loadedSettings = settings;
       _whatsappCountryCode = settings.whatsappCountryCode;
       _whatsappController.text = settings.whatsappPhone;
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading settings: $e');
+      _loadedSettings = null;
       _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;
       _whatsappController.clear();
+      if (mounted) setState(() {});
     }
   }
 
@@ -156,6 +170,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ),
       );
+      await _loadSettings();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -864,6 +879,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildTopHeader(onMenuTap: mobile ? () => _shellScaffoldKey.currentState?.openDrawer() : null),
+          if (_shouldShowWhatsappBanner) _buildWhatsappMissingBanner(),
           Expanded(
             child: ListenableBuilder(
               listenable: SuperAdminScopeService.instance,
@@ -1008,6 +1024,166 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  Widget _buildWhatsappMissingBanner() {
+    return Material(
+      color: const Color(0xFFFFF3E0),
+      child: InkWell(
+        onTap: () => setState(() => _selectedIndex = AdminSidebar.settingsIndex),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.orange.shade300, width: 1.5),
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 640;
+              final configureButton = FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF6B1124),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                ),
+                onPressed: () => setState(
+                  () => _selectedIndex = AdminSidebar.settingsIndex,
+                ),
+                icon: const Icon(Icons.settings, size: 18),
+                label: const Text('إعدادات الواتساب'),
+              );
+
+              final message = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'رقم الواتساب غير مُعيَّن',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'أدخل رقم واتساب المطعم في الإعدادات لاستقبال طلبات العملاء بنجاح.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.orange.shade800,
+                    ),
+                  ),
+                ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.orange.shade900,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: message),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    configureButton,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange.shade900,
+                    size: 30,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(child: message),
+                  const SizedBox(width: 12),
+                  configureButton,
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWhatsappStatusCard() {
+    final configured = _whatsappConfigured;
+    final savedDisplay = configured
+        ? WhatsAppPhone.formatDisplay(
+            _loadedSettings!.whatsappCountryCode,
+            _loadedSettings!.whatsappPhone,
+          )
+        : null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: configured ? Colors.green.shade50 : Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: configured ? Colors.green.shade400 : Colors.red.shade300,
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            configured ? Icons.check_circle : Icons.error_outline,
+            color: configured ? Colors.green.shade700 : Colors.red.shade700,
+            size: 34,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  configured ? 'رقم الواتساب مُفعَّل' : 'لم يُعيَّن رقم واتساب بعد',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    color: configured
+                        ? Colors.green.shade900
+                        : Colors.red.shade900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  configured
+                      ? 'الرقم المحفوظ حالياً في قاعدة البيانات:\n$savedDisplay'
+                      : 'الطلبات لن تُرسل للعملاء حتى تحفظ رقم واتساب المطعم أدناه.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: configured
+                        ? Colors.green.shade800
+                        : Colors.red.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSettingsTab() {
     final scope = SuperAdminScopeService.instance;
     final restaurantLabel = _isSuperAdmin
@@ -1050,6 +1226,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ],
           const SizedBox(height: 20),
+          _buildWhatsappStatusCard(),
+          const SizedBox(height: 16),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -1057,7 +1235,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'رقم الواتساب لاستقبال الطلبات',
+                    'تعديل رقم الواتساب',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
