@@ -22,10 +22,11 @@ class AdminSidebar extends StatelessWidget {
   });
 
   static const int ordersIndex = 0;
-  static const int menuIndex = 1;
-  static const int deliveryZonesIndex = 2;
-  static const int analyticsIndex = 3;
-  static const int settingsIndex = 4;
+  static const int customersIndex = 1;
+  static const int menuIndex = 2;
+  static const int deliveryZonesIndex = 3;
+  static const int analyticsIndex = 4;
+  static const int settingsIndex = 5;
 
   /// Super Admin sidebar — no orders tab (restaurant admins only).
   static const int superMenuIndex = 0;
@@ -39,6 +40,10 @@ class AdminSidebar extends StatelessWidget {
     AdminSidebarItem(
       icon: Icons.receipt_long_outlined,
       label: 'الطلبات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.people_outline,
+      label: 'العملاء',
     ),
     AdminSidebarItem(
       icon: Icons.restaurant_menu,

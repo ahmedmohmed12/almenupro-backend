@@ -24,6 +24,7 @@ import '../widgets/admin/admin_corner_toast.dart';
 import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
+import '../widgets/admin/admin_customers_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
 import '../widgets/admin/admin_super_restaurants_panel.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
@@ -986,6 +987,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     switch (_selectedIndex) {
       case AdminSidebar.ordersIndex:
         return AdminOrdersPanel(key: _ordersPanelKey);
+      case AdminSidebar.customersIndex:
+        return const AdminCustomersPanel();
       case AdminSidebar.menuIndex:
         return AdminMenuPanel(
           onAddItem: () => _showItemDialog(),

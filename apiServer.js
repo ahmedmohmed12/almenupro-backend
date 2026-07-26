@@ -56,6 +56,16 @@ const { scrapeTalabatMenu } = require('./lib/talabatScraper');
 const { translateCategoryName } = require('./lib/bilingualMenu');
 const { normalizeWhatsappSettings } = require('./lib/whatsappPhone');
 const {
+  normalizePhoneDigits,
+  phonesMatch,
+  customerProfileFromRecord,
+  customerProfileFromOrder,
+  findCustomerByPhone,
+  upsertCustomerFromSource,
+  enrichCustomersForRestaurant,
+  formatCustomerAddress,
+} = require('./lib/customersStore');
+const {
   ensureAutoTranslatedBilingual,
   ensureAutoTranslatedCategory,
 } = require('./lib/autoTranslate');
@@ -68,6 +78,9 @@ const {
   writeItems,
   readOrders,
   writeOrders,
+  readCustomers,
+  writeCustomers,
+  ensureCustomersMigrated,
   readRestaurants,
   writeRestaurants,
   readSettingsMap,
@@ -309,33 +322,6 @@ function sortOrdersDesc(orders) {
   });
 }
 
-function normalizePhoneDigits(raw) {
-  return String(raw || '').replace(/\D/g, '');
-}
-
-function phonesMatch(storedPhone, lookupPhone) {
-  const stored = normalizePhoneDigits(storedPhone);
-  const lookup = normalizePhoneDigits(lookupPhone);
-  if (!stored || !lookup) return false;
-  if (stored === lookup) return true;
-  if (stored.length >= 8 && lookup.length >= 8) {
-    return stored.slice(-8) === lookup.slice(-8);
-  }
-  return false;
-}
-
-function customerProfileFromOrder(order) {
-  return {
-    customerName: order.customerName || '',
-    phone: order.phone || '',
-    governorate: order.governorate || '',
-    areaName: order.areaName || '',
-    deliveryZoneId: order.deliveryZoneId || null,
-    addressDetails: order.addressDetails || {},
-    paymentMethod: order.paymentMethod || 'كاش',
-  };
-}
-
 function categoryIdFor(name) {
   const key = String(name || 'عام').trim() || 'عام';
   if (!categoryIds.has(key)) {
@@ -529,6 +515,8 @@ const server = http.createServer(async (req, res) => {
         restaurantBySlug: '/api/restaurants/public/{slug}',
         menu: '/api/items?slug={slug}',
         customerLookup: '/api/customers/lookup?phone={phone}&slug={slug}',
+        customers: '/api/customers',
+        customerDetail: '/api/customers/{id}',
         orders: '/api/orders',
         settings: '/api/settings',
         images: '/menu-images/{filename}',
@@ -1186,6 +1174,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const customers = await ensureCustomersMigrated();
+      const customer = findCustomerByPhone(customers, restaurantId, normalizedPhone);
+      if (customer) {
+        sendJson(res, 200, {
+          found: true,
+          source: 'customers',
+          profile: customerProfileFromRecord(customer),
+        });
+        return;
+      }
+
       const orders = sortOrdersDesc(
         filterByRestaurant(await readOrders(), restaurantId),
       );
@@ -1197,11 +1196,76 @@ const server = http.createServer(async (req, res) => {
 
       sendJson(res, 200, {
         found: true,
+        source: 'orders',
         profile: customerProfileFromOrder(match),
       });
     } catch (error) {
       sendJson(res, 500, { error: error.message || 'Lookup failed' });
     }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/customers') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    if (isSuperAdmin(auth)) {
+      authError(res, 403, 'Customers are managed by restaurant admins only');
+      return;
+    }
+
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth);
+    if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+      return;
+    }
+
+    const customers = await ensureCustomersMigrated();
+    const orders = await readOrders();
+    const list = enrichCustomersForRestaurant(customers, orders, restaurantId);
+    sendJson(res, 200, list);
+    return;
+  }
+
+  const customerDetailMatch = url.pathname.match(/^\/api\/customers\/([^/]+)$/);
+  if (req.method === 'GET' && customerDetailMatch) {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    if (isSuperAdmin(auth)) {
+      authError(res, 403, 'Customers are managed by restaurant admins only');
+      return;
+    }
+
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth);
+    if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+      return;
+    }
+
+    const customerId = decodeURIComponent(customerDetailMatch[1]);
+    const customers = await ensureCustomersMigrated();
+    const customer = customers.find(
+      (entry) =>
+        String(entry.id) === customerId &&
+        String(entry.restaurant_id || entry.restaurantId || '') === String(restaurantId),
+    );
+
+    if (!customer) {
+      sendJson(res, 404, { error: 'Customer not found' });
+      return;
+    }
+
+    const orders = sortOrdersDesc(
+      filterByRestaurant(await readOrders(), restaurantId),
+    ).filter((order) => phonesMatch(order.phone, customer.phone));
+
+    sendJson(res, 200, {
+      customer: {
+        ...customer,
+        formattedAddress: formatCustomerAddress(customer),
+        totalOrders: orders.length,
+      },
+      orders,
+    });
     return;
   }
 
@@ -1250,6 +1314,11 @@ const server = http.createServer(async (req, res) => {
       const orders = await readOrders();
       orders.unshift(order);
       await writeOrders(orders);
+
+      const customers = await readCustomers();
+      const nextCustomers = upsertCustomerFromSource(customers, order, restaurantId);
+      await writeCustomers(nextCustomers);
+
       sendJson(res, 201, order);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });

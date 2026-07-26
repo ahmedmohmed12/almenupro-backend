@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 
 
+import '../models/customer.dart';
 import '../models/customer_checkout_profile.dart';
 import '../models/delivery_zone.dart';
 import '../models/menu_item.dart';
@@ -1141,6 +1142,64 @@ class ApiService {
       debugPrint('Customer lookup failed: $error');
       return null;
     }
+  }
+
+  Future<List<Customer>> fetchCustomers({String? restaurantId}) async {
+    final query = <String, String>{};
+    if (restaurantId != null && restaurantId.trim().isNotEmpty) {
+      query['restaurant_id'] = restaurantId.trim();
+    } else if (AdminAuthService.instance.restaurantId != null) {
+      query['restaurant_id'] = AdminAuthService.instance.restaurantId!;
+    }
+
+    final response = await http
+        .get(_uri('/customers', query.isEmpty ? null : query), headers: _jsonHeaders)
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل العملاء (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+
+    return decoded
+        .whereType<Map>()
+        .map((raw) => Customer.fromMap(Map<String, dynamic>.from(raw)))
+        .toList();
+  }
+
+  Future<CustomerDetailData> fetchCustomerDetail(
+    String customerId, {
+    String? restaurantId,
+  }) async {
+    final query = <String, String>{};
+    if (restaurantId != null && restaurantId.trim().isNotEmpty) {
+      query['restaurant_id'] = restaurantId.trim();
+    } else if (AdminAuthService.instance.restaurantId != null) {
+      query['restaurant_id'] = AdminAuthService.instance.restaurantId!;
+    }
+
+    final response = await http
+        .get(
+          _uri('/customers/$customerId', query.isEmpty ? null : query),
+          headers: _jsonHeaders,
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode == 404) {
+      throw Exception('العميل غير موجود');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل بيانات العميل (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return CustomerDetailData.fromMap(Map<String, dynamic>.from(decoded));
   }
 
   Future<DeliveryZone> createDeliveryZone(DeliveryZone zone) async {
