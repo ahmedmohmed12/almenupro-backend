@@ -51,6 +51,7 @@ class MenuItem {
   final String imageUrl;
   final int? talabatId;
   final bool isAvailable;
+  final int displayOrder;
   final List<MenuOption> options;
 
   MenuItem({
@@ -68,6 +69,7 @@ class MenuItem {
     required this.imageUrl,
     this.talabatId,
     required this.isAvailable,
+    this.displayOrder = 0,
     this.options = const [],
   });
 
@@ -139,6 +141,9 @@ class MenuItem {
           ? json['talabat_id'] as int
           : int.tryParse(json['talabat_id']?.toString() ?? ''),
       isAvailable: json['is_available'] == 1 || json['is_available'] == true,
+      displayOrder: (json['display_order'] as num?)?.toInt() ??
+          (json['displayOrder'] as num?)?.toInt() ??
+          0,
       options: (json['options'] as List<dynamic>? ?? [])
           .whereType<Map>()
           .map((option) => MenuOption.fromMap(Map<String, dynamic>.from(option)))
@@ -190,6 +195,9 @@ class MenuItem {
           map['is_available'] == true ||
           map['isAvailable'] == true ||
           map['isAvailable'] == 1,
+      displayOrder: (map['display_order'] as num?)?.toInt() ??
+          (map['displayOrder'] as num?)?.toInt() ??
+          0,
       options: rawOptions
           .whereType<Map>()
           .map((option) => MenuOption.fromMap(Map<String, dynamic>.from(option)))
@@ -213,6 +221,7 @@ class MenuItem {
       'image_url': imageUrl,
       if (talabatId != null) 'talabat_id': talabatId,
       'is_available': isAvailable ? 1 : 0,
+      'display_order': displayOrder,
       if (options.isNotEmpty)
         'options': options.map((option) => option.toMap()).toList(),
     };
@@ -233,6 +242,7 @@ class MenuItem {
       'categoryId': categoryId,
       'options': options.map((option) => option.toMap()).toList(),
       'isAvailable': isAvailable,
+      'displayOrder': displayOrder,
     };
   }
 }

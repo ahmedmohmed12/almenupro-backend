@@ -16,8 +16,8 @@ class AdminMenuPanel extends StatefulWidget {
     this.canManageItems = true,
   });
 
-  final VoidCallback onAddItem;
-  final void Function(MenuItemRecord record) onEditItem;
+  final Future<void> Function() onAddItem;
+  final Future<void> Function(MenuItemRecord record) onEditItem;
   final void Function(String id) onDeleteItem;
   final VoidCallback? onAutofillTalabat;
   final bool canImportTalabat;
@@ -33,6 +33,7 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
 
   List<MenuItem> _apiItems = [];
   var _loading = true;
+  var _savingOrder = false;
   var _apiOnline = false;
   String? _errorMessage;
 
@@ -49,7 +50,13 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     });
 
     try {
-      _apiItems = await ApiService.instance.fetchMenuItems();
+      final items = await ApiService.instance.fetchMenuItems();
+      items.sort((a, b) {
+        final order = a.displayOrder.compareTo(b.displayOrder);
+        if (order != 0) return order;
+        return a.name.compareTo(b.name);
+      });
+      _apiItems = items;
       _apiOnline = true;
       _errorMessage = null;
     } catch (error) {
@@ -110,7 +117,10 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
               const SizedBox(height: 8),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: burgundy),
-                onPressed: widget.onAddItem,
+                onPressed: () async {
+                  await widget.onAddItem();
+                  await _loadFromApi();
+                },
                 icon: const Icon(Icons.add, color: Colors.white),
                 label: const Text(
                   'إضافة صنف جديد',
@@ -148,7 +158,10 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
                     ),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(backgroundColor: burgundy),
-                    onPressed: widget.onAddItem,
+                    onPressed: () async {
+                      await widget.onAddItem();
+                      await _loadFromApi();
+                    },
                     icon: const Icon(Icons.add, color: Colors.white),
                     label: const Text(
                       'إضافة صنف جديد',
@@ -357,28 +370,176 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
   Widget _buildApiTable(List<MenuItem> items) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 900) {
-          return ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) => _apiItemCard(items[index]),
-          );
-        }
+        final compact = constraints.maxWidth < 900;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildWideTableHeader(),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.separated(
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) => _buildWideTableRow(items[index]),
+            if (widget.canManageItems) _buildReorderHint(),
+            if (compact)
+              Expanded(
+                child: widget.canManageItems
+                    ? ReorderableListView.builder(
+                        buildDefaultDragHandles: false,
+                        onReorderItem: _onReorderItem,
+                        itemCount: items.length,
+                        itemBuilder: (context, index) =>
+                            _apiItemCard(items[index], index),
+                      )
+                    : ListView.builder(
+                        itemCount: items.length,
+                        itemBuilder: (context, index) =>
+                            _apiItemCard(items[index], index),
+                      ),
+              )
+            else ...[
+              _buildWideTableHeader(),
+              const Divider(height: 1),
+              Expanded(
+                child: widget.canManageItems
+                    ? ReorderableListView.builder(
+                        buildDefaultDragHandles: false,
+                        onReorderItem: _onReorderItem,
+                        itemCount: items.length,
+                        itemBuilder: (context, index) =>
+                            _buildWideTableRow(items[index], index),
+                      )
+                    : ListView.builder(
+                        itemCount: items.length,
+                        itemBuilder: (context, index) =>
+                            _buildWideTableRow(items[index], index),
+                      ),
               ),
-            ),
+            ],
           ],
         );
       },
+    );
+  }
+
+  Widget _buildReorderHint() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: gold.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: gold.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _savingOrder ? Icons.sync : Icons.swap_vert,
+            color: burgundy,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _savingOrder
+                  ? 'جاري حفظ ترتيب العرض...'
+                  : 'اسحب الأصناف أو استخدم أزرار ↑ ↓ لتغيير ترتيب ظهورها في قائمة «الكل» للعميل',
+              style: TextStyle(color: burgundy.withValues(alpha: 0.95), fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  MenuItemRecord _toRecord(MenuItem item) {
+    return MenuItemRecord(
+      id: item.id.toString(),
+      data: item.toMap(),
+    );
+  }
+
+  Future<void> _onReorderItem(int oldIndex, int newIndex) async {
+    if (!widget.canManageItems || _savingOrder) return;
+
+    setState(() {
+      final moved = _apiItems.removeAt(oldIndex);
+      _apiItems.insert(newIndex, moved);
+    });
+
+    await _saveDisplayOrder();
+  }
+
+  Future<void> _moveItemByStep(int index, int delta) async {
+    final target = index + delta;
+    if (target < 0 || target >= _apiItems.length) return;
+    await _onReorderItem(index, target);
+  }
+
+  Future<void> _saveDisplayOrder() async {
+    if (!widget.canManageItems) return;
+
+    setState(() => _savingOrder = true);
+    try {
+      final orderedIds = _apiItems.map((item) => item.id.toString()).toList();
+      await ApiService.instance.reorderMenuItems(orderedIds);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر حفظ الترتيب: $error')),
+        );
+      }
+      await _loadFromApi();
+    } finally {
+      if (mounted) {
+        setState(() => _savingOrder = false);
+      }
+    }
+  }
+
+  Widget _buildOrderControls(int index) {
+    if (!widget.canManageItems) {
+      return Text('${index + 1}');
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ReorderableDragStartListener(
+          index: index,
+          child: Tooltip(
+            message: 'اسحب لإعادة الترتيب',
+            child: Icon(Icons.drag_handle, color: Colors.grey.shade600),
+          ),
+        ),
+        IconButton(
+          tooltip: 'تحريك لأعلى',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          icon: Icon(
+            Icons.arrow_upward,
+            size: 18,
+            color: index > 0 ? burgundy : Colors.grey.shade400,
+          ),
+          onPressed: (!_savingOrder && index > 0)
+              ? () => _moveItemByStep(index, -1)
+              : null,
+        ),
+        Text(
+          '${index + 1}',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        IconButton(
+          tooltip: 'تحريك لأسفل',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          icon: Icon(
+            Icons.arrow_downward,
+            size: 18,
+            color: index < _apiItems.length - 1 ? burgundy : Colors.grey.shade400,
+          ),
+          onPressed: (!_savingOrder && index < _apiItems.length - 1)
+              ? () => _moveItemByStep(index, 1)
+              : null,
+        ),
+      ],
     );
   }
 
@@ -392,6 +553,8 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
+          if (widget.canManageItems)
+            const SizedBox(width: 96, child: Text('الترتيب', style: headerStyle)),
           const SizedBox(width: 72, child: Text('الصورة', style: headerStyle)),
           const Expanded(
             flex: 3,
@@ -406,43 +569,55 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
           ),
           const SizedBox(width: 110, child: Text('الحالة', style: headerStyle)),
           if (widget.canManageItems)
-            const SizedBox(width: 120, child: Text('إجراءات', style: headerStyle)),
+            const SizedBox(width: 156, child: Text('إجراءات', style: headerStyle)),
         ],
       ),
     );
   }
 
-  Widget _buildWideTableRow(MenuItem item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+  Widget _buildWideTableRow(MenuItem item, int index) {
+    return Material(
+      key: ValueKey(item.id),
+      color: index.isEven ? Colors.grey.shade50 : Colors.white,
+      child: Column(
         children: [
-          SizedBox(width: 72, height: 56, child: _itemThumb(item.imageUrl)),
-          Expanded(
-            flex: 3,
-            child: Text(
-              item.name,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (widget.canManageItems)
+                  SizedBox(width: 96, child: _buildOrderControls(index)),
+                SizedBox(width: 72, height: 56, child: _itemThumb(item.imageUrl)),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(item.categoryName),
+                ),
+                Expanded(
+                  child: Text('${item.price.toStringAsFixed(3)} د.ك'),
+                ),
+                SizedBox(
+                  width: 110,
+                  child: Chip(
+                    label: Text(item.isAvailable ? 'متوفر' : 'غير متوفر'),
+                    backgroundColor:
+                        item.isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                if (widget.canManageItems)
+                  SizedBox(width: 156, child: _apiItemActions(item)),
+              ],
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: Text(item.categoryName),
-          ),
-          Expanded(
-            child: Text('${item.price.toStringAsFixed(3)} د.ك'),
-          ),
-          SizedBox(
-            width: 110,
-            child: Chip(
-              label: Text(item.isAvailable ? 'متوفر' : 'غير متوفر'),
-              backgroundColor:
-                  item.isAvailable ? Colors.green.shade50 : Colors.red.shade50,
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-          if (widget.canManageItems) SizedBox(width: 120, child: _apiItemActions(item)),
+          const Divider(height: 1),
         ],
       ),
     );
@@ -453,17 +628,27 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
+          tooltip: 'تعديل',
+          icon: const Icon(Icons.edit, color: Colors.blue),
+          onPressed: _savingOrder
+              ? null
+              : () async {
+                  await widget.onEditItem(_toRecord(item));
+                  await _loadFromApi();
+                },
+        ),
+        IconButton(
           tooltip: item.isAvailable ? 'تعطيل' : 'تفعيل',
           icon: Icon(
             item.isAvailable ? Icons.toggle_on : Icons.toggle_off,
             color: item.isAvailable ? Colors.green : Colors.grey,
           ),
-          onPressed: () => _toggleAvailability(item),
+          onPressed: _savingOrder ? null : () => _toggleAvailability(item),
         ),
         IconButton(
           tooltip: 'حذف',
           icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () => _deleteApiItem(item),
+          onPressed: _savingOrder ? null : () => _deleteApiItem(item),
         ),
       ],
     );
@@ -514,23 +699,44 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     }
   }
 
-  Widget _apiItemCard(MenuItem item) {
+  Widget _apiItemCard(MenuItem item, int index) {
     return Card(
+      key: ValueKey(item.id),
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: SizedBox(
-          width: 56,
-          height: 56,
-          child: _itemThumb(item.imageUrl),
-        ),
-        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${item.categoryName} • ${item.price.toStringAsFixed(3)} د.ك'),
-        trailing: widget.canManageItems
-            ? _apiItemActions(item)
-            : Icon(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          children: [
+            if (widget.canManageItems) _buildOrderControls(index),
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: _itemThumb(item.imageUrl),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '${item.categoryName} • ${item.price.toStringAsFixed(3)} د.ك',
+                  ),
+                ],
+              ),
+            ),
+            if (widget.canManageItems)
+              _apiItemActions(item)
+            else
+              Icon(
                 item.isAvailable ? Icons.check_circle : Icons.cancel,
                 color: item.isAvailable ? Colors.green : Colors.red,
               ),
+          ],
+        ),
       ),
     );
   }

@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.17.3 (collapsible admin sidebar)"
+echo "Almenupro frontend build v1.17.4 (menu edit + display order)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=sidebar-v1.17.3
+  --dart-define=BUILD_FEATURE=menu-order-v1.17.4
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -36,8 +36,8 @@ cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.17.3-sidebar-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["collapsible-sidebar","admin-pos-top","picks-for-you","brand-logo"]}\n' "$BUILD_ID" \
+BUILD_ID="1.17.4-menu-order-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["menu-edit-reorder","collapsible-sidebar","admin-pos-top","picks-for-you","brand-logo"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 # Cache-bust bootstrap loader so browsers fetch the latest main.dart.js bundle.

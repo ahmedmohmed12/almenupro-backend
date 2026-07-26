@@ -328,7 +328,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  void _showItemDialog({MenuItemRecord? record}) {
+  Future<void> _showItemDialog({MenuItemRecord? record}) async {
     final isEditing = record != null;
     final Map<String, dynamic>? data = isEditing ? record.data : null;
 
@@ -363,7 +363,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
     var isAvailable = data?['isAvailable'] as bool? ?? true;
 
-    showDialog<void>(
+    await showDialog<void>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -494,6 +494,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       'imageUrl': normalizeMenuImageUrl(imageUrlController.text.trim()),
                       'options': data?['options'] ?? <dynamic>[],
                       'isAvailable': isAvailable,
+                      if (data?['displayOrder'] != null)
+                        'displayOrder': data!['displayOrder'],
                     };
 
                     if (isEditing) {

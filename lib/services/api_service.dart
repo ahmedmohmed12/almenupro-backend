@@ -1016,6 +1016,34 @@ class ApiService {
 
 
 
+  Future<void> reorderMenuItems(List<String> orderedIds) async {
+
+    final response = await http
+
+        .put(
+
+          _uri('/items/reorder'),
+
+          headers: _jsonHeaders,
+
+          body: jsonEncode({'orderedIds': orderedIds}),
+
+        )
+
+        .timeout(_writeTimeout);
+
+
+
+    if (response.statusCode != 200) {
+
+      throw Exception('فشل في حفظ ترتيب الأصناف (${response.statusCode})');
+
+    }
+
+  }
+
+
+
   Future<void> deleteMenuItem(String itemId) async {
 
     final response = await http
@@ -1109,6 +1137,10 @@ class ApiService {
       'imageUrl': data['imageUrl'] ?? data['image_url'] ?? '',
 
       'isAvailable': data['isAvailable'] ?? data['is_available'] ?? true,
+
+      if (data['displayOrder'] != null || data['display_order'] != null)
+        'display_order':
+            (data['displayOrder'] ?? data['display_order'] as num?)?.toInt() ?? 0,
 
       'source': data['source'] ?? 'Manual',
 

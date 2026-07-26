@@ -324,6 +324,32 @@ function sortOrdersDesc(orders) {
   });
 }
 
+function itemDisplayOrder(item, fallbackIndex = 0) {
+  const raw = item.display_order ?? item.displayOrder;
+  if (raw == null || raw === '') return fallbackIndex;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallbackIndex;
+}
+
+function sortItemsByDisplayOrder(items) {
+  return [...items]
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const left = itemDisplayOrder(a.item, a.index);
+      const right = itemDisplayOrder(b.item, b.index);
+      if (left !== right) return left - right;
+      return Number(a.item.id) - Number(b.item.id);
+    })
+    .map((entry) => entry.item);
+}
+
+function maxDisplayOrder(items) {
+  return items.reduce(
+    (max, item, index) => Math.max(max, itemDisplayOrder(item, index)),
+    -1,
+  );
+}
+
 function categoryIdFor(name) {
   const key = String(name || 'عام').trim() || 'عام';
   if (!categoryIds.has(key)) {
@@ -378,6 +404,7 @@ function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
           : 1,
       talabat_id: talabatId,
       source: raw.source || 'Talabat',
+      display_order: Number(raw.display_order ?? raw.displayOrder ?? 0) || 0,
     },
     restaurantId,
   );
@@ -775,8 +802,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const scopedItems = sortItemsByDisplayOrder(
+      filterByRestaurant(await readItems(), restaurantId),
+    );
     const items = mapItemsForPublicApi(
-      normalizeMenuItemsForApi(filterByRestaurant(await readItems(), restaurantId)),
+      normalizeMenuItemsForApi(scopedItems),
       requestOrigin(req),
     );
     rebuildCategoryIds(items);
@@ -963,6 +993,9 @@ const server = http.createServer(async (req, res) => {
               ? 0
               : 1,
           source: body.source || 'Manual',
+          display_order:
+            Number(body.display_order ?? body.displayOrder) ||
+            maxDisplayOrder(scoped) + 1,
         },
         restaurantId,
       );
@@ -977,6 +1010,62 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 201, item);
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'PUT' && url.pathname === '/api/items/reorder') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const orderedIds = body.orderedIds || body.ordered_ids;
+      if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+        sendJson(res, 400, { error: 'orderedIds array is required' });
+        return;
+      }
+
+      const restaurantId = resolveRestaurantId(
+        auth,
+        body.restaurantId ||
+          body.restaurant_id ||
+          req.headers['x-restaurant-id'],
+      );
+
+      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const items = await readItems();
+      const idSet = new Set(orderedIds.map((id) => String(id)));
+
+      orderedIds.forEach((id, index) => {
+        const item = findItemById(items, id);
+        if (!item) return;
+        const itemRestaurantId =
+          item.restaurant_id || item.restaurantId || DEFAULT_RESTAURANT_ID;
+        if (String(itemRestaurantId) !== String(restaurantId)) return;
+        item.display_order = index;
+      });
+
+      // Keep any restaurant items missing from payload at the end.
+      const scoped = sortItemsByDisplayOrder(filterByRestaurant(items, restaurantId));
+      let nextOrder = orderedIds.length;
+      for (const item of scoped) {
+        if (idSet.has(String(item.id))) continue;
+        item.display_order = nextOrder;
+        nextOrder += 1;
+      }
+
+      await writeItems(items);
+      sendJson(res, 200, {
+        ok: true,
+        restaurantId,
+        count: orderedIds.length,
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid reorder payload' });
     }
     return;
   }
@@ -1030,6 +1119,10 @@ const server = http.createServer(async (req, res) => {
               ? 1
               : item.is_available,
         source: body.source || item.source || 'Manual',
+        display_order:
+          body.display_order != null || body.displayOrder != null
+            ? Number(body.display_order ?? body.displayOrder) || 0
+            : itemDisplayOrder(item, 0),
       });
 
       await writeItems(items);
