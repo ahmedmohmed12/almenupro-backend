@@ -315,18 +315,31 @@ function rebuildCategoryIds(items) {
   }
 }
 
+function normalizeBilingualText(raw = {}) {
+  const nameAr = String(raw.name_ar ?? raw.nameAr ?? raw.name ?? '').trim();
+  const nameEn = String(raw.name_en ?? raw.nameEn ?? '').trim();
+  const descriptionAr = String(
+    raw.description_ar ?? raw.descriptionAr ?? raw.description ?? '',
+  ).trim();
+  const descriptionEn = String(raw.description_en ?? raw.descriptionEn ?? '').trim();
+  const name = nameAr || nameEn || String(raw.name ?? '').trim();
+  const description = descriptionAr || descriptionEn || String(raw.description ?? '').trim();
+
+  return { name_ar: nameAr, name_en: nameEn, description_ar: descriptionAr, description_en: descriptionEn, name, description };
+}
+
 function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
   const categoryName =
     raw.category_name || raw.categoryName || raw.category || 'عام';
   const talabatId = raw.talabat_id ?? raw.talabatId ?? null;
+  const bilingual = normalizeBilingualText(raw);
 
   return ensureRestaurantId(
     {
       id: Number(raw.id ?? talabatId ?? index + 1),
       category_id: Number(raw.category_id ?? raw.categoryId ?? categoryIdFor(categoryName)),
       category_name: String(categoryName).trim() || 'عام',
-      name: String(raw.name || '').trim(),
-      description: String(raw.description || ''),
+      ...bilingual,
       price: Number(raw.price) || 0,
       image_url: String(raw.image_url || raw.imageUrl || ''),
       is_available:
@@ -814,13 +827,13 @@ const server = http.createServer(async (req, res) => {
       const items = await readItems();
       const scoped = filterByRestaurant(items, restaurantId);
       const categoryName = body.categoryName || body.category_name || 'عام';
+      const bilingual = normalizeBilingualText(body);
       const item = ensureRestaurantId(
         {
           id: nextNumericItemId(scoped),
           category_id: categoryIdFor(categoryName),
           category_name: String(categoryName).trim() || 'عام',
-          name: String(body.name || '').trim(),
-          description: String(body.description || ''),
+          ...bilingual,
           price: Number(body.price) || 0,
           image_url: String(body.image_url || body.imageUrl || ''),
           is_available:
@@ -834,7 +847,7 @@ const server = http.createServer(async (req, res) => {
         restaurantId,
       );
 
-      if (!item.name) {
+      if (!item.name && !item.name_ar && !item.name_en) {
         sendJson(res, 400, { error: 'Item name is required' });
         return;
       }
@@ -877,10 +890,10 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse((await readBody(req)) || '{}');
       const categoryName =
         body.categoryName || body.category_name || item.category_name || 'عام';
+      const bilingual = normalizeBilingualText({ ...item, ...body });
 
       Object.assign(item, {
-        name: String(body.name ?? item.name).trim(),
-        description: String(body.description ?? item.description ?? ''),
+        ...bilingual,
         price: Number(body.price ?? item.price) || 0,
         category_name: String(categoryName).trim() || 'عام',
         category_id: Number(body.category_id ?? body.categoryId ?? categoryIdFor(categoryName)),

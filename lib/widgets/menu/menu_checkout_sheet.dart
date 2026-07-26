@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/kuwait_governorates.dart';
+import '../../l10n/app_strings.dart';
 import '../../models/customer_restaurant_context.dart';
 import '../../models/delivery_address_details.dart';
 import '../../models/delivery_zone.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/whatsapp_launcher.dart';
+import '../../utils/whatsapp_order_message.dart';
 
 class MenuCheckoutSheet extends StatefulWidget {
   const MenuCheckoutSheet({super.key, this.restaurantContext});
@@ -93,16 +96,21 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
         floorApartment: _floorController.text.trim(),
       );
 
-  String get _formattedAddress {
-    if (_selectedZone != null) {
-      return _addressDetails.formatArabic(
-        governorate: _selectedZone!.governorate,
-        areaName: _selectedZone!.areaName,
-      );
-    }
+  String _formattedAddressArabic() {
+    final governorate = _selectedZone?.governorate ?? _selectedGovernorate ?? '';
+    final areaName = _selectedZone?.areaName ?? '';
     return _addressDetails.formatArabic(
-      governorate: _selectedGovernorate ?? '',
-      areaName: '',
+      governorate: governorate,
+      areaName: areaName,
+    );
+  }
+
+  String _formattedAddressEnglish() {
+    final governorate = _selectedZone?.governorate ?? _selectedGovernorate ?? '';
+    final areaName = _selectedZone?.areaName ?? '';
+    return _addressDetails.formatEnglish(
+      governorate: governorate,
+      areaName: areaName,
     );
   }
 
@@ -144,11 +152,11 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     super.dispose();
   }
 
-  Future<void> _submit(CartProvider cart) async {
+  Future<void> _submit(CartProvider cart, AppStrings strings) async {
     if (!_formKey.currentState!.validate()) return;
     if (_zones.isNotEmpty && _selectedZone == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى اختيار المحافظة والمنطقة')),
+        SnackBar(content: Text(strings.selectGovernorateAndArea)),
       );
       return;
     }
@@ -157,40 +165,29 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 
     final subtotal = cart.totalPrice;
     final grandTotal = subtotal + _deliveryFee;
-    final invoiceNumber = DateTime.now().millisecondsSinceEpoch.toString().substring(5);
+    final invoiceNumber =
+        DateTime.now().millisecondsSinceEpoch.toString().substring(5);
     final now = DateTime.now();
     final orderTime =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-    final itemsDetails = StringBuffer();
-    for (final item in cart.items) {
-      itemsDetails.writeln(
-        '• ${item.menuItem.name} x${item.quantity} (${item.totalPrice.toStringAsFixed(3)} د.ك)',
-      );
-    }
+    final addressArabic = _formattedAddressArabic();
+    final addressEnglish = _formattedAddressEnglish();
 
-    final address = _formattedAddress;
-    final message = '''
-🧾 *فاتورة طلب جديدة - $_restaurantName*
-----------------------------------
-📌 *رقم الفاتورة:* #$invoiceNumber
-👤 *اسم العميل:* ${_nameController.text.trim()}
-📞 *رقم الهاتف:* ${_phoneController.text.trim()}
-📍 *عنوان التوصيل:* $address
-🚚 *رسوم التوصيل:* ${_deliveryFee.toStringAsFixed(3)} د.ك
-💳 *طريقة الدفع:* $_paymentMethod
-
-🕒 *وقت الطلب:* $orderTime
-
-🛒 *تفاصيل الطلب:*
-$itemsDetails
-----------------------------------
-🧮 *المجموع الفرعي:* ${subtotal.toStringAsFixed(3)} د.ك
-🚚 *التوصيل:* ${_deliveryFee.toStringAsFixed(3)} د.ك
-💰 *الإجمالي النهائي:* ${grandTotal.toStringAsFixed(3)} د.ك
-----------------------------------
-شكراً لطلبكم من $_restaurantName! ❤️
-''';
+    final message = WhatsAppOrderMessage.build(
+      restaurantName: _restaurantName,
+      invoiceNumber: invoiceNumber,
+      customerName: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      paymentMethod: _paymentMethod,
+      orderTime: orderTime,
+      cartItems: cart.items,
+      subtotal: subtotal,
+      deliveryFee: _deliveryFee,
+      grandTotal: grandTotal,
+      addressArabic: addressArabic,
+      addressEnglish: addressEnglish,
+    );
 
     final opened = await openWhatsAppChat(
       phone: _whatsappNumber,
@@ -203,7 +200,7 @@ $itemsDetails
           cartItems: List.from(cart.items),
           customerName: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
-          address: address,
+          address: addressArabic,
           paymentMethod: _paymentMethod,
           invoiceNumber: invoiceNumber,
           restaurantId: _restaurantId,
@@ -226,20 +223,16 @@ $itemsDetails
       cart.clear();
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم إرسال الطلب عبر الواتساب')),
+        SnackBar(content: Text(strings.orderSentViaWhatsapp)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'تعذر فتح الواتساب. رقم المطعم: $_whatsappNumber',
-          ),
-        ),
+        SnackBar(content: Text(strings.whatsappOpenFailed(_whatsappNumber))),
       );
     }
   }
 
-  Widget _buildTotals(CartProvider cart) {
+  Widget _buildTotals(CartProvider cart, AppStrings strings) {
     final subtotal = cart.totalPrice;
     final grandTotal = subtotal + _deliveryFee;
 
@@ -252,17 +245,23 @@ $itemsDetails
       ),
       child: Column(
         children: [
-          _TotalRow(label: 'المجموع الفرعي', value: subtotal),
+          _TotalRow(
+            label: strings.subtotal,
+            value: subtotal,
+            currency: strings.currency,
+          ),
           const SizedBox(height: 6),
           _TotalRow(
-            label: 'رسوم التوصيل',
+            label: strings.deliveryFee,
             value: _deliveryFee,
+            currency: strings.currency,
             highlight: _selectedZone != null,
           ),
           const Divider(height: 20),
           _TotalRow(
-            label: 'الإجمالي النهائي',
+            label: strings.grandTotal,
             value: grandTotal,
+            currency: strings.currency,
             isBold: true,
           ),
         ],
@@ -273,265 +272,301 @@ $itemsDetails
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final locale = context.watch<LocaleProvider>();
+    final strings = AppStrings(locale.localeCode);
     final grandTotal = cart.totalPrice + _deliveryFee;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.92,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'إتمام الطلب',
-                        style: TextStyle(
-                          fontSize: 20,
+    return Directionality(
+      textDirection: locale.textDirection,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.92,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          strings.checkoutTitle,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.brandMaroon,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: locale.isArabic ? 'English' : 'العربية',
+                        onPressed: () => context.read<LocaleProvider>().toggle(),
+                        icon: Text(
+                          locale.isArabic ? 'EN' : 'ع',
+                          style: const TextStyle(
+                            color: AppTheme.brandOrange,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    children: [
+                      ...cart.items.map(
+                        (item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            item.menuItem.localizedName(locale.localeCode),
+                          ),
+                          subtitle: Text(
+                            '${item.unitPrice.toStringAsFixed(3)} ${strings.currency}',
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: () => cart.updateQuantity(
+                                  item.id,
+                                  item.quantity - 1,
+                                ),
+                                icon: const Icon(Icons.remove_circle_outline),
+                              ),
+                              Text('${item.quantity}'),
+                              IconButton(
+                                onPressed: () => cart.updateQuantity(
+                                  item.id,
+                                  item.quantity + 1,
+                                ),
+                                icon: const Icon(Icons.add_circle_outline),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 32),
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: strings.customerName,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? strings.required
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: strings.phone,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? strings.required
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        strings.deliveryAddress,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.brandMaroon,
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: [
-                    ...cart.items.map(
-                      (item) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(item.menuItem.name),
-                        subtitle: Text('${item.unitPrice.toStringAsFixed(3)} د.ك'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: () => cart.updateQuantity(
-                                item.id,
-                                item.quantity - 1,
-                              ),
-                              icon: const Icon(Icons.remove_circle_outline),
-                            ),
-                            Text('${item.quantity}'),
-                            IconButton(
-                              onPressed: () => cart.updateQuantity(
-                                item.id,
-                                item.quantity + 1,
-                              ),
-                              icon: const Icon(Icons.add_circle_outline),
-                            ),
-                          ],
+                      const SizedBox(height: 10),
+                      if (_loadingZones)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: LinearProgressIndicator(),
+                        )
+                      else ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedGovernorate,
+                          decoration: InputDecoration(
+                            labelText: strings.governorate,
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: _availableGovernorates
+                              .map(
+                                (gov) => DropdownMenuItem(
+                                  value: gov,
+                                  child: Text(gov),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedGovernorate = value;
+                              _selectedZone = null;
+                            });
+                          },
+                          validator: (value) {
+                            if (_zones.isEmpty) return null;
+                            return value == null || value.isEmpty
+                                ? strings.required
+                                : null;
+                          },
                         ),
-                      ),
-                    ),
-                    const Divider(height: 32),
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'اسم العميل',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'رقم الهاتف',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'عنوان التوصيل',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.brandMaroon,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_loadingZones)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: LinearProgressIndicator(),
-                      )
-                    else ...[
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedGovernorate,
-                        decoration: const InputDecoration(
-                          labelText: 'المحافظة',
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedZone?.id,
+                          decoration: InputDecoration(
+                            labelText: strings.area,
+                            border: const OutlineInputBorder(),
+                            helperText: _areasForGovernorate.isEmpty &&
+                                    _selectedGovernorate != null
+                                ? strings.noAreasForGovernorate
+                                : null,
+                          ),
+                          items: _areasForGovernorate
+                              .map(
+                                (zone) => DropdownMenuItem(
+                                  value: zone.id,
+                                  child: Text(
+                                    '${zone.areaName} (${zone.deliveryFee.toStringAsFixed(3)} ${strings.currency})',
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _areasForGovernorate.isEmpty
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _selectedZone =
+                                        _areasForGovernorate.firstWhere(
+                                      (zone) => zone.id == value,
+                                    );
+                                  });
+                                },
+                          validator: (value) {
+                            if (_zones.isEmpty) return null;
+                            return value == null || value.isEmpty
+                                ? strings.required
+                                : null;
+                          },
                         ),
-                        items: _availableGovernorates
-                            .map(
-                              (gov) => DropdownMenuItem(
-                                value: gov,
-                                child: Text(gov),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedGovernorate = value;
-                            _selectedZone = null;
-                          });
-                        },
-                        validator: (value) {
-                          if (_zones.isEmpty) return null;
-                          return value == null || value.isEmpty ? 'مطلوب' : null;
-                        },
+                      ],
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _blockController,
+                        decoration: InputDecoration(
+                          labelText: strings.block,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? strings.required
+                            : null,
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedZone?.id,
+                      TextFormField(
+                        controller: _streetController,
                         decoration: InputDecoration(
-                          labelText: 'المنطقة',
+                          labelText: strings.street,
                           border: const OutlineInputBorder(),
-                          helperText: _areasForGovernorate.isEmpty &&
-                                  _selectedGovernorate != null
-                              ? 'لا توجد مناطق لهذه المحافظة'
-                              : null,
                         ),
-                        items: _areasForGovernorate
-                            .map(
-                              (zone) => DropdownMenuItem(
-                                value: zone.id,
-                                child: Text(
-                                  '${zone.areaName} (${zone.deliveryFee.toStringAsFixed(3)} د.ك)',
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _areasForGovernorate.isEmpty
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _selectedZone = _areasForGovernorate.firstWhere(
-                                    (zone) => zone.id == value,
-                                  );
-                                });
-                              },
-                        validator: (value) {
-                          if (_zones.isEmpty) return null;
-                          return value == null || value.isEmpty ? 'مطلوب' : null;
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? strings.required
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _avenueController,
+                        decoration: InputDecoration(
+                          labelText: strings.avenue,
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _houseController,
+                        decoration: InputDecoration(
+                          labelText: strings.houseNumber,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? strings.required
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _floorController,
+                        decoration: InputDecoration(
+                          labelText: strings.floorApartment,
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        initialValue: _paymentMethod,
+                        decoration: InputDecoration(
+                          labelText: strings.paymentMethod,
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'كاش',
+                            child: Text(strings.cash),
+                          ),
+                          DropdownMenuItem(
+                            value: 'K-Net',
+                            child: Text(strings.knet),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _paymentMethod = value);
+                          }
                         },
                       ),
+                      const SizedBox(height: 16),
+                      _buildTotals(cart, strings),
+                      const SizedBox(height: 12),
                     ],
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _blockController,
-                      decoration: const InputDecoration(
-                        labelText: 'القطعة (Block)',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _streetController,
-                      decoration: const InputDecoration(
-                        labelText: 'الشارع (Street)',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _avenueController,
-                      decoration: const InputDecoration(
-                        labelText: 'الجادة (Avenue) — اختياري',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _houseController,
-                      decoration: const InputDecoration(
-                        labelText: 'رقم البيت / المبنى',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _floorController,
-                      decoration: const InputDecoration(
-                        labelText: 'الطابق / الشقة — اختياري',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _paymentMethod,
-                      decoration: const InputDecoration(
-                        labelText: 'طريقة الدفع',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'كاش', child: Text('كاش')),
-                        DropdownMenuItem(value: 'K-Net', child: Text('K-Net')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _paymentMethod = value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTotals(cart),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.brandMaroon,
-                    minimumSize: const Size.fromHeight(52),
                   ),
-                  onPressed: _submitting ? null : () => _submit(cart),
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'إرسال الطلب ${grandTotal.toStringAsFixed(3)} د.ك',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.brandMaroon,
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    onPressed: _submitting ? null : () => _submit(cart, strings),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            strings.sendOrder(grandTotal.toStringAsFixed(3)),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -543,12 +578,14 @@ class _TotalRow extends StatelessWidget {
   const _TotalRow({
     required this.label,
     required this.value,
+    required this.currency,
     this.isBold = false,
     this.highlight = false,
   });
 
   final String label;
   final double value;
+  final String currency;
   final bool isBold;
   final bool highlight;
 
@@ -566,7 +603,7 @@ class _TotalRow extends StatelessWidget {
           ),
         ),
         Text(
-          '${value.toStringAsFixed(3)} د.ك',
+          '${value.toStringAsFixed(3)} $currency',
           style: TextStyle(
             fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
             color: isBold ? AppTheme.brandMaroon : Colors.black87,

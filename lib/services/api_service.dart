@@ -1034,11 +1034,25 @@ class ApiService {
 
   Map<String, dynamic> _itemPayload(Map<String, dynamic> data) {
 
+    final nameAr = (data['nameAr'] ?? data['name_ar'] ?? data['name'] ?? '').toString().trim();
+    final nameEn = (data['nameEn'] ?? data['name_en'] ?? '').toString().trim();
+    final descriptionAr = (data['descriptionAr'] ??
+            data['description_ar'] ??
+            data['description'] ??
+            '')
+        .toString()
+        .trim();
+    final descriptionEn =
+        (data['descriptionEn'] ?? data['description_en'] ?? '').toString().trim();
+
     return {
 
-      'name': data['name'],
-
-      'description': data['description'] ?? '',
+      'name': nameAr.isNotEmpty ? nameAr : nameEn,
+      'name_ar': nameAr,
+      'name_en': nameEn,
+      'description': descriptionAr.isNotEmpty ? descriptionAr : descriptionEn,
+      'description_ar': descriptionAr,
+      'description_en': descriptionEn,
 
       'price': data['price'] ?? 0,
 

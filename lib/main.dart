@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'providers/cart_provider.dart';
+import 'providers/locale_provider.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/client_menu_page.dart';
 import 'screens/menu_screen.dart';
@@ -22,6 +23,9 @@ Future<void> main() async {
   // Flutter Web: usePathUrlStrategy() — see configure_url_strategy_web.dart
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
+
+  final localeProvider = LocaleProvider();
+  await localeProvider.load();
 
   try {
     if (isFirebaseConfigured) {
@@ -44,8 +48,11 @@ Future<void> main() async {
   }
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => CartProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider.value(value: localeProvider),
+      ],
       child: const MyApp(),
     ),
   );

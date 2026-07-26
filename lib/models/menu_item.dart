@@ -42,6 +42,10 @@ class MenuItem {
   final String categoryName;
   final String name;
   final String description;
+  final String nameAr;
+  final String nameEn;
+  final String descriptionAr;
+  final String descriptionEn;
   final double price;
   final String imageUrl;
   final int? talabatId;
@@ -54,12 +58,38 @@ class MenuItem {
     required this.categoryName,
     required this.name,
     required this.description,
+    this.nameAr = '',
+    this.nameEn = '',
+    this.descriptionAr = '',
+    this.descriptionEn = '',
     required this.price,
     required this.imageUrl,
     this.talabatId,
     required this.isAvailable,
     this.options = const [],
   });
+
+  String localizedName(String localeCode) {
+    if (localeCode.startsWith('en')) {
+      if (nameEn.trim().isNotEmpty) return nameEn.trim();
+      if (nameAr.trim().isNotEmpty) return nameAr.trim();
+      return name;
+    }
+    if (nameAr.trim().isNotEmpty) return nameAr.trim();
+    if (nameEn.trim().isNotEmpty) return nameEn.trim();
+    return name;
+  }
+
+  String localizedDescription(String localeCode) {
+    if (localeCode.startsWith('en')) {
+      if (descriptionEn.trim().isNotEmpty) return descriptionEn.trim();
+      if (descriptionAr.trim().isNotEmpty) return descriptionAr.trim();
+      return description;
+    }
+    if (descriptionAr.trim().isNotEmpty) return descriptionAr.trim();
+    if (descriptionEn.trim().isNotEmpty) return descriptionEn.trim();
+    return description;
+  }
 
   /// Backward-compatible alias used by older screens.
   String get category => categoryName;
@@ -68,14 +98,28 @@ class MenuItem {
   String get image_url => imageUrl;
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
+    final nameAr =
+        json['name_ar']?.toString() ?? json['nameAr']?.toString() ?? json['name']?.toString() ?? '';
+    final nameEn = json['name_en']?.toString() ?? json['nameEn']?.toString() ?? '';
+    final descriptionAr = json['description_ar']?.toString() ??
+        json['descriptionAr']?.toString() ??
+        json['description']?.toString() ??
+        '';
+    final descriptionEn =
+        json['description_en']?.toString() ?? json['descriptionEn']?.toString() ?? '';
+
     return MenuItem(
       id: json['id'] is int ? json['id'] as int : int.parse(json['id'].toString()),
       categoryId: json['category_id'] is int
           ? json['category_id'] as int
           : int.parse(json['category_id']?.toString() ?? '0'),
       categoryName: json['category_name']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
+      name: json['name']?.toString() ?? nameAr,
+      description: json['description']?.toString() ?? descriptionAr,
+      nameAr: nameAr,
+      nameEn: nameEn,
+      descriptionAr: descriptionAr,
+      descriptionEn: descriptionEn,
       price: double.parse(json['price'].toString()),
       imageUrl: normalizeMenuImageUrl(json['image_url'] ?? json['imageUrl']),
       talabatId: json['talabat_id'] is int
@@ -91,6 +135,17 @@ class MenuItem {
 
   factory MenuItem.fromMap(String documentId, Map<String, dynamic> map) {
     final rawOptions = map['options'] as List<dynamic>? ?? [];
+    final nameAr = map['name_ar']?.toString() ??
+        map['nameAr']?.toString() ??
+        map['name']?.toString() ??
+        '';
+    final nameEn = map['name_en']?.toString() ?? map['nameEn']?.toString() ?? '';
+    final descriptionAr = map['description_ar']?.toString() ??
+        map['descriptionAr']?.toString() ??
+        map['description']?.toString() ??
+        '';
+    final descriptionEn =
+        map['description_en']?.toString() ?? map['descriptionEn']?.toString() ?? '';
 
     return MenuItem(
       id: int.tryParse(documentId) ?? documentId.hashCode,
@@ -102,8 +157,12 @@ class MenuItem {
       categoryName:
           (map['categoryName'] ?? map['category_name'] ?? map['category'] ?? '')
               .toString(),
-      name: map['name']?.toString() ?? '',
-      description: map['description']?.toString() ?? '',
+      name: map['name']?.toString() ?? nameAr,
+      description: map['description']?.toString() ?? descriptionAr,
+      nameAr: nameAr,
+      nameEn: nameEn,
+      descriptionAr: descriptionAr,
+      descriptionEn: descriptionEn,
       price: (map['price'] as num?)?.toDouble() ??
           double.tryParse(map['price']?.toString() ?? '') ??
           0,
@@ -127,8 +186,12 @@ class MenuItem {
       'id': id,
       'category_id': categoryId,
       'category_name': categoryName,
-      'name': name,
-      'description': description,
+      'name': nameAr.isNotEmpty ? nameAr : name,
+      'description': descriptionAr.isNotEmpty ? descriptionAr : description,
+      'name_ar': nameAr.isNotEmpty ? nameAr : name,
+      'name_en': nameEn,
+      'description_ar': descriptionAr.isNotEmpty ? descriptionAr : description,
+      'description_en': descriptionEn,
       'price': price,
       'image_url': imageUrl,
       if (talabatId != null) 'talabat_id': talabatId,
@@ -140,8 +203,12 @@ class MenuItem {
 
   Map<String, dynamic> toMap() {
     return {
-      'name': name,
-      'description': description,
+      'name': nameAr.isNotEmpty ? nameAr : name,
+      'description': descriptionAr.isNotEmpty ? descriptionAr : description,
+      'nameAr': nameAr.isNotEmpty ? nameAr : name,
+      'nameEn': nameEn,
+      'descriptionAr': descriptionAr.isNotEmpty ? descriptionAr : description,
+      'descriptionEn': descriptionEn,
       'price': price,
       'imageUrl': imageUrl,
       'categoryName': categoryName,

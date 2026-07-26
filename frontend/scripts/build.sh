@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.12.0 (delivery zones admin)"
+echo "Almenupro frontend build v1.13.0 (bilingual menu)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=delivery-zones-v1.12.0
+  --dart-define=BUILD_FEATURE=bilingual-v1.13.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -36,8 +36,8 @@ cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.12.2-no-eta-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["delivery-zones","landing-page","restaurant-persistence","client-menu-slug"]}\n' "$BUILD_ID" \
+BUILD_ID="1.13.0-bilingual-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["bilingual","delivery-zones","landing-page","restaurant-persistence","client-menu-slug"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 echo "Frontend build copied to frontend/dist ($BUILD_ID)"

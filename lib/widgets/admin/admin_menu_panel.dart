@@ -556,13 +556,20 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        data['name'] as String? ?? '',
+                        _bilingualItemTitle(data),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
-                      Text(data['description'] as String? ?? ''),
+                      if (_bilingualItemSubtitle(data).isNotEmpty)
+                        Text(
+                          _bilingualItemSubtitle(data),
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 13,
+                          ),
+                        ),
                       Text('${data['price']} د.ك'),
                     ],
                   ),
@@ -604,4 +611,25 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
       ),
     );
   }
+}
+
+String _bilingualItemTitle(Map<String, dynamic> data) {
+  final nameAr =
+      (data['nameAr'] ?? data['name_ar'] ?? data['name'] ?? '').toString().trim();
+  final nameEn = (data['nameEn'] ?? data['name_en'] ?? '').toString().trim();
+  if (nameAr.isNotEmpty && nameEn.isNotEmpty) return '$nameAr / $nameEn';
+  return nameAr.isNotEmpty ? nameAr : nameEn;
+}
+
+String _bilingualItemSubtitle(Map<String, dynamic> data) {
+  final descAr = (data['descriptionAr'] ??
+          data['description_ar'] ??
+          data['description'] ??
+          '')
+      .toString()
+      .trim();
+  final descEn =
+      (data['descriptionEn'] ?? data['description_en'] ?? '').toString().trim();
+  if (descAr.isNotEmpty && descEn.isNotEmpty) return '$descAr / $descEn';
+  return descAr.isNotEmpty ? descAr : descEn;
 }

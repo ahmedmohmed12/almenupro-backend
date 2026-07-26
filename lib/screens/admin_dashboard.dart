@@ -293,9 +293,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final isEditing = record != null;
     final Map<String, dynamic>? data = isEditing ? record.data : null;
 
-    final nameController = TextEditingController(text: data?['name'] ?? '');
-    final descController =
-        TextEditingController(text: data?['description'] ?? '');
+    final nameController = TextEditingController(
+      text: data?['nameAr']?.toString() ??
+          data?['name_ar']?.toString() ??
+          data?['name']?.toString() ??
+          '',
+    );
+    final nameEnController = TextEditingController(
+      text: data?['nameEn']?.toString() ?? data?['name_en']?.toString() ?? '',
+    );
+    final descController = TextEditingController(
+      text: data?['descriptionAr']?.toString() ??
+          data?['description_ar']?.toString() ??
+          data?['description']?.toString() ??
+          '',
+    );
+    final descEnController = TextEditingController(
+      text: data?['descriptionEn']?.toString() ??
+          data?['description_en']?.toString() ??
+          '',
+    );
     final priceController = TextEditingController(
       text: data != null ? data['price'].toString() : '',
     );
@@ -321,7 +338,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(
-                        labelText: 'اسم الوجبة / الصنف',
+                        labelText: 'اسم الصنف (عربي)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameEnController,
+                      decoration: const InputDecoration(
+                        labelText: 'Item name (English)',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -330,7 +355,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       controller: descController,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText: 'الوصف',
+                        labelText: 'الوصف (عربي)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descEnController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Description (English)',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -382,19 +416,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     backgroundColor: Colors.brown,
                   ),
                   onPressed: () async {
-                    if (nameController.text.isEmpty ||
+                    if ((nameController.text.trim().isEmpty &&
+                            nameEnController.text.trim().isEmpty) ||
                         priceController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('يرجى ملء الاسم والسعر على الأقل'),
+                          content: Text('يرجى ملء الاسم (عربي أو إنجليزي) والسعر'),
                         ),
                       );
                       return;
                     }
 
+                    final nameAr = nameController.text.trim();
+                    final nameEn = nameEnController.text.trim();
+                    final descriptionAr = descController.text.trim();
+                    final descriptionEn = descEnController.text.trim();
+
                     final itemMap = <String, dynamic>{
-                      'name': nameController.text.trim(),
-                      'description': descController.text.trim(),
+                      'name': nameAr.isNotEmpty ? nameAr : nameEn,
+                      'nameAr': nameAr,
+                      'nameEn': nameEn,
+                      'description':
+                          descriptionAr.isNotEmpty ? descriptionAr : descriptionEn,
+                      'descriptionAr': descriptionAr,
+                      'descriptionEn': descriptionEn,
                       'price': double.tryParse(priceController.text) ?? 0.0,
                       'categoryName': categoryController.text.trim(),
                       'categoryId': data?['categoryId'] ?? '',

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/customer_restaurant_context.dart';
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
+import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/menu/menu_checkout_sheet.dart';
@@ -79,18 +81,20 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   void _addToCart(MenuItem item) {
+    final strings = AppStrings.of(context);
+    final locale = context.read<LocaleProvider>().localeCode;
     context.read<CartProvider>().addMenuItem(item);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('تمت إضافة "${item.name}" إلى السلة'),
+        content: Text(strings.addedToCart(item.localizedName(locale))),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  List<String> _categories(List<MenuItem> items) {
-    final categories = <String>{'الكل'};
+  List<String> _categories(List<MenuItem> items, AppStrings strings) {
+    final categories = <String>{strings.all};
     for (final item in items) {
       if (item.categoryName.trim().isNotEmpty) {
         categories.add(item.categoryName.trim());
@@ -99,8 +103,8 @@ class _MenuScreenState extends State<MenuScreen> {
     return categories.toList();
   }
 
-  List<MenuItem> _filteredItems(List<MenuItem> items) {
-    if (_selectedCategory == 'الكل') return items;
+  List<MenuItem> _filteredItems(List<MenuItem> items, AppStrings strings) {
+    if (_selectedCategory == strings.all) return items;
     return items
         .where((item) => item.categoryName.trim() == _selectedCategory)
         .toList();
@@ -116,9 +120,11 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final locale = context.watch<LocaleProvider>();
+    final strings = AppStrings(locale.localeCode);
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: locale.textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.brandBackground,
         body: FutureBuilder<_MenuPageData>(
@@ -137,7 +143,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   message.contains('Restaurant not found');
               return _ErrorState(
                 message: isNotFound
-                    ? 'المطعم غير موجود أو الرابط غير صحيح'
+                    ? strings.restaurantNotFound
                     : message,
                 onRetry: isNotFound ? null : _reload,
               );
@@ -147,18 +153,21 @@ class _MenuScreenState extends State<MenuScreen> {
             final items = page.items;
             if (items.isEmpty) {
               return _ErrorState(
-                message: 'لا توجد أصناف متاحة حالياً',
+                message: strings.noItemsAvailable,
                 onRetry: _reload,
               );
             }
 
-            final categories = _categories(items);
-            final filtered = _filteredItems(items);
+            final categories = _categories(items, strings);
+            if (!categories.contains(_selectedCategory)) {
+              _selectedCategory = strings.all;
+            }
+            final filtered = _filteredItems(items, strings);
             final restaurantName =
                 page.context?.name ?? 'Molten Cookies';
             final restaurantTagline = page.context != null
-                ? 'قائمة الطعام — ${page.context!.name}'
-                : 'قائمة الطعام — ميني بايتس وكوكيز';
+                ? strings.menuTaglineFor(page.context!.name)
+                : strings.defaultTagline;
 
             return RefreshIndicator(
               color: AppTheme.brandOrange,
@@ -182,12 +191,12 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
                   if (filtered.isEmpty)
-                    const SliverFillRemaining(
+                    SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
                         child: Text(
-                          'لا توجد أصناف في هذا التصنيف',
-                          style: TextStyle(
+                          strings.noItemsInCategory,
+                          style: const TextStyle(
                             color: AppTheme.brandBlack,
                             fontSize: 16,
                           ),
@@ -216,6 +225,8 @@ class _MenuScreenState extends State<MenuScreen> {
                               (context, index) {
                                 return _MenuItemCard(
                                   item: filtered[index],
+                                  localeCode: locale.localeCode,
+                                  strings: strings,
                                   onAddToCart: () => _addToCart(filtered[index]),
                                 );
                               },
@@ -235,6 +246,7 @@ class _MenuScreenState extends State<MenuScreen> {
             : _FloatingCartBar(
                 itemCount: cart.itemCount,
                 totalPrice: cart.totalPrice,
+                strings: strings,
                 onCheckout: () => MenuCheckoutSheet.show(
                   context,
                   restaurantContext: _loadedContext,
@@ -249,11 +261,13 @@ class _FloatingCartBar extends StatelessWidget {
   const _FloatingCartBar({
     required this.itemCount,
     required this.totalPrice,
+    required this.strings,
     required this.onCheckout,
   });
 
   final int itemCount;
   final double totalPrice;
+  final AppStrings strings;
   final VoidCallback onCheckout;
 
   @override
@@ -298,18 +312,18 @@ class _FloatingCartBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'متابعة الطلب',
+                  strings.continueOrder,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
               Text(
-                '${totalPrice.toStringAsFixed(3)} د.ك',
+                '${totalPrice.toStringAsFixed(3)} ${strings.currency}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -387,7 +401,26 @@ class _MenuHeader extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'تحديث',
+              tooltip: 'Language / اللغة',
+              onPressed: () => context.read<LocaleProvider>().toggle(),
+              icon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppTheme.brandOrange),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  context.watch<LocaleProvider>().isArabic ? 'EN' : 'ع',
+                  style: const TextStyle(
+                    color: AppTheme.brandOrange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: context.watch<LocaleProvider>().isArabic ? 'تحديث' : 'Refresh',
               onPressed: onRefresh,
               icon: const Icon(Icons.refresh_rounded, color: AppTheme.brandOrange),
             ),
@@ -452,14 +485,21 @@ class _CategoryBar extends StatelessWidget {
 class _MenuItemCard extends StatelessWidget {
   const _MenuItemCard({
     required this.item,
+    required this.localeCode,
+    required this.strings,
     required this.onAddToCart,
   });
 
   final MenuItem item;
+  final String localeCode;
+  final AppStrings strings;
   final VoidCallback onAddToCart;
 
   @override
   Widget build(BuildContext context) {
+    final displayName = item.localizedName(localeCode);
+    final displayDescription = item.localizedDescription(localeCode);
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -488,7 +528,7 @@ class _MenuItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.name,
+                      displayName,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -500,9 +540,9 @@ class _MenuItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      item.description.isNotEmpty
-                          ? item.description
-                          : 'لا يوجد وصف',
+                      displayDescription.isNotEmpty
+                          ? displayDescription
+                          : strings.noDescription,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
