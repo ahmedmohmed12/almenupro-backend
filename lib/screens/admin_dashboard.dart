@@ -872,7 +872,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           }
         },
         onLogout: _logout,
-        width: inDrawer ? 280 : 260,
+        width: inDrawer ? 280 : AdminSidebar.expandedWidth,
+        enableCollapse: !inDrawer,
       );
     }
 
