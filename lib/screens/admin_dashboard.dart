@@ -873,10 +873,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final canManage =
         !_isSuperAdmin || scope.hasSelection;
 
-    return AdminDeliveryZonesPanel(
-      key: ValueKey('delivery-zones-$restaurantId'),
-      restaurantId: restaurantId,
-      canManage: canManage,
+    return SizedBox.expand(
+      child: AdminDeliveryZonesPanel(
+        key: ValueKey('delivery-zones-$restaurantId'),
+        restaurantId: restaurantId,
+        canManage: canManage,
+      ),
     );
   }
 

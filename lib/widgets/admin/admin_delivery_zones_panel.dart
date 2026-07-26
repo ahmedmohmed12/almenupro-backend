@@ -6,7 +6,6 @@ import '../../models/delivery_zone.dart';
 import '../../services/admin_auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/super_admin_scope_service.dart';
-import 'admin_breakpoints.dart';
 
 class AdminDeliveryZonesPanel extends StatefulWidget {
   const AdminDeliveryZonesPanel({
@@ -35,7 +34,6 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
   void initState() {
     super.initState();
     _loadZones();
-    SuperAdminScopeService.instance.addListener(_onScopeChanged);
   }
 
   @override
@@ -47,19 +45,17 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     }
   }
 
-  @override
-  void dispose() {
-    SuperAdminScopeService.instance.removeListener(_onScopeChanged);
-    super.dispose();
-  }
-
-  void _onScopeChanged() {
-    _loadZones();
-  }
-
   String get _restaurantId =>
       widget.restaurantId ??
       SuperAdminScopeService.instance.effectiveRestaurantId;
+
+  String get _restaurantLabel {
+    if (AdminAuthService.instance.isSuperAdmin) {
+      return SuperAdminScopeService.instance.selectedRestaurantName ??
+          _restaurantId;
+    }
+    return AdminAuthService.instance.restaurantName ?? _restaurantId;
+  }
 
   Future<void> _loadZones() async {
     if (!widget.canManage) {
@@ -115,79 +111,77 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(existing == null ? 'إضافة منطقة توصيل' : 'تعديل منطقة التوصيل'),
-          content: SizedBox(
-            width: 420,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: kuwaitGovernorates.contains(selectedGovernorate)
-                        ? selectedGovernorate
-                        : kuwaitGovernorates.first,
-                    decoration: const InputDecoration(
-                      labelText: 'المحافظة',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: kuwaitGovernorates
-                        .map((gov) => DropdownMenuItem(value: gov, child: Text(gov)))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) selectedGovernorate = value;
-                    },
+      builder: (context) => AlertDialog(
+        title: Text(existing == null ? 'إضافة منطقة توصيل' : 'تعديل منطقة التوصيل'),
+        content: SizedBox(
+          width: 420,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: kuwaitGovernorates.contains(selectedGovernorate)
+                      ? selectedGovernorate
+                      : kuwaitGovernorates.first,
+                  decoration: const InputDecoration(
+                    labelText: 'المحافظة',
+                    border: OutlineInputBorder(),
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: areaController,
-                    decoration: const InputDecoration(
-                      labelText: 'اسم المنطقة',
-                      border: OutlineInputBorder(),
-                      hintText: 'مثال: السالمية',
-                    ),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty ? 'مطلوب' : null,
+                  items: kuwaitGovernorates
+                      .map((gov) => DropdownMenuItem(value: gov, child: Text(gov)))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) selectedGovernorate = value;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: areaController,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم المنطقة',
+                    border: OutlineInputBorder(),
+                    hintText: 'مثال: السالمية',
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: feeController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'رسوم التوصيل (د.ك)',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return 'مطلوب';
-                      final parsed = double.tryParse(value.trim());
-                      if (parsed == null || parsed < 0) return 'قيمة غير صالحة';
-                      return null;
-                    },
+                  validator: (value) =>
+                      value == null || value.trim().isEmpty ? 'مطلوب' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: feeController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'رسوم التوصيل (د.ك)',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return 'مطلوب';
+                    final parsed = double.tryParse(value.trim());
+                    if (parsed == null || parsed < 0) return 'قيمة غير صالحة';
+                    return null;
+                  },
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() != true) return;
-                Navigator.pop(context, true);
-              },
-              child: const Text('حفظ'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() != true) return;
+              Navigator.pop(context, true);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
     );
 
     if (saved != true || !mounted) {
@@ -276,104 +270,78 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final padding = AdminBreakpoints.pagePadding(context);
-
-    return ColoredBox(
-      color: const Color(0xFFF4F6F8),
-      child: ListView(
-        padding: EdgeInsets.all(padding),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(context),
+          const Text(
+            'مناطق التوصيل ورسومها',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: _burgundy,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت.',
+            style: TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 12),
+          if (!widget.canManage)
+            Card(
+              color: Colors.orange.shade50,
+              child: const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
+                  style: TextStyle(color: Colors.black87),
+                ),
+              ),
+            )
+          else ...[
+            Text(
+              'المطعم الحالي: $_restaurantLabel',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: _burgundy),
+                onPressed: _saving ? null : () => _showZoneDialog(),
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('إضافة منطقة جديدة'),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          _buildContent(context),
+          Expanded(child: _buildBody()),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    final compact = AdminBreakpoints.isCompact(context);
-    final restaurantLabel = AdminAuthService.instance.isSuperAdmin
-        ? (SuperAdminScopeService.instance.selectedRestaurantName ?? _restaurantId)
-        : (AdminAuthService.instance.restaurantName ?? _restaurantId);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!widget.canManage)
-          Card(
-            color: Colors.orange.shade50,
-            margin: const EdgeInsets.only(bottom: 12),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
-                style: TextStyle(color: Colors.black87),
-              ),
-            ),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              'المطعم الحالي: $restaurantLabel',
-              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-            ),
-          ),
-        if (compact)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _PanelTitle(),
-              const SizedBox(height: 12),
-              if (widget.canManage) _buildAddButton(fullWidth: true),
-            ],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(child: _PanelTitle()),
-              if (widget.canManage) _buildAddButton(),
-            ],
-          ),
-      ],
-    );
-  }
-
-  Widget _buildAddButton({bool fullWidth = false}) {
-    final button = FilledButton.icon(
-      style: FilledButton.styleFrom(backgroundColor: _burgundy),
-      onPressed: _saving || !widget.canManage ? null : () => _showZoneDialog(),
-      icon: const Icon(Icons.add_location_alt_outlined),
-      label: const Text('إضافة منطقة جديدة'),
-    );
-
-    if (fullWidth) {
-      return SizedBox(width: double.infinity, child: button);
-    }
-    return button;
-  }
-
-  Widget _buildContent(BuildContext context) {
+  Widget _buildBody() {
     if (!widget.canManage) {
-      return const _StatusCard(
+      return _statusCard(
         icon: Icons.store_outlined,
         message: 'يرجى اختيار مطعم أولاً لعرض مناطق التوصيل.',
       );
     }
 
     if (_loading) {
-      return const SizedBox(
-        height: 220,
-        child: Center(
-          child: CircularProgressIndicator(color: _burgundy),
-        ),
+      return const Center(
+        child: CircularProgressIndicator(color: _burgundy),
       );
     }
 
     if (_error != null) {
-      return _StatusCard(
+      return _statusCard(
         icon: Icons.error_outline,
         message: 'تعذر تحميل مناطق التوصيل:\n$_error',
         action: OutlinedButton.icon(
@@ -385,7 +353,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     }
 
     if (_zones.isEmpty) {
-      return _StatusCard(
+      return _statusCard(
         icon: Icons.map_outlined,
         message: 'لا توجد مناطق توصيل بعد.\nاضغط "إضافة منطقة جديدة" لبدء الإعداد.',
         action: FilledButton.icon(
@@ -401,156 +369,118 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final useTable = constraints.maxWidth >= 720;
-          if (useTable) {
-            return _buildZonesTable();
+          if (constraints.maxWidth >= 720) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: _buildZonesTable(),
+              ),
+            );
           }
-          return _buildZonesList();
+          return ListView.separated(
+            itemCount: _zones.length,
+            separatorBuilder: (_, index) => const Divider(height: 1),
+            itemBuilder: (context, index) => _buildZoneTile(_zones[index]),
+          );
         },
       ),
     );
   }
 
-  Widget _buildZonesTable() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(_burgundy.withValues(alpha: 0.08)),
-        columns: const [
-          DataColumn(label: Text('المحافظة', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('المنطقة', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('رسوم التوصيل', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('إجراءات', style: TextStyle(fontWeight: FontWeight.bold))),
-        ],
-        rows: _zones.map((zone) {
-          return DataRow(
-            cells: [
-              DataCell(Text(zone.governorate)),
-              DataCell(Text(zone.areaName)),
-              DataCell(
-                Text(
-                  '${zone.deliveryFee.toStringAsFixed(3)} د.ك',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: _gold),
-                ),
-              ),
-              DataCell(
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'تعديل',
-                      onPressed: _saving ? null : () => _showZoneDialog(existing: zone),
-                      icon: const Icon(Icons.edit_outlined, color: _burgundy),
-                    ),
-                    IconButton(
-                      tooltip: 'حذف',
-                      onPressed: _saving ? null : () => _deleteZone(zone),
-                      icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildZonesList() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _zones.length,
-      separatorBuilder: (_, index) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final zone = _zones[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: _burgundy.withValues(alpha: 0.12),
-            child: const Icon(Icons.location_on_outlined, color: _burgundy),
-          ),
-          title: Text(zone.areaName, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(zone.governorate),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${zone.deliveryFee.toStringAsFixed(3)} د.ك',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: _gold),
-              ),
-              IconButton(
-                tooltip: 'تعديل',
-                onPressed: _saving ? null : () => _showZoneDialog(existing: zone),
-                icon: const Icon(Icons.edit_outlined),
-              ),
-              IconButton(
-                tooltip: 'حذف',
-                onPressed: _saving ? null : () => _deleteZone(zone),
-                icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PanelTitle extends StatelessWidget {
-  const _PanelTitle();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'مناطق التوصيل ورسومها',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF6B1124),
-          ),
-        ),
-        SizedBox(height: 6),
-        Text(
-          'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت.',
-          style: TextStyle(color: Colors.black54),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.icon,
-    required this.message,
-    this.action,
-  });
-
-  final IconData icon;
-  final String message;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _statusCard({
+    required IconData icon,
+    required String message,
+    Widget? action,
+  }) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 48, color: Colors.grey.shade500),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             if (action != null) ...[
               const SizedBox(height: 16),
-              action!,
+              action,
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildZonesTable() {
+    return DataTable(
+      headingRowColor: WidgetStateProperty.all(_burgundy.withValues(alpha: 0.08)),
+      columns: const [
+        DataColumn(label: Text('المحافظة', style: TextStyle(fontWeight: FontWeight.bold))),
+        DataColumn(label: Text('المنطقة', style: TextStyle(fontWeight: FontWeight.bold))),
+        DataColumn(label: Text('رسوم التوصيل', style: TextStyle(fontWeight: FontWeight.bold))),
+        DataColumn(label: Text('إجراءات', style: TextStyle(fontWeight: FontWeight.bold))),
+      ],
+      rows: _zones.map((zone) {
+        return DataRow(
+          cells: [
+            DataCell(Text(zone.governorate)),
+            DataCell(Text(zone.areaName)),
+            DataCell(
+              Text(
+                '${zone.deliveryFee.toStringAsFixed(3)} د.ك',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: _gold),
+              ),
+            ),
+            DataCell(
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'تعديل',
+                    onPressed: _saving ? null : () => _showZoneDialog(existing: zone),
+                    icon: const Icon(Icons.edit_outlined, color: _burgundy),
+                  ),
+                  IconButton(
+                    tooltip: 'حذف',
+                    onPressed: _saving ? null : () => _deleteZone(zone),
+                    icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildZoneTile(DeliveryZone zone) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: _burgundy.withValues(alpha: 0.12),
+        child: const Icon(Icons.location_on_outlined, color: _burgundy),
+      ),
+      title: Text(zone.areaName, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(zone.governorate),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${zone.deliveryFee.toStringAsFixed(3)} د.ك',
+            style: const TextStyle(fontWeight: FontWeight.bold, color: _gold),
+          ),
+          IconButton(
+            tooltip: 'تعديل',
+            onPressed: _saving ? null : () => _showZoneDialog(existing: zone),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'حذف',
+            onPressed: _saving ? null : () => _deleteZone(zone),
+            icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
+          ),
+        ],
       ),
     );
   }
