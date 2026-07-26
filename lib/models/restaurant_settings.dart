@@ -8,6 +8,10 @@ class RestaurantSettings {
     this.whatsappCountryCode = WhatsAppPhone.defaultCountryCode,
     this.whatsappPhone = '',
     this.updatedAt,
+    this.smartUpsellEnabled = true,
+    this.freeDeliveryThreshold = 0,
+    this.impulseBumpItemIds = const [],
+    this.impulseBumpMaxPrice = 2,
   });
 
   final String whatsappNumber;
@@ -15,6 +19,12 @@ class RestaurantSettings {
   final String whatsappPhone;
   final WorkingHoursSettings workingHours;
   final DateTime? updatedAt;
+  final bool smartUpsellEnabled;
+  /// Minimum cart subtotal for free delivery. `0` disables the feature.
+  final double freeDeliveryThreshold;
+  final List<int> impulseBumpItemIds;
+  /// Used to auto-pick impulse items when [impulseBumpItemIds] is empty.
+  final double impulseBumpMaxPrice;
 
   String get fullWhatsappNumber {
     final combined = WhatsAppPhone.combine(whatsappCountryCode, whatsappPhone);
@@ -23,6 +33,9 @@ class RestaurantSettings {
   }
 
   bool get hasWhatsappNumber => fullWhatsappNumber.isNotEmpty;
+
+  bool get hasFreeDeliveryGoal =>
+      smartUpsellEnabled && freeDeliveryThreshold > 0;
 
   factory RestaurantSettings.defaults() {
     return RestaurantSettings(
@@ -59,6 +72,10 @@ class RestaurantSettings {
       phone = split.phone;
     }
 
+    final rawBumpIds = json['impulseBumpItemIds'] as List<dynamic>? ??
+        json['impulse_bump_item_ids'] as List<dynamic>? ??
+        [];
+
     return RestaurantSettings(
       whatsappCountryCode: countryCode,
       whatsappPhone: phone,
@@ -68,6 +85,19 @@ class RestaurantSettings {
             json['working_hours'] as List<dynamic>?,
       ),
       updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? ''),
+      smartUpsellEnabled: json['smartUpsellEnabled'] != false,
+      freeDeliveryThreshold:
+          (json['freeDeliveryThreshold'] as num?)?.toDouble() ??
+              (json['free_delivery_threshold'] as num?)?.toDouble() ??
+              0,
+      impulseBumpItemIds: rawBumpIds
+          .map((id) => int.tryParse(id.toString()))
+          .whereType<int>()
+          .toList(),
+      impulseBumpMaxPrice:
+          (json['impulseBumpMaxPrice'] as num?)?.toDouble() ??
+              (json['impulse_bump_max_price'] as num?)?.toDouble() ??
+              2,
     );
   }
 
@@ -77,6 +107,10 @@ class RestaurantSettings {
     String? whatsappPhone,
     WorkingHoursSettings? workingHours,
     DateTime? updatedAt,
+    bool? smartUpsellEnabled,
+    double? freeDeliveryThreshold,
+    List<int>? impulseBumpItemIds,
+    double? impulseBumpMaxPrice,
   }) {
     final nextCountry = whatsappCountryCode ?? this.whatsappCountryCode;
     final nextPhone = whatsappPhone ?? this.whatsappPhone;
@@ -90,6 +124,10 @@ class RestaurantSettings {
           : (whatsappNumber ?? this.whatsappNumber),
       workingHours: workingHours ?? this.workingHours,
       updatedAt: updatedAt ?? this.updatedAt,
+      smartUpsellEnabled: smartUpsellEnabled ?? this.smartUpsellEnabled,
+      freeDeliveryThreshold: freeDeliveryThreshold ?? this.freeDeliveryThreshold,
+      impulseBumpItemIds: impulseBumpItemIds ?? this.impulseBumpItemIds,
+      impulseBumpMaxPrice: impulseBumpMaxPrice ?? this.impulseBumpMaxPrice,
     );
   }
 
@@ -98,6 +136,10 @@ class RestaurantSettings {
         'whatsappPhone': whatsappPhone,
         'whatsappNumber': fullWhatsappNumber,
         'workingHours': workingHours.toJsonList(),
+        'smartUpsellEnabled': smartUpsellEnabled,
+        'freeDeliveryThreshold': freeDeliveryThreshold,
+        'impulseBumpItemIds': impulseBumpItemIds,
+        'impulseBumpMaxPrice': impulseBumpMaxPrice,
         if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
       };
 }

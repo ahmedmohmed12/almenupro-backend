@@ -9,15 +9,21 @@ import '../../models/customer_checkout_profile.dart';
 import '../../models/customer_restaurant_context.dart';
 import '../../models/delivery_address_details.dart';
 import '../../models/delivery_zone.dart';
+import '../../models/menu_item.dart';
+import '../../models/restaurant_settings.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/customer_checkout_cache_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/upsell_item_resolver.dart';
 import '../../utils/whatsapp_launcher.dart';
 import '../../utils/whatsapp_order_message.dart';
 import '../../utils/whatsapp_phone.dart';
+import 'checkout_impulse_bumps.dart';
+import 'customization_dialog.dart';
+import 'free_delivery_progress_bar.dart';
 
 class MenuCheckoutSheet extends StatefulWidget {
   const MenuCheckoutSheet({super.key, this.restaurantContext});
@@ -78,6 +84,26 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   List<DeliveryZone> _zones = [];
   String? _selectedGovernorate;
   DeliveryZone? _selectedZone;
+  List<MenuItem> _menuItems = [];
+
+  RestaurantSettings get _settings =>
+      widget.restaurantContext?.settings ?? RestaurantSettings.defaults();
+
+  double get _baseDeliveryFee => _selectedZone?.deliveryFee ?? 0;
+
+  double _effectiveDeliveryFee(double subtotal) {
+    if (_settings.hasFreeDeliveryGoal &&
+        subtotal >= _settings.freeDeliveryThreshold &&
+        _baseDeliveryFee > 0) {
+      return 0;
+    }
+    return _baseDeliveryFee;
+  }
+
+  bool _hasFreeDeliveryApplied(double subtotal) =>
+      _settings.hasFreeDeliveryGoal &&
+      subtotal >= _settings.freeDeliveryThreshold &&
+      _baseDeliveryFee > 0;
 
   String get _restaurantName =>
       widget.restaurantContext?.name ?? 'Molten Cookies';
@@ -86,8 +112,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
       widget.restaurantContext?.id ?? ApiService.defaultRestaurantId;
 
   String? get _restaurantSlug => widget.restaurantContext?.slug;
-
-  double get _deliveryFee => _selectedZone?.deliveryFee ?? 0;
 
   List<String> get _availableGovernorates {
     if (_zones.isEmpty) return kuwaitGovernorates;
@@ -244,7 +268,10 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   }
 
   Future<void> _bootstrapCheckout() async {
-    await _loadDeliveryZones();
+    await Future.wait([
+      _loadDeliveryZones(),
+      _loadMenuItems(),
+    ]);
     final lastPhone =
         await CustomerCheckoutCacheService.instance.loadLastPhone(_restaurantId);
     if (!mounted || lastPhone == null || lastPhone.trim().isEmpty) return;
@@ -402,6 +429,40 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     }
   }
 
+  Future<void> _loadMenuItems() async {
+    try {
+      final slug = _restaurantSlug;
+      final items = slug != null && slug.isNotEmpty
+          ? await ApiService.instance.fetchPublicItems(
+              slug: slug,
+              restaurantId: _restaurantId,
+            )
+          : await ApiService.instance.fetchItems(restaurantId: _restaurantId);
+      if (!mounted) return;
+      setState(() => _menuItems = items);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _menuItems = const []);
+    }
+  }
+
+  Future<void> _handleImpulseAdd(MenuItem item) async {
+    if (item.hasCustomizations) {
+      await showCustomizationDialog(context, item);
+      return;
+    }
+    if (!mounted) return;
+    context.read<CartProvider>().addMenuItem(item);
+    final locale = context.read<LocaleProvider>().localeCode;
+    final strings = AppStrings.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(strings.addedToCart(item.localizedName(locale))),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _focusNext(FocusNode node) {
     FocusScope.of(context).requestFocus(node);
   }
@@ -440,7 +501,8 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 
     try {
       final subtotal = cart.totalPrice;
-      final grandTotal = subtotal + _deliveryFee;
+      final deliveryFee = _effectiveDeliveryFee(subtotal);
+      final grandTotal = subtotal + deliveryFee;
       final invoiceNumber =
           DateTime.now().millisecondsSinceEpoch.toString().substring(5);
       final now = DateTime.now();
@@ -459,7 +521,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
         orderTime: orderTime,
         cartItems: cart.items,
         subtotal: subtotal,
-        deliveryFee: _deliveryFee,
+        deliveryFee: deliveryFee,
         grandTotal: grandTotal,
         addressArabic: addressArabic,
         addressEnglish: addressEnglish,
@@ -480,7 +542,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
             paymentMethod: _paymentMethod,
             invoiceNumber: invoiceNumber,
             restaurantId: _restaurantId,
-            deliveryFee: _deliveryFee,
+            deliveryFee: deliveryFee,
             governorate: _selectedZone?.governorate ?? _selectedGovernorate,
             areaName: _selectedZone?.areaName,
             deliveryZoneId: _selectedZone?.id,
@@ -515,7 +577,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 
   Widget _buildTotals(CartProvider cart, AppStrings strings) {
     final subtotal = cart.totalPrice;
-    final grandTotal = subtotal + _deliveryFee;
+    final deliveryFee = _effectiveDeliveryFee(subtotal);
+    final grandTotal = subtotal + deliveryFee;
+    final freeApplied = _hasFreeDeliveryApplied(subtotal);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -534,9 +598,10 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
           const SizedBox(height: 6),
           _TotalRow(
             label: strings.deliveryFee,
-            value: _deliveryFee,
+            value: deliveryFee,
             currency: strings.currency,
             highlight: _selectedZone != null,
+            originalValue: freeApplied ? _baseDeliveryFee : null,
           ),
           const Divider(height: 20),
           _TotalRow(
@@ -555,7 +620,14 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     final cart = context.watch<CartProvider>();
     final locale = context.watch<LocaleProvider>();
     final strings = AppStrings(locale.localeCode);
-    final grandTotal = cart.totalPrice + _deliveryFee;
+    final subtotal = cart.totalPrice;
+    final deliveryFee = _effectiveDeliveryFee(subtotal);
+    final grandTotal = subtotal + deliveryFee;
+    final impulseItems = UpsellItemResolver.impulseBumpItems(
+      allItems: _menuItems,
+      settings: _settings,
+      cartItemIds: cart.items.map((item) => item.menuItem.id).toSet(),
+    );
 
     return Directionality(
       textDirection: locale.textDirection,
@@ -656,6 +728,21 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                         );
                         },
                       ),
+                      if (_settings.smartUpsellEnabled &&
+                          _settings.hasFreeDeliveryGoal)
+                        FreeDeliveryProgressBar(
+                          subtotal: subtotal,
+                          threshold: _settings.freeDeliveryThreshold,
+                          baseDeliveryFee: _baseDeliveryFee,
+                          strings: strings,
+                        ),
+                      if (_settings.smartUpsellEnabled)
+                        CheckoutImpulseBumps(
+                          items: impulseItems,
+                          localeCode: locale.localeCode,
+                          strings: strings,
+                          onAddItem: (item) => unawaited(_handleImpulseAdd(item)),
+                        ),
                       const Divider(height: 32),
                       if (_loadingWhatsapp)
                         const Padding(
@@ -963,6 +1050,7 @@ class _TotalRow extends StatelessWidget {
     required this.currency,
     this.isBold = false,
     this.highlight = false,
+    this.originalValue,
   });
 
   final String label;
@@ -970,6 +1058,7 @@ class _TotalRow extends StatelessWidget {
   final String currency;
   final bool isBold;
   final bool highlight;
+  final double? originalValue;
 
   @override
   Widget build(BuildContext context) {
@@ -984,13 +1073,31 @@ class _TotalRow extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          '${value.toStringAsFixed(3)} $currency',
-          style: TextStyle(
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: isBold ? AppTheme.brandMaroon : Colors.black87,
+        if (originalValue != null && value == 0) ...[
+          Text(
+            '${originalValue!.toStringAsFixed(3)} $currency',
+            style: TextStyle(
+              decoration: TextDecoration.lineThrough,
+              color: Colors.grey.shade500,
+              fontSize: 13,
+            ),
           ),
-        ),
+          const SizedBox(width: 8),
+          Text(
+            'مجاني',
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: Colors.green.shade700,
+            ),
+          ),
+        ] else
+          Text(
+            '${value.toStringAsFixed(3)} $currency',
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: isBold ? AppTheme.brandMaroon : Colors.black87,
+            ),
+          ),
       ],
     );
   }

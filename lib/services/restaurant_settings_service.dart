@@ -84,6 +84,33 @@ class RestaurantSettingsService {
     await _syncFirebase(updated);
   }
 
+  Future<void> saveUpsellSettings({
+    required bool smartUpsellEnabled,
+    required double freeDeliveryThreshold,
+    required double impulseBumpMaxPrice,
+    List<int>? impulseBumpItemIds,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    final updated = current.copyWith(
+      smartUpsellEnabled: smartUpsellEnabled,
+      freeDeliveryThreshold: freeDeliveryThreshold,
+      impulseBumpMaxPrice: impulseBumpMaxPrice,
+      impulseBumpItemIds: impulseBumpItemIds,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    await ApiService.instance.updateSettings(
+      updated,
+      restaurantId: scopedRestaurantId,
+    );
+    _cached = updated;
+    await _saveCache(updated, restaurantId: scopedRestaurantId);
+    await _syncFirebase(updated);
+  }
+
   Future<void> saveWhatsappNumber({
     required String countryCode,
     required String phone,

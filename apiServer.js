@@ -199,6 +199,16 @@ function normalizeSettings(raw) {
       open: String(day.open || day.openTime || '10:00'),
       close: String(day.close || day.closeTime || '22:00'),
     })),
+    smartUpsellEnabled: source.smartUpsellEnabled !== false,
+    freeDeliveryThreshold:
+      Number(source.freeDeliveryThreshold ?? source.free_delivery_threshold ?? 0) || 0,
+    impulseBumpItemIds: Array.isArray(source.impulseBumpItemIds)
+      ? source.impulseBumpItemIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      : [],
+    impulseBumpMaxPrice:
+      Number(source.impulseBumpMaxPrice ?? source.impulse_bump_max_price ?? 2) || 2,
     updatedAt: source.updatedAt || new Date().toISOString(),
   };
 }
@@ -1605,6 +1615,9 @@ const server = http.createServer(async (req, res) => {
         workingHours: Array.isArray(body.workingHours)
           ? body.workingHours
           : current.workingHours,
+        impulseBumpItemIds: Array.isArray(body.impulseBumpItemIds)
+          ? body.impulseBumpItemIds
+          : current.impulseBumpItemIds,
         updatedAt: new Date().toISOString(),
       });
       sendJson(res, 200, merged);

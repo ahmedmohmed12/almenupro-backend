@@ -52,6 +52,17 @@ class AppStrings {
       ? 'يرجى اختيار خيار من مجموعة "$groupName"'
       : 'Please choose an option from "$groupName"';
 
+  String get impulseBumpsTitle =>
+      isArabic ? 'حاجات تنور سفرتك ✨' : 'Complete your order ✨';
+  String freeDeliveryRemaining(String amount) => isArabic
+      ? 'أضف $amount د.ك أخرى للحصول على توصيل مجاني! 🚚'
+      : 'Add $amount KWD more for FREE delivery! 🚚';
+  String get freeDeliveryUnlocked =>
+      isArabic ? '🎉 مبروك! حصلت على توصيل مجاني' : '🎉 You unlocked free delivery!';
+  String freeDeliveryProgressHint(String current, String target) => isArabic
+      ? 'مجموعك $current من $target د.ك'
+      : 'Your total: $current of $target KWD';
+
   String get checkoutTitle => isArabic ? 'إتمام الطلب' : 'Complete Order';
   String get customerName => isArabic ? 'اسم العميل' : 'Customer name';
   String get phone => isArabic ? 'رقم الهاتف' : 'Phone number';

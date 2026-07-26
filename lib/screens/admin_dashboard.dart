@@ -33,6 +33,7 @@ import '../widgets/admin/admin_sidebar.dart';
 import '../widgets/admin/admin_super_restaurants_panel.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
+import '../widgets/admin/admin_smart_upsell_settings_card.dart';
 import '../widgets/admin/admin_working_hours_card.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -1360,6 +1361,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 20),
           const AdminWorkingHoursCard(),
+          const SizedBox(height: 20),
+          const AdminSmartUpsellSettingsCard(),
           if (!_isSuperAdmin) ...[
             const SizedBox(height: 20),
             const AdminSoundSettingsCard(),
