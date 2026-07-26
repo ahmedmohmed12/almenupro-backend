@@ -1066,7 +1066,7 @@ class ApiService {
     }
 
     final response = await http
-        .get(_uri('/delivery-zones', query), headers: _jsonHeaders)
+        .get(_uri('/delivery-zones', query), headers: _publicHeaders)
         .timeout(_fetchTimeout);
 
     if (response.statusCode != 200) {
