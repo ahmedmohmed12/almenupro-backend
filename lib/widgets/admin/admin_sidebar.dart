@@ -27,6 +27,7 @@ class AdminSidebar extends StatelessWidget {
   static const int deliveryZonesIndex = 3;
   static const int analyticsIndex = 4;
   static const int settingsIndex = 5;
+  static const int posIndex = 6;
 
   /// Super Admin sidebar — no orders tab (restaurant admins only).
   static const int superMenuIndex = 0;
@@ -60,6 +61,10 @@ class AdminSidebar extends StatelessWidget {
     AdminSidebarItem(
       icon: Icons.store,
       label: 'إعدادات المحل والواتساب',
+    ),
+    AdminSidebarItem(
+      icon: Icons.point_of_sale,
+      label: 'نقطة البيع POS',
     ),
   ];
 

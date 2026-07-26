@@ -285,6 +285,7 @@ function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
       createdAt,
       invoiceNumber: raw.invoiceNumber?.toString() || raw.invoice_number?.toString() || null,
       paymentMethod: raw.paymentMethod?.toString() || raw.payment_method?.toString() || null,
+      orderSource: String(raw.orderSource || raw.order_source || '').trim() || null,
     },
     raw.restaurant_id || raw.restaurantId || restaurantId,
   );

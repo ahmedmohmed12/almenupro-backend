@@ -16,12 +16,14 @@ import '../services/admin_order_monitor_service.dart';
 import '../services/analytics_demo_service.dart';
 import '../services/api_service.dart';
 import '../services/menu_storage_service.dart';
+import '../services/orders_service.dart';
 import '../services/order_alert_sound_service.dart';
 import '../services/order_browser_notification_service.dart';
 import '../services/restaurant_settings_service.dart';
 import '../services/super_admin_scope_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_corner_toast.dart';
+import '../widgets/admin/admin_pos_panel.dart';
 import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
@@ -1019,6 +1021,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return _buildAnalyticsTab();
       case AdminSidebar.settingsIndex:
         return _buildSettingsTab();
+      case AdminSidebar.posIndex:
+        return AdminPosPanel(
+          onOrderSubmitted: () {
+            unawaited(OrdersService.instance.refreshOrders());
+          },
+        );
       default:
         return AdminOrdersPanel(key: _ordersPanelKey);
     }

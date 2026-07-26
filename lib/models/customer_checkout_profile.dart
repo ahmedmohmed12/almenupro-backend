@@ -9,6 +9,7 @@ class CustomerCheckoutProfile {
     this.deliveryZoneId,
     this.addressDetails = const DeliveryAddressDetails(),
     this.paymentMethod = 'كاش',
+    this.customerId,
   });
 
   final String phone;
@@ -18,6 +19,7 @@ class CustomerCheckoutProfile {
   final String? deliveryZoneId;
   final DeliveryAddressDetails addressDetails;
   final String paymentMethod;
+  final String? customerId;
 
   factory CustomerCheckoutProfile.fromMap(Map<String, dynamic> map) {
     final detailsRaw = map['addressDetails'] ?? map['address_details'];
@@ -36,6 +38,7 @@ class CustomerCheckoutProfile {
             ),
       paymentMethod:
           map['paymentMethod']?.toString() ?? map['payment_method']?.toString() ?? 'كاش',
+      customerId: map['customerId']?.toString() ?? map['customer_id']?.toString(),
     );
   }
 
@@ -49,6 +52,7 @@ class CustomerCheckoutProfile {
         'deliveryZoneId': deliveryZoneId,
       'addressDetails': addressDetails.toMap(),
       'paymentMethod': paymentMethod,
+      if (customerId != null && customerId!.isNotEmpty) 'customerId': customerId,
     };
   }
 

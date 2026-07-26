@@ -253,6 +253,8 @@ class OrdersDemoService {
     String? areaName,
     String? deliveryZoneId,
     DeliveryAddressDetails addressDetails = const DeliveryAddressDetails(),
+    String orderSource = '',
+    OrderType orderType = OrderType.delivery,
   }) {
     final items = cartItems.map(OrderLineItem.fromCartItem).toList();
     final subtotal = cartItems.fold<double>(0, (sum, item) => sum + item.totalPrice);
@@ -266,7 +268,7 @@ class OrdersDemoService {
       subtotal: subtotal,
       deliveryFee: deliveryFee,
       totalPrice: subtotal + deliveryFee,
-      orderType: OrderType.delivery,
+      orderType: orderType,
       status: OrderStatus.pending,
       createdAt: DateTime.now(),
       invoiceNumber: invoiceNumber,
@@ -275,6 +277,7 @@ class OrdersDemoService {
       areaName: areaName,
       deliveryZoneId: deliveryZoneId,
       addressDetails: addressDetails,
+      orderSource: orderSource.isEmpty ? null : orderSource,
     );
   }
 }

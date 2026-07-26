@@ -43,6 +43,8 @@ class OrdersService {
     String? areaName,
     String? deliveryZoneId,
     DeliveryAddressDetails addressDetails = const DeliveryAddressDetails(),
+    String orderSource = 'pos',
+    OrderType orderType = OrderType.delivery,
   }) async {
     final order = OrdersDemoService.orderFromCart(
       cartItems: cartItems,
@@ -56,6 +58,8 @@ class OrdersService {
       areaName: areaName,
       deliveryZoneId: deliveryZoneId,
       addressDetails: addressDetails,
+      orderSource: orderSource,
+      orderType: orderType,
     );
 
     if (usesFirebase) {

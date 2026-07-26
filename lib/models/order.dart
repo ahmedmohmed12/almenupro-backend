@@ -150,6 +150,7 @@ class Order {
     this.areaName,
     this.deliveryZoneId,
     this.addressDetails = const DeliveryAddressDetails(),
+    this.orderSource,
   });
 
   final String id;
@@ -169,6 +170,7 @@ class Order {
   final String? areaName;
   final String? deliveryZoneId;
   final DeliveryAddressDetails addressDetails;
+  final String? orderSource;
 
   factory Order.fromMap(String id, Map<String, dynamic> map) {
     final rawItems = map['items'] as List<dynamic>? ?? [];
@@ -198,6 +200,8 @@ class Order {
         map['addressDetails'] as Map<String, dynamic>? ??
             map['address_details'] as Map<String, dynamic>?,
       ),
+      orderSource:
+          map['orderSource']?.toString() ?? map['order_source']?.toString(),
     );
   }
 
@@ -227,6 +231,7 @@ class Order {
       areaName: areaName,
       deliveryZoneId: deliveryZoneId,
       addressDetails: addressDetails,
+      orderSource: orderSource,
     );
   }
 
@@ -251,6 +256,7 @@ class Order {
         'invoiceNumber': invoiceNumber,
       if (paymentMethod != null && paymentMethod!.isNotEmpty)
         'paymentMethod': paymentMethod,
+      if (orderSource != null && orderSource!.isNotEmpty) 'orderSource': orderSource,
     };
   }
 
