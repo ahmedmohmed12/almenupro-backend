@@ -59,6 +59,7 @@ const {
   ensureAutoTranslatedBilingual,
   ensureAutoTranslatedCategory,
 } = require('./lib/autoTranslate');
+const { normalizeMenuItemsForApi, autoTranslateMenuItems } = require('./lib/bilingualItemMigration');
 const {
   initDataStore,
   usesMongo,
@@ -648,6 +649,49 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/items/migrate-bilingual') {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const targetRestaurantId =
+        body.restaurantId || body.restaurant_id || url.searchParams.get('restaurant_id');
+
+      const allItems = await readItems();
+      const scoped = targetRestaurantId
+        ? filterByRestaurant(allItems, targetRestaurantId)
+        : allItems;
+
+      const { items: migrated, updated, scanned } = await autoTranslateMenuItems(scoped, {
+        delayMs: 150,
+      });
+
+      if (targetRestaurantId) {
+        const others = allItems.filter(
+          (item) =>
+            String(item.restaurant_id || item.restaurantId || DEFAULT_RESTAURANT_ID) !==
+            String(targetRestaurantId),
+        );
+        await writeItems([...others, ...migrated]);
+      } else {
+        await writeItems(migrated);
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        updated,
+        scanned,
+        restaurantId: targetRestaurantId || 'all',
+      });
+    } catch (error) {
+      sendJson(res, 500, {
+        error: error.message || 'Bilingual migration failed',
+      });
+    }
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/items') {
     const auth = parseAuthHeader(req);
     const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
@@ -671,7 +715,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     const items = mapItemsForPublicApi(
-      filterByRestaurant(await readItems(), restaurantId),
+      normalizeMenuItemsForApi(filterByRestaurant(await readItems(), restaurantId)),
       requestOrigin(req),
     );
     rebuildCategoryIds(items);
