@@ -1033,6 +1033,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ? 'المطعم الحالي: $restaurantLabel — حدد رقم الواتساب الذي يستقبل طلبات هذا المطعم:'
                 : 'حدد رقم الواتساب الذي يستقبل طلبات وفواتير عملاء مطعمك:',
           ),
+          const SizedBox(height: 6),
+          Text(
+            'يجب حفظ رقم واتساب هنا ليتمكن العملاء من إرسال الطلبات.',
+            style: TextStyle(
+              color: Colors.red.shade700,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
           if (_isSuperAdmin && !scope.hasSelection) ...[
             const SizedBox(height: 12),
             const Text(

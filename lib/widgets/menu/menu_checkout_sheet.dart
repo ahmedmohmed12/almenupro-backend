@@ -67,6 +67,10 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   var _loadingZones = true;
   var _lookupInProgress = false;
   var _profileAutofilled = false;
+  var _loadingWhatsapp = true;
+  var _hasWhatsapp = false;
+
+  String _whatsappNumber = '';
 
   Timer? _lookupDebounce;
   String? _lastLookupPhone;
@@ -77,9 +81,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 
   String get _restaurantName =>
       widget.restaurantContext?.name ?? 'Molten Cookies';
-
-  String get _whatsappNumber =>
-      widget.restaurantContext?.whatsappNumber ?? '';
 
   String get _restaurantId =>
       widget.restaurantContext?.id ?? ApiService.defaultRestaurantId;
@@ -175,16 +176,35 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
       }
     }
 
-    if (_whatsappNumber.trim().isEmpty) {
-      _showFeedback(
-        strings.isArabic
-            ? 'لم يُعيَّن رقم واتساب لهذا المطعم بعد. يرجى التواصل مع المطعم.'
-            : 'This restaurant has no WhatsApp number configured yet.',
-      );
+    if (!_hasWhatsapp || _whatsappNumber.trim().isEmpty) {
+      _showFeedback(strings.whatsappNotConfiguredCheckout);
       return false;
     }
 
     return true;
+  }
+
+  Future<void> _resolveWhatsappNumber() async {
+    var number = widget.restaurantContext?.whatsappNumber ?? '';
+
+    if (number.trim().isEmpty) {
+      try {
+        final settings = await ApiService.instance.fetchPublicSettings(
+          slug: _restaurantSlug,
+          restaurantId: _restaurantId,
+        );
+        number = settings.fullWhatsappNumber;
+      } catch (error) {
+        debugPrint('Failed to resolve restaurant WhatsApp: $error');
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _whatsappNumber = number.trim();
+      _hasWhatsapp = _whatsappNumber.isNotEmpty;
+      _loadingWhatsapp = false;
+    });
   }
 
   DeliveryAddressDetails get _addressDetails => DeliveryAddressDetails(
@@ -217,6 +237,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   void initState() {
     super.initState();
     _phoneController.addListener(_onPhoneChanged);
+    _whatsappNumber = widget.restaurantContext?.whatsappNumber ?? '';
+    _hasWhatsapp = _whatsappNumber.trim().isNotEmpty;
+    unawaited(_resolveWhatsappNumber());
     unawaited(_bootstrapCheckout());
   }
 
@@ -620,6 +643,42 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                         ),
                       ),
                       const Divider(height: 32),
+                      if (_loadingWhatsapp)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: LinearProgressIndicator(color: AppTheme.brandOrange),
+                        )
+                      else if (!_hasWhatsapp)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.brandMaroon.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.brandMaroon.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                color: AppTheme.brandMaroon,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  strings.whatsappNotConfiguredCheckout,
+                                  style: const TextStyle(
+                                    color: AppTheme.brandMaroon,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       TextFormField(
                         controller: _phoneController,
                         focusNode: _phoneFocus,
@@ -852,7 +911,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       backgroundColor: AppTheme.brandMaroon,
                       minimumSize: const Size.fromHeight(52),
                     ),
-                    onPressed: _submitting ? null : () => _submit(cart, strings),
+                    onPressed: (_submitting || _loadingWhatsapp || !_hasWhatsapp)
+                        ? null
+                        : () => _submit(cart, strings),
                     child: _submitting
                         ? const SizedBox(
                             width: 22,

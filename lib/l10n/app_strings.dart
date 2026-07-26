@@ -68,6 +68,15 @@ class AppStrings {
   String get lookingUpProfile => isArabic
       ? 'جاري البحث عن بياناتك...'
       : 'Looking up your saved details...';
+  String get whatsappNotConfiguredForCustomers => isArabic
+      ? 'لا يمكن إتمام الطلب حالياً — لم يُعيَّن رقم واتساب للمطعم. يرجى التواصل مع إدارة المطعم.'
+      : 'Checkout is unavailable — this restaurant has no WhatsApp number configured yet.';
+  String get whatsappNotConfiguredCheckout => isArabic
+      ? 'لم يُعيَّن رقم واتساب لهذا المطعم بعد. يرجى التواصل مع المطعم أو إعداد الرقم من لوحة التحكم.'
+      : 'This restaurant has no WhatsApp number configured yet. Please contact the restaurant or set it in admin settings.';
+  String get whatsappRequiredAdminHint => isArabic
+      ? 'يجب حفظ رقم واتساب هنا ليتمكن العملاء من إرسال الطلبات.'
+      : 'Save a WhatsApp number here so customers can complete orders.';
   String get orderSubmitFailed => isArabic
       ? 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.'
       : 'Could not send the order. Please try again.';

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../models/customer_restaurant_context.dart';
 import '../models/menu_item.dart';
+import '../models/restaurant.dart';
 import '../providers/cart_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
@@ -50,15 +51,16 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<_MenuPageData> _loadPage() async {
     final slug = widget.restaurantSlug?.trim();
     if (slug == null || slug.isEmpty) {
-      final items = await ApiService.instance.fetchItems();
-      return _MenuPageData(items: items);
+      return _loadDefaultRestaurantPage();
     }
 
     final restaurant = await ApiService.instance.fetchPublicRestaurant(slug);
     final settings = await ApiService.instance.fetchPublicSettings(
+      slug: slug,
       restaurantId: restaurant.id,
     );
     final items = await ApiService.instance.fetchPublicItems(
+      slug: slug,
       restaurantId: restaurant.id,
     );
     return _MenuPageData(
@@ -67,6 +69,86 @@ class _MenuScreenState extends State<MenuScreen> {
         restaurant: restaurant,
         settings: settings,
       ),
+    );
+  }
+
+  Future<_MenuPageData> _loadDefaultRestaurantPage() async {
+    const defaultSlug = 'molton-cookies';
+
+    try {
+      final restaurant =
+          await ApiService.instance.fetchPublicRestaurant(defaultSlug);
+      final settings = await ApiService.instance.fetchPublicSettings(
+        slug: defaultSlug,
+        restaurantId: restaurant.id,
+      );
+      final items = await ApiService.instance.fetchPublicItems(
+        slug: defaultSlug,
+        restaurantId: restaurant.id,
+      );
+      return _MenuPageData(
+        items: items,
+        context: CustomerRestaurantContext(
+          restaurant: restaurant,
+          settings: settings,
+        ),
+      );
+    } catch (_) {
+      final settings = await ApiService.instance.fetchPublicSettings(
+        restaurantId: ApiService.defaultRestaurantId,
+      );
+      final items = await ApiService.instance.fetchItems(
+        restaurantId: ApiService.defaultRestaurantId,
+      );
+      return _MenuPageData(
+        items: items,
+        context: CustomerRestaurantContext(
+          restaurant: const Restaurant(
+            id: ApiService.defaultRestaurantId,
+            slug: defaultSlug,
+            name: 'Molten Cookies',
+          ),
+          settings: settings,
+        ),
+      );
+    }
+  }
+
+  Future<CustomerRestaurantContext?> _refreshRestaurantContext() async {
+    try {
+      final page = await _loadPage();
+      if (mounted) {
+        setState(() => _loadedContext = page.context);
+      }
+      return page.context;
+    } catch (_) {
+      return _loadedContext;
+    }
+  }
+
+  Future<void> _openCheckout() async {
+    final strings = AppStrings.of(context);
+    var contextData = _loadedContext;
+
+    if (contextData == null || !contextData.settings.hasWhatsappNumber) {
+      contextData = await _refreshRestaurantContext();
+    }
+
+    if (!mounted) return;
+
+    if (contextData == null || !contextData.settings.hasWhatsappNumber) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(strings.whatsappNotConfiguredForCustomers),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    await MenuCheckoutSheet.show(
+      context,
+      restaurantContext: contextData,
     );
   }
 
@@ -298,10 +380,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 itemCount: cart.itemCount,
                 totalPrice: cart.totalPrice,
                 strings: strings,
-                onCheckout: () => MenuCheckoutSheet.show(
-                  context,
-                  restaurantContext: _loadedContext,
-                ),
+                onCheckout: _openCheckout,
               ),
       ),
     );
