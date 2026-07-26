@@ -50,6 +50,14 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   final _houseController = TextEditingController();
   final _floorController = TextEditingController();
 
+  final _nameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _blockFocus = FocusNode();
+  final _streetFocus = FocusNode();
+  final _avenueFocus = FocusNode();
+  final _houseFocus = FocusNode();
+  final _floorFocus = FocusNode();
+
   var _paymentMethod = 'كاش';
   var _submitting = false;
   var _loadingZones = true;
@@ -138,6 +146,14 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     }
   }
 
+  void _focusNext(FocusNode node) {
+    FocusScope.of(context).requestFocus(node);
+  }
+
+  void _unfocusKeyboard() {
+    FocusScope.of(context).unfocus();
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -147,6 +163,13 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     _avenueController.dispose();
     _houseController.dispose();
     _floorController.dispose();
+    _nameFocus.dispose();
+    _phoneFocus.dispose();
+    _blockFocus.dispose();
+    _streetFocus.dispose();
+    _avenueFocus.dispose();
+    _houseFocus.dispose();
+    _floorFocus.dispose();
     super.dispose();
   }
 
@@ -370,6 +393,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const Divider(height: 32),
                       TextFormField(
                         controller: _nameController,
+                        focusNode: _nameFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _focusNext(_phoneFocus),
                         decoration: InputDecoration(
                           labelText: strings.customerName,
                           border: const OutlineInputBorder(),
@@ -381,7 +407,10 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _phoneController,
+                        focusNode: _phoneFocus,
                         keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _focusNext(_blockFocus),
                         decoration: InputDecoration(
                           labelText: strings.phone,
                           border: const OutlineInputBorder(),
@@ -474,6 +503,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _blockController,
+                        focusNode: _blockFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _focusNext(_streetFocus),
                         decoration: InputDecoration(
                           labelText: strings.block,
                           border: const OutlineInputBorder(),
@@ -485,6 +517,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _streetController,
+                        focusNode: _streetFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _focusNext(_avenueFocus),
                         decoration: InputDecoration(
                           labelText: strings.street,
                           border: const OutlineInputBorder(),
@@ -496,6 +531,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _avenueController,
+                        focusNode: _avenueFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _focusNext(_houseFocus),
                         decoration: InputDecoration(
                           labelText: strings.avenue,
                           border: const OutlineInputBorder(),
@@ -504,6 +542,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _houseController,
+                        focusNode: _houseFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _focusNext(_floorFocus),
                         decoration: InputDecoration(
                           labelText: strings.houseNumber,
                           border: const OutlineInputBorder(),
@@ -515,6 +556,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _floorController,
+                        focusNode: _floorFocus,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _unfocusKeyboard(),
                         decoration: InputDecoration(
                           labelText: strings.floorApartment,
                           border: const OutlineInputBorder(),
