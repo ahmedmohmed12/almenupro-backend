@@ -54,7 +54,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final _passwordController = TextEditingController();
   String? _errorMessage;
   String? _restaurantLabel;
-  int _selectedIndex = 0;
+  int _selectedIndex = AdminSidebar.ordersIndex;
 
   final _whatsappController = TextEditingController();
   String _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;

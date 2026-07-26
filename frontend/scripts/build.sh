@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.17.1 (fix POS web build + sidebar)"
+echo "Almenupro frontend build v1.17.2 (POS first in sidebar + cache bust)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=pos-v1.17.1
+  --dart-define=BUILD_FEATURE=pos-v1.17.2
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -36,8 +36,14 @@ cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.17.1-pos-fix-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["admin-pos","picks-for-you","brand-logo","whatsapp-admin"]}\n' "$BUILD_ID" \
+BUILD_ID="1.17.2-pos-top-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["admin-pos-top","admin-pos","picks-for-you","brand-logo"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
+
+# Cache-bust bootstrap loader so browsers fetch the latest main.dart.js bundle.
+if [ -f "$FRONTEND_DIR/dist/index.html" ]; then
+  sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" "$FRONTEND_DIR/dist/index.html"
+  sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" "$FRONTEND_DIR/dist/404.html"
+fi
 
 echo "Frontend build copied to frontend/dist ($BUILD_ID)"

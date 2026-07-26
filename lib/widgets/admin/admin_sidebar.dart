@@ -21,8 +21,8 @@ class AdminSidebar extends StatelessWidget {
     this.width = 260,
   });
 
-  static const int ordersIndex = 0;
-  static const int posIndex = 1;
+  static const int posIndex = 0;
+  static const int ordersIndex = 1;
   static const int customersIndex = 2;
   static const int menuIndex = 3;
   static const int deliveryZonesIndex = 4;
@@ -37,14 +37,14 @@ class AdminSidebar extends StatelessWidget {
   static const int superSettingsIndex = 4;
 
   static const List<AdminSidebarItem> defaultItems = [
-    // Must stay first: opens AdminOrdersPanel (new + archived tabs).
-    AdminSidebarItem(
-      icon: Icons.receipt_long_outlined,
-      label: 'الطلبات',
-    ),
     AdminSidebarItem(
       icon: Icons.point_of_sale,
       label: 'نقطة البيع POS',
+    ),
+    // Opens AdminOrdersPanel (new + archived tabs).
+    AdminSidebarItem(
+      icon: Icons.receipt_long_outlined,
+      label: 'الطلبات',
     ),
     AdminSidebarItem(
       icon: Icons.people_outline,
