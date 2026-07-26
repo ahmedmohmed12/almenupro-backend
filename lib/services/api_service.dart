@@ -347,6 +347,46 @@ class ApiService {
     }
   }
 
+  Future<List<int>> fetchTopMenuItemIds({
+    String? slug,
+    String? restaurantId,
+    int limit = 12,
+    int days = 90,
+  }) async {
+    try {
+      final query = {
+        ..._publicRestaurantQuery(slug: slug, restaurantId: restaurantId),
+        'limit': '$limit',
+        'days': '$days',
+      };
+      final response = await http
+          .get(_uri('/analytics/top-items', query), headers: _publicHeaders)
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) return const [];
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const [];
+
+      final items = decoded['items'];
+      if (items is! List) return const [];
+
+      return items
+          .whereType<Map>()
+          .map((entry) => entry['menuItemId'])
+          .map((id) {
+            if (id is int) return id;
+            if (id is num) return id.toInt();
+            return int.tryParse(id?.toString() ?? '');
+          })
+          .whereType<int>()
+          .where((id) => id > 0)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<RestaurantSettings> fetchPublicSettings({
     String? slug,
     String? restaurantId,

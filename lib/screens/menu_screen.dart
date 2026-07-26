@@ -27,10 +27,12 @@ class _MenuPageData {
   const _MenuPageData({
     required this.items,
     this.context,
+    this.topItemIds = const [],
   });
 
   final List<MenuItem> items;
   final CustomerRestaurantContext? context;
+  final List<int> topItemIds;
 }
 
 class _MenuScreenState extends State<MenuScreen> {
@@ -59,12 +61,21 @@ class _MenuScreenState extends State<MenuScreen> {
       slug: slug,
       restaurantId: restaurant.id,
     );
-    final items = await ApiService.instance.fetchPublicItems(
-      slug: slug,
-      restaurantId: restaurant.id,
-    );
+    final results = await Future.wait([
+      ApiService.instance.fetchPublicItems(
+        slug: slug,
+        restaurantId: restaurant.id,
+      ),
+      ApiService.instance.fetchTopMenuItemIds(
+        slug: slug,
+        restaurantId: restaurant.id,
+      ),
+    ]);
+    final items = results[0] as List<MenuItem>;
+    final topItemIds = results[1] as List<int>;
     return _MenuPageData(
       items: items,
+      topItemIds: topItemIds,
       context: CustomerRestaurantContext(
         restaurant: restaurant,
         settings: settings,
@@ -82,12 +93,21 @@ class _MenuScreenState extends State<MenuScreen> {
         slug: defaultSlug,
         restaurantId: restaurant.id,
       );
-      final items = await ApiService.instance.fetchPublicItems(
-        slug: defaultSlug,
-        restaurantId: restaurant.id,
-      );
+      final results = await Future.wait([
+        ApiService.instance.fetchPublicItems(
+          slug: defaultSlug,
+          restaurantId: restaurant.id,
+        ),
+        ApiService.instance.fetchTopMenuItemIds(
+          slug: defaultSlug,
+          restaurantId: restaurant.id,
+        ),
+      ]);
+      final items = results[0] as List<MenuItem>;
+      final topItemIds = results[1] as List<int>;
       return _MenuPageData(
         items: items,
+        topItemIds: topItemIds,
         context: CustomerRestaurantContext(
           restaurant: restaurant,
           settings: settings,
@@ -97,11 +117,19 @@ class _MenuScreenState extends State<MenuScreen> {
       final settings = await ApiService.instance.fetchPublicSettings(
         restaurantId: ApiService.defaultRestaurantId,
       );
-      final items = await ApiService.instance.fetchItems(
-        restaurantId: ApiService.defaultRestaurantId,
-      );
+      final results = await Future.wait([
+        ApiService.instance.fetchItems(
+          restaurantId: ApiService.defaultRestaurantId,
+        ),
+        ApiService.instance.fetchTopMenuItemIds(
+          restaurantId: ApiService.defaultRestaurantId,
+        ),
+      ]);
+      final items = results[0] as List<MenuItem>;
+      final topItemIds = results[1] as List<int>;
       return _MenuPageData(
         items: items,
+        topItemIds: topItemIds,
         context: CustomerRestaurantContext(
           restaurant: const Restaurant(
             id: ApiService.defaultRestaurantId,
@@ -176,14 +204,48 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  List<String> _categories(List<MenuItem> items, AppStrings strings) {
-    final categories = <String>{strings.all};
+  bool _isStaticPicksCategory(String category) {
+    final value = category.trim().toLowerCase();
+    return value.contains('ذوقك') || value.contains('picks for you');
+  }
+
+  List<String> _categories(
+    List<MenuItem> items,
+    AppStrings strings,
+    List<int> topItemIds,
+  ) {
+    final categories = <String>[strings.all];
+    if (topItemIds.isNotEmpty) {
+      categories.add(strings.picksForYou);
+    }
     for (final item in items) {
-      if (item.categoryName.trim().isNotEmpty) {
-        categories.add(item.categoryName.trim());
+      final category = item.categoryName.trim();
+      if (category.isEmpty || _isStaticPicksCategory(category)) continue;
+      if (!categories.contains(category)) {
+        categories.add(category);
       }
     }
-    return categories.toList();
+    return categories;
+  }
+
+  List<MenuItem> _filterItems(
+    List<MenuItem> items,
+    String category,
+    AppStrings strings,
+    List<int> topItemIds,
+  ) {
+    if (category == strings.all) return items;
+    if (category == strings.picksForYou) {
+      final byId = {for (final item in items) item.id: item};
+      return topItemIds
+          .map((id) => byId[id])
+          .whereType<MenuItem>()
+          .where((item) => item.isAvailable)
+          .toList();
+    }
+    return items
+        .where((item) => item.categoryName.trim() == category)
+        .toList();
   }
 
   String _heroImageUrl(List<MenuItem> items) {
@@ -252,6 +314,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
             final page = snapshot.data!;
             final items = page.items;
+            final topItemIds = page.topItemIds;
             if (items.isEmpty) {
               return _ErrorState(
                 message: strings.noItemsAvailable,
@@ -259,7 +322,7 @@ class _MenuScreenState extends State<MenuScreen> {
               );
             }
 
-            final categories = _categories(items, strings);
+            final categories = _categories(items, strings, topItemIds);
             final effectiveCategory = categories.contains(_selectedCategory)
                 ? _selectedCategory
                 : strings.all;
@@ -270,10 +333,12 @@ class _MenuScreenState extends State<MenuScreen> {
                 }
               });
             }
-            final filtered = items.where((item) {
-              if (effectiveCategory == strings.all) return true;
-              return item.categoryName.trim() == effectiveCategory;
-            }).toList();
+            final filtered = _filterItems(
+              items,
+              effectiveCategory,
+              strings,
+              topItemIds,
+            );
             final restaurantName =
                 page.context?.name ?? 'Molten Cookies';
             final restaurantTagline = page.context != null
@@ -317,6 +382,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       items: items,
                       localeCode: locale.localeCode,
                       allLabel: strings.all,
+                      picksForYouLabel: strings.picksForYou,
                       selected: effectiveCategory,
                       onSelected: (value) {
                         setState(() => _selectedCategory = value);
@@ -567,6 +633,7 @@ class _CategoryBar extends StatelessWidget {
     required this.items,
     required this.localeCode,
     required this.allLabel,
+    required this.picksForYouLabel,
     required this.selected,
     required this.onSelected,
   });
@@ -575,11 +642,19 @@ class _CategoryBar extends StatelessWidget {
   final List<MenuItem> items;
   final String localeCode;
   final String allLabel;
+  final String picksForYouLabel;
   final String selected;
   final ValueChanged<String> onSelected;
 
+  bool _isHotCategory(String category) {
+    return category == picksForYouLabel ||
+        category.contains('🔥') ||
+        category.contains('ذوقك');
+  }
+
   String _labelFor(String category) {
     if (category == allLabel) return allLabel;
+    if (category == picksForYouLabel) return picksForYouLabel;
     for (final item in items) {
       if (item.categoryName.trim() == category) {
         return item.localizedCategoryName(localeCode);
@@ -600,8 +675,16 @@ class _CategoryBar extends StatelessWidget {
         itemBuilder: (context, index) {
           final category = categories[index];
           final isSelected = category == selected;
+          final isHot = _isHotCategory(category);
 
           return FilterChip(
+            avatar: isHot
+                ? Icon(
+                    Icons.local_fire_department,
+                    size: 16,
+                    color: isSelected ? Colors.white : AppTheme.brandOrange,
+                  )
+                : null,
             label: Text(_labelFor(category)),
             selected: isSelected,
             showCheckmark: false,

@@ -16,6 +16,8 @@ class AppStrings {
   }
 
   String get all => isArabic ? 'الكل' : 'All';
+  String get picksForYou =>
+      isArabic ? 'اختيارات على ذوقك 🔥' : 'Picks for You 🔥';
   String get menuTagline => isArabic ? 'قائمة الطعام' : 'Menu';
   String menuTaglineFor(String restaurantName) =>
       isArabic ? 'قائمة الطعام — $restaurantName' : 'Menu — $restaurantName';

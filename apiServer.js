@@ -70,6 +70,7 @@ const {
   ensureAutoTranslatedCategory,
 } = require('./lib/autoTranslate');
 const { normalizeMenuItemsForApi, autoTranslateMenuItems } = require('./lib/bilingualItemMigration');
+const { computeTopMenuItems } = require('./lib/topItemsAnalytics');
 const {
   initDataStore,
   usesMongo,
@@ -514,6 +515,7 @@ const server = http.createServer(async (req, res) => {
         restaurantPublic: '/api/restaurants/public',
         restaurantBySlug: '/api/restaurants/public/{slug}',
         menu: '/api/items?slug={slug}',
+        topItems: '/api/analytics/top-items?slug={slug}',
         customerLookup: '/api/customers/lookup?phone={phone}&slug={slug}',
         customers: '/api/customers',
         customerDetail: '/api/customers/{id}',
@@ -706,6 +708,47 @@ const server = http.createServer(async (req, res) => {
         error: error.message || 'Bilingual migration failed',
       });
     }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/analytics/top-items') {
+    const auth = parseAuthHeader(req);
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: true,
+    });
+
+    if (!restaurantId) {
+      const slugParam =
+        url.searchParams.get('restaurant_slug') || url.searchParams.get('slug');
+      if (slugParam) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+      } else {
+        authError(res, 401, 'Restaurant context required');
+      }
+      return;
+    }
+
+    if (auth && !canAccessRestaurant(auth, restaurantId)) {
+      authError(res, 403, 'Access denied for this restaurant');
+      return;
+    }
+
+    const days = Number(url.searchParams.get('days') || 90);
+    const limit = Number(url.searchParams.get('limit') || 12);
+    const orders = filterByRestaurant(await readOrders(), restaurantId);
+    const menuItems = filterByRestaurant(await readItems(), restaurantId);
+    const result = computeTopMenuItems(orders, menuItems, restaurantId, {
+      days,
+      limit,
+    });
+
+    sendJson(res, 200, {
+      restaurantId,
+      days,
+      limit,
+      source: result.source,
+      items: result.items,
+    });
     return;
   }
 
