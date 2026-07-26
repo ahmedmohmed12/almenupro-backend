@@ -234,7 +234,6 @@ class _ClientMenuPageState extends State<ClientMenuPage> {
   Future<bool> _sendOrderToWhatsApp(
     String invoiceNumber,
     String orderTime,
-    String expectedTime,
   ) async {
     final itemsDetails = StringBuffer();
     for (final item in _cart.values) {
@@ -255,7 +254,6 @@ class _ClientMenuPageState extends State<ClientMenuPage> {
 💳 *طريقة الدفع:* $_paymentMethod
 
 🕒 *وقت الطلب:* $orderTime
-⏳ *الوقت المتوقع للتوصيل:* $expectedTime
 
 🛒 *تفاصيل الطلب:*
 $itemsDetails
@@ -520,13 +518,8 @@ $itemsDetails
                                   }
 
                                   final now = DateTime.now();
-                                  final expectedDelivery = now.add(
-                                    const Duration(minutes: 45),
-                                  );
                                   final orderTimeStr =
                                       '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
-                                  final expectedTimeStr =
-                                      '${expectedDelivery.hour}:${expectedDelivery.minute.toString().padLeft(2, '0')}';
                                   final invoiceNumber =
                                       (10000 + Random().nextInt(90000))
                                           .toString();
@@ -579,7 +572,6 @@ $itemsDetails
                                   final opened = await _sendOrderToWhatsApp(
                                     invoiceNumber,
                                     orderTimeStr,
-                                    expectedTimeStr,
                                   );
 
                                   if (!opened && context.mounted) {

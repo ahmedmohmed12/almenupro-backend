@@ -36,7 +36,7 @@ cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.12.1-delivery-zones-$(date -u +%Y%m%d%H%M%S)"
+BUILD_ID="1.12.2-no-eta-$(date -u +%Y%m%d%H%M%S)"
 printf '{"build":"%s","features":["delivery-zones","landing-page","restaurant-persistence","client-menu-slug"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 

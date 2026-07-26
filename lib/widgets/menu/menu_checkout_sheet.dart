@@ -161,9 +161,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     final now = DateTime.now();
     final orderTime =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    final expected = now.add(const Duration(minutes: 45));
-    final expectedTime =
-        '${expected.hour.toString().padLeft(2, '0')}:${expected.minute.toString().padLeft(2, '0')}';
 
     final itemsDetails = StringBuffer();
     for (final item in cart.items) {
@@ -184,7 +181,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 💳 *طريقة الدفع:* $_paymentMethod
 
 🕒 *وقت الطلب:* $orderTime
-⏳ *الوقت المتوقع للتوصيل:* $expectedTime
 
 🛒 *تفاصيل الطلب:*
 $itemsDetails
