@@ -159,10 +159,20 @@ class _MenuScreenState extends State<MenuScreen> {
             }
 
             final categories = _categories(items, strings);
-            if (!categories.contains(_selectedCategory)) {
-              _selectedCategory = strings.all;
+            final effectiveCategory = categories.contains(_selectedCategory)
+                ? _selectedCategory
+                : strings.all;
+            if (effectiveCategory != _selectedCategory) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() => _selectedCategory = effectiveCategory);
+                }
+              });
             }
-            final filtered = _filteredItems(items, strings);
+            final filtered = items.where((item) {
+              if (effectiveCategory == strings.all) return true;
+              return item.categoryName.trim() == effectiveCategory;
+            }).toList();
             final restaurantName =
                 page.context?.name ?? 'Molten Cookies';
             final restaurantTagline = page.context != null
@@ -184,7 +194,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   SliverToBoxAdapter(
                     child: _CategoryBar(
                       categories: categories,
-                      selected: _selectedCategory,
+                      selected: effectiveCategory,
                       onSelected: (value) {
                         setState(() => _selectedCategory = value);
                       },
