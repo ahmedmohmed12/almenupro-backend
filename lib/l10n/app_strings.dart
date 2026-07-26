@@ -59,6 +59,12 @@ class AppStrings {
   String get required => isArabic ? 'مطلوب' : 'Required';
   String get selectGovernorateAndArea =>
       isArabic ? 'يرجى اختيار المحافظة والمنطقة' : 'Please select governorate and area';
+  String get fillRequiredFields => isArabic
+      ? 'يرجى تعبئة جميع الحقول الإجبارية (الاسم، الهاتف، العنوان، القطعة، الشارع، والمنزل)'
+      : 'Please fill all required fields (name, phone, area, block, street, and house)';
+  String get orderSubmitFailed => isArabic
+      ? 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.'
+      : 'Could not send the order. Please try again.';
   String get orderSentViaWhatsapp =>
       isArabic ? 'تم إرسال الطلب عبر الواتساب' : 'Order sent via WhatsApp';
   String whatsappOpenFailed(String phone) => isArabic
