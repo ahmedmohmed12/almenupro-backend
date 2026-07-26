@@ -1058,6 +1058,8 @@ class ApiService {
 
       'categoryName': data['categoryName'] ?? data['category_name'] ?? 'عام',
 
+      'categoryNameEn': data['categoryNameEn'] ?? data['category_name_en'] ?? '',
+
       'imageUrl': data['imageUrl'] ?? data['image_url'] ?? '',
 
       'isAvailable': data['isAvailable'] ?? data['is_available'] ?? true,

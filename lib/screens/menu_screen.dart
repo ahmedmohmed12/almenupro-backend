@@ -103,13 +103,6 @@ class _MenuScreenState extends State<MenuScreen> {
     return categories.toList();
   }
 
-  List<MenuItem> _filteredItems(List<MenuItem> items, AppStrings strings) {
-    if (_selectedCategory == strings.all) return items;
-    return items
-        .where((item) => item.categoryName.trim() == _selectedCategory)
-        .toList();
-  }
-
   int _gridColumns(double width) {
     if (width >= 1200) return 4;
     if (width >= 900) return 3;
@@ -194,6 +187,9 @@ class _MenuScreenState extends State<MenuScreen> {
                   SliverToBoxAdapter(
                     child: _CategoryBar(
                       categories: categories,
+                      items: items,
+                      localeCode: locale.localeCode,
+                      allLabel: strings.all,
                       selected: effectiveCategory,
                       onSelected: (value) {
                         setState(() => _selectedCategory = value);
@@ -444,13 +440,29 @@ class _MenuHeader extends StatelessWidget {
 class _CategoryBar extends StatelessWidget {
   const _CategoryBar({
     required this.categories,
+    required this.items,
+    required this.localeCode,
+    required this.allLabel,
     required this.selected,
     required this.onSelected,
   });
 
   final List<String> categories;
+  final List<MenuItem> items;
+  final String localeCode;
+  final String allLabel;
   final String selected;
   final ValueChanged<String> onSelected;
+
+  String _labelFor(String category) {
+    if (category == allLabel) return allLabel;
+    for (final item in items) {
+      if (item.categoryName.trim() == category) {
+        return item.localizedCategoryName(localeCode);
+      }
+    }
+    return category;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -466,7 +478,7 @@ class _CategoryBar extends StatelessWidget {
           final isSelected = category == selected;
 
           return FilterChip(
-            label: Text(category),
+            label: Text(_labelFor(category)),
             selected: isSelected,
             showCheckmark: false,
             labelStyle: TextStyle(

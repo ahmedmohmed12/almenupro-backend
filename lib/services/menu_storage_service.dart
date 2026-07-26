@@ -431,13 +431,49 @@ class MenuStorageService {
 
     return {
       'name': (data['name'] ?? preserveFrom?['name'] ?? '').toString().trim(),
+      'nameAr': (data['nameAr'] ??
+              data['name_ar'] ??
+              preserveFrom?['nameAr'] ??
+              preserveFrom?['name_ar'] ??
+              data['name'] ??
+              preserveFrom?['name'] ??
+              '')
+          .toString()
+          .trim(),
+      'nameEn': (data['nameEn'] ??
+              data['name_en'] ??
+              preserveFrom?['nameEn'] ??
+              preserveFrom?['name_en'] ??
+              '')
+          .toString()
+          .trim(),
       'description':
           (data['description'] ?? preserveFrom?['description'] ?? '')
               .toString(),
+      'descriptionAr': (data['descriptionAr'] ??
+              data['description_ar'] ??
+              preserveFrom?['descriptionAr'] ??
+              preserveFrom?['description_ar'] ??
+              data['description'] ??
+              preserveFrom?['description'] ??
+              '')
+          .toString(),
+      'descriptionEn': (data['descriptionEn'] ??
+              data['description_en'] ??
+              preserveFrom?['descriptionEn'] ??
+              preserveFrom?['description_en'] ??
+              '')
+          .toString(),
       'price': _toDouble(data['price'] ?? preserveFrom?['price']),
       'categoryName':
           (data['categoryName'] ?? preserveFrom?['categoryName'] ?? 'عام')
               .toString(),
+      'categoryNameEn': (data['categoryNameEn'] ??
+              data['category_name_en'] ??
+              preserveFrom?['categoryNameEn'] ??
+              preserveFrom?['category_name_en'] ??
+              '')
+          .toString(),
       'categoryId':
           (data['categoryId'] ?? preserveFrom?['categoryId'] ?? '').toString(),
       'talabatId': (data['talabatId'] ?? preserveFrom?['talabatId'] ?? '')

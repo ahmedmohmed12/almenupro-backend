@@ -382,7 +382,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     TextField(
                       controller: categoryController,
                       decoration: const InputDecoration(
-                        labelText: 'اسم القسم / التصنيف',
+                        labelText: 'اسم القسم / التصنيف (عربي)',
                         border: OutlineInputBorder(),
                       ),
                     ),

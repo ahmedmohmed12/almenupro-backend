@@ -9,7 +9,17 @@
     "image_url": "/menu-images/1962105681.jpg",
     "is_available": 1,
     "talabat_id": 1962105681,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس كيندر",
+    "name_en": "Kinder Mini Bites",
+    "description_ar": "مينى بايتس كيندر 40 قطعة داخل البوكس",
+    "description_en": "Kinder mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس كيندر",
+    "nameEn": "Kinder Mini Bites",
+    "descriptionAr": "مينى بايتس كيندر 40 قطعة داخل البوكس",
+    "descriptionEn": "Kinder mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105679,
@@ -21,7 +31,17 @@
     "image_url": "/menu-images/1962105679.jpg",
     "is_available": 1,
     "talabat_id": 1962105679,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس ميكس",
+    "name_en": "Mixed Mini Bites",
+    "description_ar": "مينى بايتس مشكل 40 قطعة داخل البوكس",
+    "description_en": "Assorted mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس ميكس",
+    "nameEn": "Mixed Mini Bites",
+    "descriptionAr": "مينى بايتس مشكل 40 قطعة داخل البوكس",
+    "descriptionEn": "Assorted mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105699,
@@ -33,7 +53,17 @@
     "image_url": "/menu-images/1962105699.jpg",
     "is_available": 1,
     "talabat_id": 1962105699,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "كوكيز شوكولاتة كيندر",
+    "name_en": "Kinder Chocolate Cookies",
+    "description_ar": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces, served with chocolate sauce",
+    "nameAr": "كوكيز شوكولاتة كيندر",
+    "nameEn": "Kinder Chocolate Cookies",
+    "descriptionAr": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces, served with chocolate sauce"
   },
   {
     "id": 1962105673,
@@ -45,7 +75,17 @@
     "image_url": "/menu-images/1962105673.png",
     "is_available": 1,
     "talabat_id": 1962105673,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Picks for You 🔥",
+    "categoryNameEn": "Picks for You 🔥",
+    "name_ar": "2 بوكس مينى بايتس",
+    "name_en": "2 Mini Bites Boxes",
+    "description_ar": "40 قطعة لكل بوكس.",
+    "description_en": "40 pieces per box",
+    "nameAr": "2 بوكس مينى بايتس",
+    "nameEn": "2 Mini Bites Boxes",
+    "descriptionAr": "40 قطعة لكل بوكس.",
+    "descriptionEn": "40 pieces per box"
   },
   {
     "id": 1962105665,
@@ -57,7 +97,17 @@
     "image_url": "/menu-images/1962105665.jpg",
     "is_available": 1,
     "talabat_id": 1962105665,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "مولتن نوتيلا",
+    "name_en": "Molten Nutella",
+    "description_ar": "6 حبات",
+    "description_en": "6 pieces",
+    "nameAr": "مولتن نوتيلا",
+    "nameEn": "Molten Nutella",
+    "descriptionAr": "6 حبات",
+    "descriptionEn": "6 pieces"
   },
   {
     "id": 1962105689,
@@ -69,7 +119,17 @@
     "image_url": "/menu-images/1962105689.jpg",
     "is_available": 1,
     "talabat_id": 1962105689,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس نوتيلا",
+    "name_en": "Nutella Mini Bites",
+    "description_ar": "مينى بايتس بشيكولاتة النوتيلا 40 قطعة داخل البوكس",
+    "description_en": "Nutella chocolate mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس نوتيلا",
+    "nameEn": "Nutella Mini Bites",
+    "descriptionAr": "مينى بايتس بشيكولاتة النوتيلا 40 قطعة داخل البوكس",
+    "descriptionEn": "Nutella chocolate mini bites, 40 pieces in the box"
   },
   {
     "id": 600220024,
@@ -81,7 +141,17 @@
     "image_url": "/menu-images/600220024.jpg",
     "is_available": 1,
     "talabat_id": 600220024,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Extra Cookies",
+    "categoryNameEn": "Extra Cookies",
+    "name_ar": "كوكيز اكسترا شوكولاتة",
+    "name_en": "Extra Chocolate Cookies",
+    "description_ar": "كوكيز اكسترا شوكولاتة ميلك مع صوص الشيكولاته الذيذ 15 قطعه داحل البوكس.",
+    "description_en": "Extra milk chocolate cookies with delicious chocolate sauce, 15 pieces in the box",
+    "nameAr": "كوكيز اكسترا شوكولاتة",
+    "nameEn": "Extra Chocolate Cookies",
+    "descriptionAr": "كوكيز اكسترا شوكولاتة ميلك مع صوص الشيكولاته الذيذ 15 قطعه داحل البوكس.",
+    "descriptionEn": "Extra milk chocolate cookies with delicious chocolate sauce, 15 pieces in the box"
   },
   {
     "id": 1962105672,
@@ -93,7 +163,17 @@
     "image_url": "/menu-images/1962105672.jpg",
     "is_available": 1,
     "talabat_id": 1962105672,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Offers",
+    "categoryNameEn": "Offers",
+    "name_ar": "2 بوكس كوكيز",
+    "name_en": "2 Cookie Boxes",
+    "description_ar": "20 قطعة لكل بوكس.",
+    "description_en": "20 pieces per box",
+    "nameAr": "2 بوكس كوكيز",
+    "nameEn": "2 Cookie Boxes",
+    "descriptionAr": "20 قطعة لكل بوكس.",
+    "descriptionEn": "20 pieces per box"
   },
   {
     "id": 1962105670,
@@ -105,7 +185,17 @@
     "image_url": "/menu-images/1962105670.jpg",
     "is_available": 1,
     "talabat_id": 1962105670,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Offers",
+    "categoryNameEn": "Offers",
+    "name_ar": "2 بوكس كوكيز كب",
+    "name_en": "2 Large Cookie Boxes",
+    "description_ar": "16 قطعة لكل بوكس. تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces per box, served with chocolate sauce",
+    "nameAr": "2 بوكس كوكيز كب",
+    "nameEn": "2 Large Cookie Boxes",
+    "descriptionAr": "16 قطعة لكل بوكس. تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces per box, served with chocolate sauce"
   },
   {
     "id": 600217645,
@@ -117,7 +207,17 @@
     "image_url": "/menu-images/600217645.jpg",
     "is_available": 1,
     "talabat_id": 600217645,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "كيندر ميني ماكس",
+    "name_en": "Kinder Mini Max",
+    "description_ar": "كيندر ميني ماكس مع صوص الشوكلاتة الذيذ 32 حبة في صندوق",
+    "description_en": "Kinder Mini Max with delicious chocolate sauce, 32 pieces in a box",
+    "nameAr": "كيندر ميني ماكس",
+    "nameEn": "Kinder Mini Max",
+    "descriptionAr": "كيندر ميني ماكس مع صوص الشوكلاتة الذيذ 32 حبة في صندوق",
+    "descriptionEn": "Kinder Mini Max with delicious chocolate sauce, 32 pieces in a box"
   },
   {
     "id": 1962105675,
@@ -129,7 +229,17 @@
     "image_url": "/menu-images/1962105675.jpg",
     "is_available": 1,
     "talabat_id": 1962105675,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس توبليرون",
+    "name_en": "Toblerone Mini Bites",
+    "description_ar": "مينى بايتس توبليرون شوكليت بالحليب 40 قطعة داخل البوكس",
+    "description_en": "Toblerone milk chocolate mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس توبليرون",
+    "nameEn": "Toblerone Mini Bites",
+    "descriptionAr": "مينى بايتس توبليرون شوكليت بالحليب 40 قطعة داخل البوكس",
+    "descriptionEn": "Toblerone milk chocolate mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105685,
@@ -141,7 +251,17 @@
     "image_url": "/menu-images/1962105685.jpg",
     "is_available": 1,
     "talabat_id": 1962105685,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس هيرشيز كوكيز",
+    "name_en": "Hershey's Cookies Mini Bites",
+    "description_ar": "مينى بايتس بشوكولاتة الهيرشيز 40 قطعة داخل البوكس",
+    "description_en": "Hershey's chocolate mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس هيرشيز كوكيز",
+    "nameEn": "Hershey's Cookies Mini Bites",
+    "descriptionAr": "مينى بايتس بشوكولاتة الهيرشيز 40 قطعة داخل البوكس",
+    "descriptionEn": "Hershey's chocolate mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105687,
@@ -153,31 +273,61 @@
     "image_url": "/menu-images/1962105687.jpg",
     "is_available": 1,
     "talabat_id": 1962105687,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس هيرشيز الشيكولاتة البيضاء",
+    "name_en": "Hershey's White Chocolate Mini Bites",
+    "description_ar": "مينى بايتس بشيكولاتة الهيرشيز البيضاء 40 قطعة داخل البوكس",
+    "description_en": "White Hershey's chocolate mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس هيرشيز الشيكولاتة البيضاء",
+    "nameEn": "Hershey's White Chocolate Mini Bites",
+    "descriptionAr": "مينى بايتس بشيكولاتة الهيرشيز البيضاء 40 قطعة داخل البوكس",
+    "descriptionEn": "White Hershey's chocolate mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105691,
     "category_id": 1,
     "category_name": "مينى بايتس",
     "name": "اوريو ميني بايتس 40 قطعة",
-    "description": "",
+    "description": "Oreo mini bites, 40 pieces in the box",
     "price": 6.5,
     "image_url": "/menu-images/1962105691.jpg",
     "is_available": 1,
     "talabat_id": 1962105691,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "اوريو ميني بايتس 40 قطعة",
+    "name_en": "Oreo Mini Bites 40 Pieces",
+    "description_ar": "",
+    "description_en": "Oreo mini bites, 40 pieces in the box",
+    "nameAr": "اوريو ميني بايتس 40 قطعة",
+    "nameEn": "Oreo Mini Bites 40 Pieces",
+    "descriptionAr": "",
+    "descriptionEn": "Oreo mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105693,
     "category_id": 1,
     "category_name": "مينى بايتس",
     "name": "بوستاشو ميني بايتس 40 قطعة",
-    "description": "",
+    "description": "Pistachio mini bites, 40 pieces in the box",
     "price": 6.5,
     "image_url": "/menu-images/1962105693.jpg",
     "is_available": 1,
     "talabat_id": 1962105693,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "بوستاشو ميني بايتس 40 قطعة",
+    "name_en": "Pistachio Mini Bites 40 Pieces",
+    "description_ar": "",
+    "description_en": "Pistachio mini bites, 40 pieces in the box",
+    "nameAr": "بوستاشو ميني بايتس 40 قطعة",
+    "nameEn": "Pistachio Mini Bites 40 Pieces",
+    "descriptionAr": "",
+    "descriptionEn": "Pistachio mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105677,
@@ -189,7 +339,17 @@
     "image_url": "/menu-images/1962105677.jpg",
     "is_available": 1,
     "talabat_id": 1962105677,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Mini Bites",
+    "categoryNameEn": "Mini Bites",
+    "name_ar": "مينى بايتس دوبل شوكليت",
+    "name_en": "Double Chocolate Mini Bites",
+    "description_ar": "مينى بايتس دبل شوكليت 40 قطعة داخل البوكس",
+    "description_en": "Double chocolate mini bites, 40 pieces in the box",
+    "nameAr": "مينى بايتس دوبل شوكليت",
+    "nameEn": "Double Chocolate Mini Bites",
+    "descriptionAr": "مينى بايتس دبل شوكليت 40 قطعة داخل البوكس",
+    "descriptionEn": "Double chocolate mini bites, 40 pieces in the box"
   },
   {
     "id": 1962105695,
@@ -201,7 +361,17 @@
     "image_url": "/menu-images/1962105695.jpg",
     "is_available": 1,
     "talabat_id": 1962105695,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "كوكيز محشية فستق",
+    "name_en": "Pistachio Stuffed Cookies",
+    "description_ar": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces, served with chocolate sauce",
+    "nameAr": "كوكيز محشية فستق",
+    "nameEn": "Pistachio Stuffed Cookies",
+    "descriptionAr": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces, served with chocolate sauce"
   },
   {
     "id": 1962105697,
@@ -213,7 +383,17 @@
     "image_url": "/menu-images/1962105697.jpg",
     "is_available": 1,
     "talabat_id": 1962105697,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "كوكيز شوكولاتة دوبل",
+    "name_en": "Double Chocolate Cookies",
+    "description_ar": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces, served with chocolate sauce",
+    "nameAr": "كوكيز شوكولاتة دوبل",
+    "nameEn": "Double Chocolate Cookies",
+    "descriptionAr": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces, served with chocolate sauce"
   },
   {
     "id": 1962105702,
@@ -225,7 +405,17 @@
     "image_url": "/menu-images/1962105702.jpg",
     "is_available": 1,
     "talabat_id": 1962105702,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "كوكيز شوكولاتة نوتيلا",
+    "name_en": "Nutella Chocolate Cookies",
+    "description_ar": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces, served with chocolate sauce",
+    "nameAr": "كوكيز شوكولاتة نوتيلا",
+    "nameEn": "Nutella Chocolate Cookies",
+    "descriptionAr": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces, served with chocolate sauce"
   },
   {
     "id": 1962105703,
@@ -237,7 +427,17 @@
     "image_url": "/menu-images/1962105703.jpg",
     "is_available": 1,
     "talabat_id": 1962105703,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "كوكيز مشكلة",
+    "name_en": "Assorted Cookies",
+    "description_ar": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces, served with chocolate sauce",
+    "nameAr": "كوكيز مشكلة",
+    "nameEn": "Assorted Cookies",
+    "descriptionAr": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces, served with chocolate sauce"
   },
   {
     "id": 1962105705,
@@ -249,7 +449,17 @@
     "image_url": "/menu-images/1962105705.jpg",
     "is_available": 1,
     "talabat_id": 1962105705,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "كوكيز شوكولاتة نوتيلا بيضاء",
+    "name_en": "White Nutella Chocolate Cookies",
+    "description_ar": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "description_en": "16 pieces, served with chocolate sauce",
+    "nameAr": "كوكيز شوكولاتة نوتيلا بيضاء",
+    "nameEn": "White Nutella Chocolate Cookies",
+    "descriptionAr": "16 قطعة، تقدم مع صوص شوكولاتة.",
+    "descriptionEn": "16 pieces, served with chocolate sauce"
   },
   {
     "id": 1962105707,
@@ -261,7 +471,17 @@
     "image_url": "/menu-images/1962105707.jpg",
     "is_available": 1,
     "talabat_id": 1962105707,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Large Cookies",
+    "categoryNameEn": "Large Cookies",
+    "name_ar": "مولتن كيندر",
+    "name_en": "Molten Kinder",
+    "description_ar": "6 قطع.",
+    "description_en": "6 pieces",
+    "nameAr": "مولتن كيندر",
+    "nameEn": "Molten Kinder",
+    "descriptionAr": "6 قطع.",
+    "descriptionEn": "6 pieces"
   },
   {
     "id": 172097966,
@@ -273,7 +493,17 @@
     "image_url": "/menu-images/172097966.jpg",
     "is_available": 1,
     "talabat_id": 172097966,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Molten Cookies",
+    "categoryNameEn": "Molten Cookies",
+    "name_ar": "مولتن نوتيلا",
+    "name_en": "Molten Nutella",
+    "description_ar": "molten Nutella 6 pccs",
+    "description_en": "Molten Nutella, 6 pieces",
+    "nameAr": "مولتن نوتيلا",
+    "nameEn": "Molten Nutella",
+    "descriptionAr": "molten Nutella 6 pccs",
+    "descriptionEn": "Molten Nutella, 6 pieces"
   },
   {
     "id": 1962105653,
@@ -285,7 +515,17 @@
     "image_url": "/menu-images/1962105653.jpg",
     "is_available": 1,
     "talabat_id": 1962105653,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "توبليرون كوكيز",
+    "name_en": "Toblerone Cookies",
+    "description_ar": "قطعة كوكيز بشيكولاتة التوبليرون 20 قطعة داخل العلبة",
+    "description_en": "Toblerone chocolate cookies, 20 pieces in the box",
+    "nameAr": "توبليرون كوكيز",
+    "nameEn": "Toblerone Cookies",
+    "descriptionAr": "قطعة كوكيز بشيكولاتة التوبليرون 20 قطعة داخل العلبة",
+    "descriptionEn": "Toblerone chocolate cookies, 20 pieces in the box"
   },
   {
     "id": 1962105654,
@@ -297,7 +537,17 @@
     "image_url": "/menu-images/1962105654.jpg",
     "is_available": 1,
     "talabat_id": 1962105654,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "هرشيز كوكيز",
+    "name_en": "Hershey's Cookies",
+    "description_ar": "قطعة كوكيز بشيكولاتة الهرشيز 20 قطعة داخل العلبة",
+    "description_en": "Hershey's chocolate cookies, 20 pieces in the box",
+    "nameAr": "هرشيز كوكيز",
+    "nameEn": "Hershey's Cookies",
+    "descriptionAr": "قطعة كوكيز بشيكولاتة الهرشيز 20 قطعة داخل العلبة",
+    "descriptionEn": "Hershey's chocolate cookies, 20 pieces in the box"
   },
   {
     "id": 1962105655,
@@ -309,7 +559,17 @@
     "image_url": "/menu-images/1962105655.jpg",
     "is_available": 1,
     "talabat_id": 1962105655,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "كوكيز هرشيز البيضاء",
+    "name_en": "Hershey's White Chocolate Cookies",
+    "description_ar": "قطعة كوكيز بشيكولاتة الهيرشيز البيضاء 20 قطعة داخل العلبة",
+    "description_en": "White Hershey's chocolate cookies, 20 pieces in the box",
+    "nameAr": "كوكيز هرشيز البيضاء",
+    "nameEn": "Hershey's White Chocolate Cookies",
+    "descriptionAr": "قطعة كوكيز بشيكولاتة الهيرشيز البيضاء 20 قطعة داخل العلبة",
+    "descriptionEn": "White Hershey's chocolate cookies, 20 pieces in the box"
   },
   {
     "id": 1962105656,
@@ -321,7 +581,17 @@
     "image_url": "/menu-images/1962105656.jpg",
     "is_available": 1,
     "talabat_id": 1962105656,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "ريسز كوكيز",
+    "name_en": "Reese's Cookies",
+    "description_ar": "قطعة كوكيز بشيكولاتة الريسز 20 قطعة داخل العلبة",
+    "description_en": "Reese's chocolate cookies, 20 pieces in the box",
+    "nameAr": "ريسز كوكيز",
+    "nameEn": "Reese's Cookies",
+    "descriptionAr": "قطعة كوكيز بشيكولاتة الريسز 20 قطعة داخل العلبة",
+    "descriptionEn": "Reese's chocolate cookies, 20 pieces in the box"
   },
   {
     "id": 1962105657,
@@ -333,7 +603,17 @@
     "image_url": "/menu-images/1962105657.jpg",
     "is_available": 1,
     "talabat_id": 1962105657,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "ميكس كوكيز",
+    "name_en": "Mixed Cookies",
+    "description_ar": "قطعة كوكيز منوعة 20 قطعة داخل العلبة",
+    "description_en": "Assorted cookies, 20 pieces in the box",
+    "nameAr": "ميكس كوكيز",
+    "nameEn": "Mixed Cookies",
+    "descriptionAr": "قطعة كوكيز منوعة 20 قطعة داخل العلبة",
+    "descriptionEn": "Assorted cookies, 20 pieces in the box"
   },
   {
     "id": 1962105658,
@@ -345,7 +625,17 @@
     "image_url": "/menu-images/1962105658.jpg",
     "is_available": 1,
     "talabat_id": 1962105658,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "بوكس من اختيارك",
+    "name_en": "Custom Box",
+    "description_ar": "عبارة عن 20 قطعة مختلفة داخل العلبة",
+    "description_en": "20 assorted pieces of your choice in the box",
+    "nameAr": "بوكس من اختيارك",
+    "nameEn": "Custom Box",
+    "descriptionAr": "عبارة عن 20 قطعة مختلفة داخل العلبة",
+    "descriptionEn": "20 assorted pieces of your choice in the box"
   },
   {
     "id": 1962105659,
@@ -357,7 +647,17 @@
     "image_url": "/menu-images/1962105659.jpg",
     "is_available": 1,
     "talabat_id": 1962105659,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "نوتيلا كوكيز",
+    "name_en": "Nutella Cookies",
+    "description_ar": "قطعة نوتيلا كوكيز 20 قطعة داخل العلبة",
+    "description_en": "Nutella cookies, 20 pieces in the box",
+    "nameAr": "نوتيلا كوكيز",
+    "nameEn": "Nutella Cookies",
+    "descriptionAr": "قطعة نوتيلا كوكيز 20 قطعة داخل العلبة",
+    "descriptionEn": "Nutella cookies, 20 pieces in the box"
   },
   {
     "id": 1962105660,
@@ -369,7 +669,17 @@
     "image_url": "/menu-images/1962105660.jpg",
     "is_available": 1,
     "talabat_id": 1962105660,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "كوكيز دوبل",
+    "name_en": "Double Cookies",
+    "description_ar": "قطعة كوكيز دبل  20 قطعة داخل العلبة",
+    "description_en": "Double chocolate cookies, 20 pieces in the box",
+    "nameAr": "كوكيز دوبل",
+    "nameEn": "Double Cookies",
+    "descriptionAr": "قطعة كوكيز دبل  20 قطعة داخل العلبة",
+    "descriptionEn": "Double chocolate cookies, 20 pieces in the box"
   },
   {
     "id": 1962105661,
@@ -381,7 +691,17 @@
     "image_url": "/menu-images/1962105661.jpg",
     "is_available": 1,
     "talabat_id": 1962105661,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "بستاشيو كوكيز",
+    "name_en": "Pistachio Cookies",
+    "description_ar": "قطعة كوكيز بنكهة الباستاشيو 20 قطعة داخل العلبة",
+    "description_en": "Pistachio flavored cookies, 20 pieces in the box",
+    "nameAr": "بستاشيو كوكيز",
+    "nameEn": "Pistachio Cookies",
+    "descriptionAr": "قطعة كوكيز بنكهة الباستاشيو 20 قطعة داخل العلبة",
+    "descriptionEn": "Pistachio flavored cookies, 20 pieces in the box"
   },
   {
     "id": 1962105662,
@@ -393,7 +713,17 @@
     "image_url": "/menu-images/1962105662.jpg",
     "is_available": 1,
     "talabat_id": 1962105662,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "اوريو كوكيز",
+    "name_en": "Oreo Cookies",
+    "description_ar": "قطعة اوريو كوكيز 20 قطعة داخل العلبة",
+    "description_en": "Oreo cookies, 20 pieces in the box",
+    "nameAr": "اوريو كوكيز",
+    "nameEn": "Oreo Cookies",
+    "descriptionAr": "قطعة اوريو كوكيز 20 قطعة داخل العلبة",
+    "descriptionEn": "Oreo cookies, 20 pieces in the box"
   },
   {
     "id": 1962105663,
@@ -405,7 +735,17 @@
     "image_url": "/menu-images/1962105663.jpg",
     "is_available": 1,
     "talabat_id": 1962105663,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "شيكولاتة شيبس",
+    "name_en": "Chocolate Chip Cookies",
+    "description_ar": "قطعة رقائق الشيكولاتة 20 قطعة داخل العلبة",
+    "description_en": "Chocolate chip cookies, 20 pieces in the box",
+    "nameAr": "شيكولاتة شيبس",
+    "nameEn": "Chocolate Chip Cookies",
+    "descriptionAr": "قطعة رقائق الشيكولاتة 20 قطعة داخل العلبة",
+    "descriptionEn": "Chocolate chip cookies, 20 pieces in the box"
   },
   {
     "id": 1962105664,
@@ -417,7 +757,17 @@
     "image_url": "/menu-images/1962105664.jpg",
     "is_available": 1,
     "talabat_id": 1962105664,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "مولتون كوكيز مشكل",
+    "name_en": "Assorted Molten Cookies",
+    "description_ar": "6 قطع من كيندر و النوتيلا",
+    "description_en": "6 pieces of Kinder and Nutella",
+    "nameAr": "مولتون كوكيز مشكل",
+    "nameEn": "Assorted Molten Cookies",
+    "descriptionAr": "6 قطع من كيندر و النوتيلا",
+    "descriptionEn": "6 pieces of Kinder and Nutella"
   },
   {
     "id": 1962105667,
@@ -429,6 +779,16 @@
     "image_url": "/menu-images/1962105667.jpg",
     "is_available": 1,
     "talabat_id": 1962105667,
-    "source": "Talabat"
+    "source": "Talabat",
+    "category_name_en": "Cookies",
+    "categoryNameEn": "Cookies",
+    "name_ar": "كوكيز بشوكولاتة جلاكسي",
+    "name_en": "Galaxy Chocolate Cookies",
+    "description_ar": "20 قطعة من الكوكيز مع شوكولاتة جلاكسي بالحليب",
+    "description_en": "20 cookies with Galaxy milk chocolate",
+    "nameAr": "كوكيز بشوكولاتة جلاكسي",
+    "nameEn": "Galaxy Chocolate Cookies",
+    "descriptionAr": "20 قطعة من الكوكيز مع شوكولاتة جلاكسي بالحليب",
+    "descriptionEn": "20 cookies with Galaxy milk chocolate"
   }
 ]

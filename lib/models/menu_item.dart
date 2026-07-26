@@ -40,6 +40,7 @@ class MenuItem {
   final int id;
   final int categoryId;
   final String categoryName;
+  final String categoryNameEn;
   final String name;
   final String description;
   final String nameAr;
@@ -56,6 +57,7 @@ class MenuItem {
     required this.id,
     required this.categoryId,
     required this.categoryName,
+    this.categoryNameEn = '',
     required this.name,
     required this.description,
     this.nameAr = '',
@@ -78,6 +80,14 @@ class MenuItem {
     if (nameAr.trim().isNotEmpty) return nameAr.trim();
     if (nameEn.trim().isNotEmpty) return nameEn.trim();
     return name;
+  }
+
+  String localizedCategoryName(String localeCode) {
+    if (localeCode.startsWith('en')) {
+      if (categoryNameEn.trim().isNotEmpty) return categoryNameEn.trim();
+      return categoryName;
+    }
+    return categoryName;
   }
 
   String localizedDescription(String localeCode) {
@@ -114,6 +124,9 @@ class MenuItem {
           ? json['category_id'] as int
           : int.parse(json['category_id']?.toString() ?? '0'),
       categoryName: json['category_name']?.toString() ?? '',
+      categoryNameEn: json['category_name_en']?.toString() ??
+          json['categoryNameEn']?.toString() ??
+          '',
       name: json['name']?.toString() ?? nameAr,
       description: json['description']?.toString() ?? descriptionAr,
       nameAr: nameAr,
@@ -157,6 +170,9 @@ class MenuItem {
       categoryName:
           (map['categoryName'] ?? map['category_name'] ?? map['category'] ?? '')
               .toString(),
+      categoryNameEn: map['category_name_en']?.toString() ??
+          map['categoryNameEn']?.toString() ??
+          '',
       name: map['name']?.toString() ?? nameAr,
       description: map['description']?.toString() ?? descriptionAr,
       nameAr: nameAr,
@@ -186,6 +202,7 @@ class MenuItem {
       'id': id,
       'category_id': categoryId,
       'category_name': categoryName,
+      if (categoryNameEn.isNotEmpty) 'category_name_en': categoryNameEn,
       'name': nameAr.isNotEmpty ? nameAr : name,
       'description': descriptionAr.isNotEmpty ? descriptionAr : description,
       'name_ar': nameAr.isNotEmpty ? nameAr : name,
@@ -212,6 +229,7 @@ class MenuItem {
       'price': price,
       'imageUrl': imageUrl,
       'categoryName': categoryName,
+      if (categoryNameEn.isNotEmpty) 'categoryNameEn': categoryNameEn,
       'categoryId': categoryId,
       'options': options.map((option) => option.toMap()).toList(),
       'isAvailable': isAvailable,

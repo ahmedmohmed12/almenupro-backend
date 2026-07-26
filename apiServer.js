@@ -53,6 +53,7 @@ function warmMenuImageBundle() {
 warmMenuImageBundle();
 
 const { scrapeTalabatMenu } = require('./lib/talabatScraper');
+const { translateCategoryName } = require('./lib/bilingualMenu');
 const {
   initDataStore,
   usesMongo,
@@ -67,6 +68,7 @@ const {
   writeSettingsMap,
   readDeliveryZones,
   writeDeliveryZones,
+  ensureBilingualMenuItems,
 } = require('./lib/dataStore');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -331,6 +333,9 @@ function normalizeBilingualText(raw = {}) {
 function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
   const categoryName =
     raw.category_name || raw.categoryName || raw.category || 'عام';
+  const categoryNameEn =
+    String(raw.category_name_en ?? raw.categoryNameEn ?? '').trim() ||
+    translateCategoryName(categoryName);
   const talabatId = raw.talabat_id ?? raw.talabatId ?? null;
   const bilingual = normalizeBilingualText(raw);
 
@@ -339,6 +344,8 @@ function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
       id: Number(raw.id ?? talabatId ?? index + 1),
       category_id: Number(raw.category_id ?? raw.categoryId ?? categoryIdFor(categoryName)),
       category_name: String(categoryName).trim() || 'عام',
+      category_name_en: categoryNameEn,
+      categoryNameEn: categoryNameEn,
       ...bilingual,
       price: Number(raw.price) || 0,
       image_url: String(raw.image_url || raw.imageUrl || ''),
@@ -827,12 +834,17 @@ const server = http.createServer(async (req, res) => {
       const items = await readItems();
       const scoped = filterByRestaurant(items, restaurantId);
       const categoryName = body.categoryName || body.category_name || 'عام';
+      const categoryNameEn =
+        String(body.category_name_en ?? body.categoryNameEn ?? '').trim() ||
+        translateCategoryName(categoryName);
       const bilingual = normalizeBilingualText(body);
       const item = ensureRestaurantId(
         {
           id: nextNumericItemId(scoped),
           category_id: categoryIdFor(categoryName),
           category_name: String(categoryName).trim() || 'عام',
+          category_name_en: categoryNameEn,
+          categoryNameEn: categoryNameEn,
           ...bilingual,
           price: Number(body.price) || 0,
           image_url: String(body.image_url || body.imageUrl || ''),
@@ -890,12 +902,22 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse((await readBody(req)) || '{}');
       const categoryName =
         body.categoryName || body.category_name || item.category_name || 'عام';
+      const categoryNameEn =
+        String(
+          body.category_name_en ??
+            body.categoryNameEn ??
+            item.category_name_en ??
+            item.categoryNameEn ??
+            '',
+        ).trim() || translateCategoryName(categoryName);
       const bilingual = normalizeBilingualText({ ...item, ...body });
 
       Object.assign(item, {
         ...bilingual,
         price: Number(body.price ?? item.price) || 0,
         category_name: String(categoryName).trim() || 'عام',
+        category_name_en: categoryNameEn,
+        categoryNameEn: categoryNameEn,
         category_id: Number(body.category_id ?? body.categoryId ?? categoryIdFor(categoryName)),
         image_url: String(body.image_url ?? body.imageUrl ?? item.image_url ?? ''),
         is_available:
@@ -1227,6 +1249,14 @@ ensureUploadDir();
 storeReady = storeReady.then(async () => {
   const items = await readItems();
   rebuildCategoryIds(items);
+  try {
+    const result = await ensureBilingualMenuItems();
+    if (result.updated > 0) {
+      console.log(`Bilingual menu migration: updated ${result.updated}/${result.total} items`);
+    }
+  } catch (error) {
+    console.warn('Bilingual menu migration skipped:', error.message || error);
+  }
 });
 
 module.exports = server;
