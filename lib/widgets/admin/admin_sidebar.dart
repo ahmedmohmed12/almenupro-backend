@@ -31,14 +31,16 @@ class AdminSidebar extends StatefulWidget {
   static const int menuIndex = 3;
   static const int deliveryZonesIndex = 4;
   static const int analyticsIndex = 5;
-  static const int settingsIndex = 6;
+  static const int smartUpsellIndex = 6;
+  static const int settingsIndex = 7;
 
   /// Super Admin sidebar — no orders tab (restaurant admins only).
   static const int superMenuIndex = 0;
   static const int superRestaurantsIndex = 1;
   static const int superDeliveryZonesIndex = 2;
   static const int superAnalyticsIndex = 3;
-  static const int superSettingsIndex = 4;
+  static const int superSmartUpsellIndex = 4;
+  static const int superSettingsIndex = 5;
 
   static const List<AdminSidebarItem> defaultItems = [
     AdminSidebarItem(
@@ -66,6 +68,10 @@ class AdminSidebar extends StatefulWidget {
       label: 'التحليلات والمبيعات',
     ),
     AdminSidebarItem(
+      icon: Icons.auto_awesome,
+      label: 'البياع الشاطر',
+    ),
+    AdminSidebarItem(
       icon: Icons.store,
       label: 'إعدادات المحل والواتساب',
     ),
@@ -87,6 +93,10 @@ class AdminSidebar extends StatefulWidget {
     AdminSidebarItem(
       icon: Icons.bar_chart,
       label: 'التحليلات والمبيعات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.auto_awesome,
+      label: 'البياع الشاطر',
     ),
     AdminSidebarItem(
       icon: Icons.settings,

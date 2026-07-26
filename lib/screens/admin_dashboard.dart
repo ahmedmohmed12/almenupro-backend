@@ -33,7 +33,7 @@ import '../widgets/admin/admin_sidebar.dart';
 import '../widgets/admin/admin_super_restaurants_panel.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
-import '../widgets/admin/admin_smart_upsell_settings_card.dart';
+import '../widgets/admin/admin_smart_upsell_panel.dart';
 import '../widgets/admin/admin_working_hours_card.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -1020,6 +1020,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           return _buildDeliveryZonesPanel();
         case AdminSidebar.superAnalyticsIndex:
           return _buildAnalyticsTab();
+        case AdminSidebar.superSmartUpsellIndex:
+          return const AdminSmartUpsellPanel();
         case AdminSidebar.superSettingsIndex:
           return _buildSettingsTab();
         default:
@@ -1044,6 +1046,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return _buildDeliveryZonesPanel();
       case AdminSidebar.analyticsIndex:
         return _buildAnalyticsTab();
+      case AdminSidebar.smartUpsellIndex:
+        return const AdminSmartUpsellPanel();
       case AdminSidebar.settingsIndex:
         return _buildSettingsTab();
       case AdminSidebar.posIndex:
@@ -1361,8 +1365,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 20),
           const AdminWorkingHoursCard(),
-          const SizedBox(height: 20),
-          const AdminSmartUpsellSettingsCard(),
           if (!_isSuperAdmin) ...[
             const SizedBox(height: 20),
             const AdminSoundSettingsCard(),
