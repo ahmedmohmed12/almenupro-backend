@@ -71,6 +71,7 @@ const {
 } = require('./lib/autoTranslate');
 const { normalizeMenuItemsForApi, autoTranslateMenuItems } = require('./lib/bilingualItemMigration');
 const { computeTopMenuItems } = require('./lib/topItemsAnalytics');
+const { computeCartRecommendations } = require('./lib/recommendationsAnalytics');
 const {
   initDataStore,
   usesMongo,
@@ -209,6 +210,7 @@ function normalizeSettings(raw) {
       : [],
     impulseBumpMaxPrice:
       Number(source.impulseBumpMaxPrice ?? source.impulse_bump_max_price ?? 2) || 2,
+    smartRecommendationsEnabled: source.smartRecommendationsEnabled !== false,
     updatedAt: source.updatedAt || new Date().toISOString(),
   };
 }
@@ -426,9 +428,26 @@ function normalizeMenuOptions(raw) {
           opt.is_available === false ||
           opt.isAvailable === false
         ),
+        ...(Number(opt.linked_menu_item_id ?? opt.linkedMenuItemId) > 0
+          ? {
+              linked_menu_item_id: Number(
+                opt.linked_menu_item_id ?? opt.linkedMenuItemId,
+              ),
+              linkedMenuItemId: Number(
+                opt.linked_menu_item_id ?? opt.linkedMenuItemId,
+              ),
+            }
+          : {}),
       };
     })
     .filter((opt) => opt.name);
+}
+
+function normalizeLinkedItemIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0);
 }
 
 function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
@@ -458,6 +477,16 @@ function normalizeIncoming(raw, index, restaurantId = DEFAULT_RESTAURANT_ID) {
       source: raw.source || 'Talabat',
       display_order: Number(raw.display_order ?? raw.displayOrder ?? 0) || 0,
       ...(raw.options != null ? { options: normalizeMenuOptions(raw.options) } : {}),
+      ...(raw.linkedItemIds != null || raw.linked_item_ids != null
+        ? {
+            linkedItemIds: normalizeLinkedItemIds(
+              raw.linkedItemIds ?? raw.linked_item_ids,
+            ),
+            linked_item_ids: normalizeLinkedItemIds(
+              raw.linkedItemIds ?? raw.linked_item_ids,
+            ),
+          }
+        : {}),
     },
     restaurantId,
   );
@@ -597,6 +626,7 @@ const server = http.createServer(async (req, res) => {
         restaurantBySlug: '/api/restaurants/public/{slug}',
         menu: '/api/items?slug={slug}',
         topItems: '/api/analytics/top-items?slug={slug}',
+        recommendations: '/api/recommendations?slug={slug}&cart=1,2,3',
         customerLookup: '/api/customers/lookup?phone={phone}&slug={slug}',
         customers: '/api/customers',
         customerDetail: '/api/customers/{id}',
@@ -833,6 +863,59 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/recommendations') {
+    const auth = parseAuthHeader(req);
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: true,
+    });
+
+    if (!restaurantId) {
+      const slugParam =
+        url.searchParams.get('restaurant_slug') || url.searchParams.get('slug');
+      if (slugParam) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+      } else {
+        authError(res, 401, 'Restaurant context required');
+      }
+      return;
+    }
+
+    const cartRaw =
+      url.searchParams.get('cart') ||
+      url.searchParams.get('cartItemIds') ||
+      url.searchParams.get('cart_item_ids') ||
+      '';
+    const cartItemIds = String(cartRaw)
+      .split(',')
+      .map((id) => Number(id.trim()))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    const limit = Number(url.searchParams.get('limit') || 8);
+    const subtotal = Number(url.searchParams.get('subtotal') || 0);
+    const settings = await readSettings(restaurantId);
+    const orders = filterByRestaurant(await readOrders(), restaurantId);
+    const menuItems = filterByRestaurant(await readItems(), restaurantId);
+    const result = computeCartRecommendations(
+      orders,
+      menuItems,
+      restaurantId,
+      cartItemIds,
+      {
+        limit,
+        subtotal,
+        freeDeliveryThreshold: settings.freeDeliveryThreshold || 0,
+      },
+    );
+
+    sendJson(res, 200, {
+      restaurantId,
+      cartItemIds,
+      subtotal,
+      source: result.source,
+      recommendations: result.recommendations,
+    });
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/items') {
     const auth = parseAuthHeader(req);
     const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
@@ -1050,6 +1133,12 @@ const server = http.createServer(async (req, res) => {
             Number(body.display_order ?? body.displayOrder) ||
             maxDisplayOrder(scoped) + 1,
           options: normalizeMenuOptions(body.options),
+          linkedItemIds: normalizeLinkedItemIds(
+            body.linkedItemIds ?? body.linked_item_ids ?? [],
+          ),
+          linked_item_ids: normalizeLinkedItemIds(
+            body.linkedItemIds ?? body.linked_item_ids ?? [],
+          ),
         },
         restaurantId,
       );
@@ -1181,6 +1270,14 @@ const server = http.createServer(async (req, res) => {
 
       if (body.options != null) {
         item.options = normalizeMenuOptions(body.options);
+      }
+
+      if (body.linkedItemIds != null || body.linked_item_ids != null) {
+        const linked = normalizeLinkedItemIds(
+          body.linkedItemIds ?? body.linked_item_ids,
+        );
+        item.linkedItemIds = linked;
+        item.linked_item_ids = linked;
       }
 
       await writeItems(items);

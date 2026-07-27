@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
+import 'admin_menu_item_picker.dart';
+
 class AdminItemAddonsEditor extends StatelessWidget {
   const AdminItemAddonsEditor({
     super.key,
     required this.options,
     required this.onChanged,
+    this.currentItemId,
   });
 
   final List<Map<String, dynamic>> options;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
+  final int? currentItemId;
 
   static const burgundy = Color(0xFF6B1124);
 
@@ -63,6 +67,7 @@ class AdminItemAddonsEditor extends StatelessWidget {
             return _OptionEditorCard(
               key: ValueKey(options[index]['id'] ?? index),
               data: options[index],
+              currentItemId: currentItemId,
               onChanged: (updated) {
                 final next = List<Map<String, dynamic>>.from(options);
                 next[index] = updated;
@@ -98,11 +103,13 @@ class _OptionEditorCard extends StatefulWidget {
     required this.data,
     required this.onChanged,
     required this.onDelete,
+    this.currentItemId,
   });
 
   final Map<String, dynamic> data;
   final ValueChanged<Map<String, dynamic>> onChanged;
   final VoidCallback onDelete;
+  final int? currentItemId;
 
   @override
   State<_OptionEditorCard> createState() => _OptionEditorCardState();
@@ -240,9 +247,32 @@ class _OptionEditorCardState extends State<_OptionEditorCard> {
                 _toggle('isAvailable');
               },
             ),
+            const SizedBox(height: 8),
+            AdminLinkedMenuItemDropdown(
+              value: _linkedMenuItemId,
+              excludeId: widget.currentItemId,
+              onChanged: (linkedId) {
+                final next = Map<String, dynamic>.from(widget.data);
+                if (linkedId == null) {
+                  next.remove('linkedMenuItemId');
+                  next.remove('linked_menu_item_id');
+                } else {
+                  next['linkedMenuItemId'] = linkedId;
+                  next['linked_menu_item_id'] = linkedId;
+                }
+                widget.onChanged(next);
+              },
+            ),
           ],
         ),
       ),
     );
+  }
+
+  int? get _linkedMenuItemId {
+    final raw = widget.data['linkedMenuItemId'] ?? widget.data['linked_menu_item_id'];
+    if (raw == null) return null;
+    if (raw is int) return raw > 0 ? raw : null;
+    return int.tryParse(raw.toString());
   }
 }

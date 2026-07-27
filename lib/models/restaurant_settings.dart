@@ -12,6 +12,7 @@ class RestaurantSettings {
     this.freeDeliveryThreshold = 0,
     this.impulseBumpItemIds = const [],
     this.impulseBumpMaxPrice = 2,
+    this.smartRecommendationsEnabled = true,
   });
 
   final String whatsappNumber;
@@ -25,6 +26,8 @@ class RestaurantSettings {
   final List<int> impulseBumpItemIds;
   /// Used to auto-pick impulse items when [impulseBumpItemIds] is empty.
   final double impulseBumpMaxPrice;
+  /// Cart-aware smart recommendations in checkout (Phase 2).
+  final bool smartRecommendationsEnabled;
 
   String get fullWhatsappNumber {
     final combined = WhatsAppPhone.combine(whatsappCountryCode, whatsappPhone);
@@ -98,6 +101,7 @@ class RestaurantSettings {
           (json['impulseBumpMaxPrice'] as num?)?.toDouble() ??
               (json['impulse_bump_max_price'] as num?)?.toDouble() ??
               2,
+      smartRecommendationsEnabled: json['smartRecommendationsEnabled'] != false,
     );
   }
 
@@ -111,6 +115,7 @@ class RestaurantSettings {
     double? freeDeliveryThreshold,
     List<int>? impulseBumpItemIds,
     double? impulseBumpMaxPrice,
+    bool? smartRecommendationsEnabled,
   }) {
     final nextCountry = whatsappCountryCode ?? this.whatsappCountryCode;
     final nextPhone = whatsappPhone ?? this.whatsappPhone;
@@ -128,6 +133,8 @@ class RestaurantSettings {
       freeDeliveryThreshold: freeDeliveryThreshold ?? this.freeDeliveryThreshold,
       impulseBumpItemIds: impulseBumpItemIds ?? this.impulseBumpItemIds,
       impulseBumpMaxPrice: impulseBumpMaxPrice ?? this.impulseBumpMaxPrice,
+      smartRecommendationsEnabled:
+          smartRecommendationsEnabled ?? this.smartRecommendationsEnabled,
     );
   }
 
@@ -140,6 +147,7 @@ class RestaurantSettings {
         'freeDeliveryThreshold': freeDeliveryThreshold,
         'impulseBumpItemIds': impulseBumpItemIds,
         'impulseBumpMaxPrice': impulseBumpMaxPrice,
+        'smartRecommendationsEnabled': smartRecommendationsEnabled,
         if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
       };
 }

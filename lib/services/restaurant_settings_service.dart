@@ -89,6 +89,7 @@ class RestaurantSettingsService {
     required double freeDeliveryThreshold,
     required double impulseBumpMaxPrice,
     List<int>? impulseBumpItemIds,
+    bool? smartRecommendationsEnabled,
     String? restaurantId,
   }) async {
     final scopedRestaurantId =
@@ -99,6 +100,7 @@ class RestaurantSettingsService {
       freeDeliveryThreshold: freeDeliveryThreshold,
       impulseBumpMaxPrice: impulseBumpMaxPrice,
       impulseBumpItemIds: impulseBumpItemIds,
+      smartRecommendationsEnabled: smartRecommendationsEnabled,
       updatedAt: DateTime.now().toUtc(),
     );
 

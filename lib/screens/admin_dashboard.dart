@@ -26,6 +26,7 @@ import '../widgets/admin/admin_corner_toast.dart';
 import '../widgets/admin/admin_pos_panel.dart';
 import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_item_addons_editor.dart';
+import '../widgets/admin/admin_item_linked_sides_editor.dart';
 import '../widgets/admin/admin_menu_panel.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_customers_panel.dart';
@@ -368,6 +369,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         .whereType<Map>()
         .map((entry) => Map<String, dynamic>.from(entry))
         .toList();
+    var linkedItemIds = (data?['linkedItemIds'] as List<dynamic>? ??
+            data?['linked_item_ids'] as List<dynamic>? ??
+            [])
+        .map((id) => int.tryParse(id.toString()))
+        .whereType<int>()
+        .toList();
+    final editingItemId = isEditing ? record.id : null;
 
     await showDialog<void>(
       context: context,
@@ -462,8 +470,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     const SizedBox(height: 8),
                     AdminItemAddonsEditor(
                       options: addonOptions,
+                      currentItemId: int.tryParse(editingItemId?.toString() ?? ''),
                       onChanged: (next) =>
                           setDialogState(() => addonOptions = next),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    AdminItemLinkedSidesEditor(
+                      linkedItemIds: linkedItemIds,
+                      currentItemId: int.tryParse(editingItemId?.toString() ?? ''),
+                      onChanged: (next) =>
+                          setDialogState(() => linkedItemIds = next),
                     ),
                   ],
                 ),
@@ -514,6 +532,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           )
                           .map((option) => Map<String, dynamic>.from(option))
                           .toList(),
+                      'linkedItemIds': linkedItemIds,
                       'isAvailable': isAvailable,
                       if (data?['displayOrder'] != null)
                         'displayOrder': data!['displayOrder'],

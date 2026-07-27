@@ -54,6 +54,17 @@ class AppStrings {
 
   String get impulseBumpsTitle =>
       isArabic ? 'حاجات تنور سفرتك ✨' : 'Complete your order ✨';
+  String get impulseBumpsSubtitle => isArabic
+      ? 'إضافات سريعة بسعر مناسب — اضغط + للإضافة'
+      : 'Quick affordable add-ons — tap + to add';
+  String get smartRecommendationsTitle =>
+      isArabic ? 'يناسب طلبك 🎯' : 'Pairs with your order 🎯';
+  String get smartRecommendationsSubtitle => isArabic
+      ? 'اقتراحات ذكية بناءً على محتويات سلتك'
+      : 'Smart picks based on what\'s in your cart';
+  String get quickAddLabel => isArabic ? 'أضف +' : 'Add +';
+  String get linkedSideItemsTitle =>
+      isArabic ? 'إضافات مقترحة مع هذا الصنف' : 'Suggested with this item';
   String freeDeliveryRemaining(String amount) => isArabic
       ? 'أضف $amount د.ك أخرى للحصول على توصيل مجاني! 🚚'
       : 'Add $amount KWD more for FREE delivery! 🚚';

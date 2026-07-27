@@ -387,6 +387,41 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchRecommendations({
+    String? slug,
+    String? restaurantId,
+    required List<int> cartItemIds,
+    double subtotal = 0,
+    int limit = 8,
+  }) async {
+    try {
+      final query = {
+        ..._publicRestaurantQuery(slug: slug, restaurantId: restaurantId),
+        'cart': cartItemIds.join(','),
+        'subtotal': subtotal.toStringAsFixed(3),
+        'limit': '$limit',
+      };
+      final response = await http
+          .get(_uri('/recommendations', query), headers: _publicHeaders)
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) return const [];
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const [];
+
+      final recommendations = decoded['recommendations'];
+      if (recommendations is! List) return const [];
+
+      return recommendations
+          .whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<RestaurantSettings> fetchPublicSettings({
     String? slug,
     String? restaurantId,

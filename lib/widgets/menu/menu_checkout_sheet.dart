@@ -17,11 +17,13 @@ import '../../services/api_service.dart';
 import '../../services/customer_checkout_cache_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
+import '../../models/upsell_recommendation.dart';
 import '../../utils/upsell_item_resolver.dart';
 import '../../utils/whatsapp_launcher.dart';
 import '../../utils/whatsapp_order_message.dart';
 import '../../utils/whatsapp_phone.dart';
 import 'checkout_impulse_bumps.dart';
+import 'checkout_smart_recommendations.dart';
 import 'customization_dialog.dart';
 import 'free_delivery_progress_bar.dart';
 
@@ -85,6 +87,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   String? _selectedGovernorate;
   DeliveryZone? _selectedZone;
   List<MenuItem> _menuItems = [];
+  List<Map<String, dynamic>> _serverRecommendationHints = const [];
+  List<int> _topItemIds = const [];
+  String _lastCartSignature = '';
 
   RestaurantSettings get _settings =>
       widget.restaurantContext?.settings ?? RestaurantSettings.defaults();
@@ -271,6 +276,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     await Future.wait([
       _loadDeliveryZones(),
       _loadMenuItems(),
+      _loadUpsellData(),
     ]);
     final lastPhone =
         await CustomerCheckoutCacheService.instance.loadLastPhone(_restaurantId);
@@ -440,19 +446,67 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
           : await ApiService.instance.fetchItems(restaurantId: _restaurantId);
       if (!mounted) return;
       setState(() => _menuItems = items);
+      await _refreshRecommendations();
     } catch (_) {
       if (!mounted) return;
       setState(() => _menuItems = const []);
     }
   }
 
-  Future<void> _handleImpulseAdd(MenuItem item) async {
+  Future<void> _loadUpsellData() async {
+    try {
+      final topIds = await ApiService.instance.fetchTopMenuItemIds(
+        slug: _restaurantSlug,
+        restaurantId: _restaurantId,
+      );
+      if (!mounted) return;
+      setState(() => _topItemIds = topIds);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _topItemIds = const []);
+    }
+  }
+
+  Future<void> _refreshRecommendations() async {
+    if (!mounted || !_settings.smartRecommendationsEnabled) return;
+    final cart = context.read<CartProvider>();
+    final cartIds = cart.items.map((item) => item.menuItem.id).toList();
+    if (cartIds.isEmpty) {
+      if (mounted) setState(() => _serverRecommendationHints = const []);
+      return;
+    }
+
+    try {
+      final hints = await ApiService.instance.fetchRecommendations(
+        slug: _restaurantSlug,
+        restaurantId: _restaurantId,
+        cartItemIds: cartIds,
+        subtotal: cart.totalPrice,
+      );
+      if (!mounted) return;
+      setState(() => _serverRecommendationHints = hints);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _serverRecommendationHints = const []);
+    }
+  }
+
+  Future<void> _handleUpsellAdd(UpsellRecommendation recommendation) async {
+    final item = recommendation.item;
     if (item.hasCustomizations) {
-      await showCustomizationDialog(context, item);
+      await showCustomizationDialog(
+        context,
+        item,
+        allMenuItems: _menuItems,
+      );
+      if (!mounted) return;
+      await _refreshRecommendations();
       return;
     }
     if (!mounted) return;
     context.read<CartProvider>().addMenuItem(item);
+    await _refreshRecommendations();
+    if (!mounted) return;
     final locale = context.read<LocaleProvider>().localeCode;
     final strings = AppStrings.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -620,14 +674,47 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     final cart = context.watch<CartProvider>();
     final locale = context.watch<LocaleProvider>();
     final strings = AppStrings(locale.localeCode);
+    final cartSignature =
+        cart.items.map((item) => '${item.menuItem.id}:${item.quantity}').join('|');
+    if (cartSignature != _lastCartSignature) {
+      _lastCartSignature = cartSignature;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_refreshRecommendations());
+      });
+    }
     final subtotal = cart.totalPrice;
     final deliveryFee = _effectiveDeliveryFee(subtotal);
     final grandTotal = subtotal + deliveryFee;
-    final impulseItems = UpsellItemResolver.impulseBumpItems(
+    final cartItemIds = cart.items.map((item) => item.menuItem.id).toSet();
+    final cartMenuItems = cart.items.map((item) => item.menuItem).toList();
+
+    final smartRecommendations = UpsellItemResolver.smartRecommendations(
+      allItems: _menuItems,
+      cartItems: cartMenuItems,
+      settings: _settings,
+      cartItemIds: cartItemIds,
+      topItemIds: _topItemIds,
+      subtotal: subtotal,
+      serverHints: _serverRecommendationHints,
+    );
+
+    final smartIds = smartRecommendations.map((entry) => entry.item.id).toSet();
+    final impulseRecommendations = UpsellItemResolver.impulseBumpRecommendations(
       allItems: _menuItems,
       settings: _settings,
-      cartItemIds: cart.items.map((item) => item.menuItem.id).toSet(),
+      cartItemIds: cartItemIds,
+      excludeIds: smartIds,
     );
+
+    String? impulseHint;
+    if (_settings.hasFreeDeliveryGoal &&
+        subtotal > 0 &&
+        subtotal < _settings.freeDeliveryThreshold) {
+      final remaining = (_settings.freeDeliveryThreshold - subtotal)
+          .clamp(0, double.infinity)
+          .toStringAsFixed(3);
+      impulseHint = strings.freeDeliveryRemaining(remaining);
+    }
 
     return Directionality(
       textDirection: locale.textDirection,
@@ -736,12 +823,23 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                           baseDeliveryFee: _baseDeliveryFee,
                           strings: strings,
                         ),
-                      if (_settings.smartUpsellEnabled)
-                        CheckoutImpulseBumps(
-                          items: impulseItems,
+                      if (_settings.smartUpsellEnabled &&
+                          _settings.smartRecommendationsEnabled &&
+                          smartRecommendations.isNotEmpty)
+                        CheckoutSmartRecommendations(
+                          recommendations: smartRecommendations,
                           localeCode: locale.localeCode,
                           strings: strings,
-                          onAddItem: (item) => unawaited(_handleImpulseAdd(item)),
+                          onAddItem: (entry) => unawaited(_handleUpsellAdd(entry)),
+                        ),
+                      if (_settings.smartUpsellEnabled &&
+                          impulseRecommendations.isNotEmpty)
+                        CheckoutImpulseBumps(
+                          recommendations: impulseRecommendations,
+                          localeCode: locale.localeCode,
+                          strings: strings,
+                          freeDeliveryHint: impulseHint,
+                          onAddItem: (entry) => unawaited(_handleUpsellAdd(entry)),
                         ),
                       const Divider(height: 32),
                       if (_loadingWhatsapp)

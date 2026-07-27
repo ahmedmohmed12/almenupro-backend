@@ -12,6 +12,7 @@ class MenuOption {
     this.groupRequired = false,
     this.allowMultiple = false,
     this.isAvailable = true,
+    this.linkedMenuItemId,
   });
 
   final String id;
@@ -25,6 +26,8 @@ class MenuOption {
   final bool groupRequired;
   final bool allowMultiple;
   final bool isAvailable;
+  /// When set, this modifier references another menu item (advanced side item).
+  final int? linkedMenuItemId;
 
   bool get isGroupRequired => groupRequired || isRequired;
 
@@ -59,7 +62,18 @@ class MenuOption {
       allowMultiple:
           map['allowMultiple'] == true || map['allow_multiple'] == true,
       isAvailable: isAvailable,
+      linkedMenuItemId: _parseLinkedMenuItemId(map),
     );
+  }
+
+  static int? _parseLinkedMenuItemId(Map<String, dynamic> map) {
+    final raw = map['linkedMenuItemId'] ??
+        map['linked_menu_item_id'] ??
+        map['linkedItemId'] ??
+        map['linked_item_id'];
+    if (raw == null || raw == '') return null;
+    if (raw is int) return raw > 0 ? raw : null;
+    return int.tryParse(raw.toString());
   }
 
   Map<String, dynamic> toMap() {
@@ -76,6 +90,10 @@ class MenuOption {
       'allow_multiple': allowMultiple,
       'isAvailable': isAvailable,
       'is_available': isAvailable ? 1 : 0,
+      if (linkedMenuItemId != null) ...{
+        'linkedMenuItemId': linkedMenuItemId,
+        'linked_menu_item_id': linkedMenuItemId,
+      },
     };
   }
 }
@@ -97,6 +115,7 @@ class MenuItem {
   final bool isAvailable;
   final int displayOrder;
   final List<MenuOption> options;
+  final List<int> linkedItemIds;
 
   MenuItem({
     required this.id,
@@ -115,6 +134,7 @@ class MenuItem {
     required this.isAvailable,
     this.displayOrder = 0,
     this.options = const [],
+    this.linkedItemIds = const [],
   });
 
   bool get hasCustomizations =>
@@ -198,7 +218,19 @@ class MenuItem {
           .whereType<Map>()
           .map((option) => MenuOption.fromMap(Map<String, dynamic>.from(option)))
           .toList(),
+      linkedItemIds: _parseLinkedItemIds(json),
     );
+  }
+
+  static List<int> _parseLinkedItemIds(Map<String, dynamic> json) {
+    final raw = json['linkedItemIds'] as List<dynamic>? ??
+        json['linked_item_ids'] as List<dynamic>? ??
+        [];
+    return raw
+        .map((id) => int.tryParse(id.toString()))
+        .whereType<int>()
+        .where((id) => id > 0)
+        .toList();
   }
 
   factory MenuItem.fromMap(String documentId, Map<String, dynamic> map) {
@@ -252,6 +284,7 @@ class MenuItem {
           .whereType<Map>()
           .map((option) => MenuOption.fromMap(Map<String, dynamic>.from(option)))
           .toList(),
+      linkedItemIds: _parseLinkedItemIds(map),
     );
   }
 
@@ -274,6 +307,8 @@ class MenuItem {
       'display_order': displayOrder,
       if (options.isNotEmpty)
         'options': options.map((option) => option.toMap()).toList(),
+      if (linkedItemIds.isNotEmpty) 'linkedItemIds': linkedItemIds,
+      if (linkedItemIds.isNotEmpty) 'linked_item_ids': linkedItemIds,
     };
   }
 
@@ -293,6 +328,7 @@ class MenuItem {
       'options': options.map((option) => option.toMap()).toList(),
       'isAvailable': isAvailable,
       'displayOrder': displayOrder,
+      if (linkedItemIds.isNotEmpty) 'linkedItemIds': linkedItemIds,
     };
   }
 }

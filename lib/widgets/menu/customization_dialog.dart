@@ -7,6 +7,8 @@ import '../../models/menu_item.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/upsell_item_resolver.dart';
+import '../network_menu_image.dart';
 
 class _OptionGroupView {
   const _OptionGroupView({
@@ -26,10 +28,15 @@ Future<void> showCustomizationDialog(
   BuildContext context,
   MenuItem item, {
   void Function(CartItem cartItem)? onAdd,
+  List<MenuItem> allMenuItems = const [],
 }) async {
   await showDialog<void>(
     context: context,
-    builder: (context) => _CustomizationDialog(item: item, onAdd: onAdd),
+    builder: (context) => _CustomizationDialog(
+      item: item,
+      onAdd: onAdd,
+      allMenuItems: allMenuItems,
+    ),
   );
 }
 
@@ -37,10 +44,12 @@ class _CustomizationDialog extends StatefulWidget {
   const _CustomizationDialog({
     required this.item,
     this.onAdd,
+    this.allMenuItems = const [],
   });
 
   final MenuItem item;
   final void Function(CartItem cartItem)? onAdd;
+  final List<MenuItem> allMenuItems;
 
   @override
   State<_CustomizationDialog> createState() => _CustomizationDialogState();
@@ -225,6 +234,34 @@ class _CustomizationDialogState extends State<_CustomizationDialog> {
                   ),
                 ),
               if (displayDescription.isNotEmpty) const SizedBox(height: 16),
+              if (_linkedSideItems.isNotEmpty) ...[
+                Text(
+                  strings.linkedSideItemsTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.brandMaroon,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 112,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _linkedSideItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final sideItem = _linkedSideItems[index];
+                      return _LinkedSideChip(
+                        item: sideItem,
+                        localeCode: localeCode,
+                        strings: strings,
+                        onAdd: () => _addLinkedSideItem(sideItem, strings),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               Text(
                 strings.basePriceLabel(
                   widget.item.price.toStringAsFixed(3),
@@ -384,6 +421,95 @@ class _CustomizationDialogState extends State<_CustomizationDialog> {
           child: Text(strings.addToCart),
         ),
       ],
+    );
+  }
+
+  List<MenuItem> get _linkedSideItems => resolveLinkedSideItems(
+        item: widget.item,
+        allItems: widget.allMenuItems,
+      );
+
+  void _addLinkedSideItem(MenuItem sideItem, AppStrings strings) {
+    context.read<CartProvider>().addMenuItem(sideItem);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          strings.addedToCart(sideItem.localizedName(_localeCode)),
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkedSideChip extends StatelessWidget {
+  const _LinkedSideChip({
+    required this.item,
+    required this.localeCode,
+    required this.strings,
+    required this.onAdd,
+  });
+
+  final MenuItem item;
+  final String localeCode;
+  final AppStrings strings;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onAdd,
+        child: Container(
+          width: 120,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppTheme.brandMaroon.withValues(alpha: 0.15)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: item.imageUrl.isNotEmpty
+                    ? NetworkMenuImage(
+                        imageUrl: item.imageUrl,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        color: AppTheme.brandMaroon.withValues(alpha: 0.06),
+                        child: const Icon(Icons.restaurant),
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.localizedName(localeCode),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '${item.price.toStringAsFixed(3)} ${strings.currency}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.brandMaroon,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
