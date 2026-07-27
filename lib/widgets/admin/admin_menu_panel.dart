@@ -79,11 +79,30 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
         children: [
           _buildToolbar(),
           const SizedBox(height: 16),
-          _buildServerStatus(),
-          const SizedBox(height: 16),
           Expanded(child: _buildContent()),
+          const SizedBox(height: 12),
+          _buildBottomStatusBars(),
         ],
       ),
+    );
+  }
+
+  Widget _buildBottomStatusBars() {
+    final showReorderHint = widget.canManageItems &&
+        !_loading &&
+        _errorMessage == null &&
+        _apiItems.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showReorderHint) ...[
+          _buildReorderHint(),
+          const SizedBox(height: 10),
+        ],
+        _buildServerStatus(),
+      ],
     );
   }
 
@@ -375,7 +394,6 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (widget.canManageItems) _buildReorderHint(),
             if (compact)
               Expanded(
                 child: widget.canManageItems
@@ -420,7 +438,6 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
   Widget _buildReorderHint() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: gold.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
