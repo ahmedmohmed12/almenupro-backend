@@ -4,6 +4,7 @@ import '../../models/menu_item.dart';
 import '../../services/api_service.dart';
 import '../../services/menu_storage_service.dart';
 import '../network_menu_image.dart';
+import 'admin_menu_panel_status.dart';
 
 class AdminMenuPanel extends StatefulWidget {
   const AdminMenuPanel({
@@ -14,6 +15,7 @@ class AdminMenuPanel extends StatefulWidget {
     this.onAutofillTalabat,
     this.canImportTalabat = false,
     this.canManageItems = true,
+    this.onStatusChanged,
   });
 
   final Future<void> Function() onAddItem;
@@ -22,6 +24,7 @@ class AdminMenuPanel extends StatefulWidget {
   final VoidCallback? onAutofillTalabat;
   final bool canImportTalabat;
   final bool canManageItems;
+  final ValueChanged<AdminMenuPanelStatus>? onStatusChanged;
 
   @override
   State<AdminMenuPanel> createState() => _AdminMenuPanelState();
@@ -29,7 +32,6 @@ class AdminMenuPanel extends StatefulWidget {
 
 class _AdminMenuPanelState extends State<AdminMenuPanel> {
   static const burgundy = Color(0xFF6B1124);
-  static const gold = Color(0xFFD49A00);
 
   List<MenuItem> _apiItems = [];
   var _loading = true;
@@ -43,11 +45,24 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     _loadFromApi();
   }
 
+  void _emitStatus() {
+    widget.onStatusChanged?.call(
+      AdminMenuPanelStatus(
+        loading: _loading,
+        apiOnline: _apiOnline,
+        errorMessage: _errorMessage,
+        savingOrder: _savingOrder,
+        itemCount: _apiItems.length,
+      ),
+    );
+  }
+
   Future<void> _loadFromApi() async {
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
+    _emitStatus();
 
     try {
       final items = await ApiService.instance.fetchMenuItems();
@@ -67,6 +82,7 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
 
     if (mounted) {
       setState(() => _loading = false);
+      _emitStatus();
     }
   }
 
@@ -80,29 +96,8 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
           _buildToolbar(),
           const SizedBox(height: 16),
           Expanded(child: _buildContent()),
-          const SizedBox(height: 12),
-          _buildBottomStatusBars(),
         ],
       ),
-    );
-  }
-
-  Widget _buildBottomStatusBars() {
-    final showReorderHint = widget.canManageItems &&
-        !_loading &&
-        _errorMessage == null &&
-        _apiItems.isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showReorderHint) ...[
-          _buildReorderHint(),
-          const SizedBox(height: 10),
-        ],
-        _buildServerStatus(),
-      ],
     );
   }
 
@@ -193,75 +188,6 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildServerStatus() {
-    final apiUrl = ApiService.baseUrl;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: _loading
-            ? Colors.blue.shade50
-            : _errorMessage != null
-                ? Colors.red.shade50
-                : _apiOnline
-                    ? Colors.green.shade50
-                    : Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: _loading
-              ? Colors.blue.shade200
-              : _errorMessage != null
-                  ? Colors.red.shade200
-                  : _apiOnline
-                      ? Colors.green.shade200
-                      : Colors.orange.shade200,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _loading
-                ? Icons.sync
-                : _errorMessage != null
-                    ? Icons.error_outline
-                    : _apiOnline
-                        ? Icons.cloud_done
-                        : Icons.cloud_off,
-            color: _loading
-                ? Colors.blue.shade700
-                : _errorMessage != null
-                    ? Colors.red.shade700
-                    : _apiOnline
-                        ? Colors.green.shade700
-                        : Colors.orange.shade800,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _loading
-                  ? 'جاري تحميل الأصناف من $apiUrl/items ...'
-                  : _errorMessage != null
-                      ? 'تعذر تحميل الأصناف: $_errorMessage'
-                      : _apiItems.isEmpty
-                          ? 'متصل بالسيرفر ($apiUrl) — لا توجد أصناف حالياً'
-                          : 'متصل بالسيرفر: $apiUrl/items (${_apiItems.length} صنف)',
-              style: TextStyle(
-                color: _loading
-                    ? Colors.blue.shade900
-                    : _errorMessage != null
-                        ? Colors.red.shade900
-                        : _apiOnline
-                            ? Colors.green.shade900
-                            : Colors.orange.shade900,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -435,35 +361,6 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     );
   }
 
-  Widget _buildReorderHint() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: gold.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: gold.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _savingOrder ? Icons.sync : Icons.swap_vert,
-            color: burgundy,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _savingOrder
-                  ? 'جاري حفظ ترتيب العرض...'
-                  : 'اسحب الأصناف أو استخدم أزرار ↑ ↓ لتغيير ترتيب ظهورها في قائمة «الكل» للعميل',
-              style: TextStyle(color: burgundy.withValues(alpha: 0.95), fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   MenuItemRecord _toRecord(MenuItem item) {
     return MenuItemRecord(
       id: item.id.toString(),
@@ -492,6 +389,7 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     if (!widget.canManageItems) return;
 
     setState(() => _savingOrder = true);
+    _emitStatus();
     try {
       final orderedIds = _apiItems.map((item) => item.id.toString()).toList();
       await ApiService.instance.reorderMenuItems(orderedIds);
@@ -505,6 +403,7 @@ class _AdminMenuPanelState extends State<AdminMenuPanel> {
     } finally {
       if (mounted) {
         setState(() => _savingOrder = false);
+        _emitStatus();
       }
     }
   }

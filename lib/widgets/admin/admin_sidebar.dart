@@ -20,6 +20,7 @@ class AdminSidebar extends StatefulWidget {
     required this.onItemSelected,
     this.width = expandedWidth,
     this.enableCollapse = true,
+    this.footerBuilder,
   });
 
   static const double expandedWidth = 260;
@@ -115,6 +116,7 @@ class AdminSidebar extends StatefulWidget {
   final ValueChanged<int> onItemSelected;
   final double width;
   final bool enableCollapse;
+  final Widget Function(bool collapsed)? footerBuilder;
 
   @override
   State<AdminSidebar> createState() => _AdminSidebarState();
@@ -190,6 +192,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
             const Divider(color: Colors.white24, height: 1),
             const SizedBox(height: 12),
             Expanded(child: _buildNavList()),
+            if (widget.footerBuilder != null)
+              widget.footerBuilder!(_isCollapsed),
             if (widget.enableCollapse) _buildCollapseToggle(),
           ],
         ),

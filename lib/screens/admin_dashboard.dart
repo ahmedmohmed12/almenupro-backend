@@ -28,6 +28,7 @@ import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_item_addons_editor.dart';
 import '../widgets/admin/admin_item_linked_sides_editor.dart';
 import '../widgets/admin/admin_menu_panel.dart';
+import '../widgets/admin/admin_menu_panel_status.dart';
 import '../widgets/admin/admin_orders_panel.dart';
 import '../widgets/admin/admin_customers_panel.dart';
 import '../widgets/admin/admin_sidebar.dart';
@@ -58,6 +59,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String? _errorMessage;
   String? _restaurantLabel;
   int _selectedIndex = AdminSidebar.ordersIndex;
+  AdminMenuPanelStatus? _menuPanelStatus;
 
   final _whatsappController = TextEditingController();
   String _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;
@@ -898,6 +900,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  bool get _isMenuTabSelected {
+    if (_isSuperAdmin) {
+      return _selectedIndex == AdminSidebar.superMenuIndex;
+    }
+    return _selectedIndex == AdminSidebar.menuIndex;
+  }
+
+  void _onMenuPanelStatusChanged(AdminMenuPanelStatus status) {
+    if (_menuPanelStatus == status) return;
+    setState(() => _menuPanelStatus = status);
+  }
+
+  Widget _buildMenuSidebarFooter(bool collapsed) {
+    final status = _menuPanelStatus;
+    if (!_isMenuTabSelected || status == null || status.isHealthy) {
+      return const SizedBox.shrink();
+    }
+    return AdminMenuSidebarFooter(status: status, collapsed: collapsed);
+  }
+
   Widget _buildAuthenticatedShell() {
     final sidebarItems = _isSuperAdmin
         ? AdminSidebar.superAdminItems
@@ -915,6 +937,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         },
         width: inDrawer ? 280 : AdminSidebar.expandedWidth,
         enableCollapse: !inDrawer,
+        footerBuilder: inDrawer ? null : _buildMenuSidebarFooter,
       );
     }
 
@@ -1032,6 +1055,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onDeleteItem: _deleteItem,
             canImportTalabat: false,
             canManageItems: SuperAdminScopeService.instance.hasSelection,
+            onStatusChanged: _onMenuPanelStatusChanged,
           );
         case AdminSidebar.superRestaurantsIndex:
           return const AdminSuperRestaurantsPanel();
@@ -1060,6 +1084,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onDeleteItem: _deleteItem,
           canImportTalabat: false,
           canManageItems: true,
+          onStatusChanged: _onMenuPanelStatusChanged,
         );
       case AdminSidebar.deliveryZonesIndex:
         return _buildDeliveryZonesPanel();
