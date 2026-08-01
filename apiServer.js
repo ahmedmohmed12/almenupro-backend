@@ -73,6 +73,10 @@ const {
   ensureAutoTranslatedCategory,
 } = require('./lib/autoTranslate');
 const { normalizeMenuItemsForApi, autoTranslateMenuItems } = require('./lib/bilingualItemMigration');
+const {
+  applyPostCheckoutRewards,
+  buildCheckoutPreview,
+} = require('./lib/smartClosingEngine');
 const { computeTopMenuItems } = require('./lib/topItemsAnalytics');
 const { computeCartRecommendations } = require('./lib/recommendationsAnalytics');
 const {
@@ -1675,7 +1679,6 @@ const server = http.createServer(async (req, res) => {
         order.phone,
       );
       const settings = await readSettings(restaurantId);
-      const { applyPostCheckoutRewards } = require('./lib/smartClosingEngine');
       const rewardResult = applyPostCheckoutRewards({
         customers: nextCustomers,
         order,
@@ -1829,7 +1832,6 @@ const server = http.createServer(async (req, res) => {
       const customer = phone
         ? findCustomerByPhone(customers, restaurantId, phone)
         : null;
-      const { buildCheckoutPreview } = require('./lib/smartClosingEngine');
       sendJson(res, 200, buildCheckoutPreview({ customer, settings, body }));
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
