@@ -1,10 +1,13 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/loyalty_cashback.dart';
+import '../models/payment_method_config.dart';
 import '../models/restaurant_settings.dart';
+import '../models/sales_platform_config.dart';
 import '../models/working_hours.dart';
 import '../utils/firebase_config.dart';
 import 'api_service.dart';
@@ -138,6 +141,116 @@ class RestaurantSettingsService {
 
   void clearCache() {
     _cached = null;
+  }
+
+  Future<void> _persist(
+    RestaurantSettings updated, {
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    await ApiService.instance.updateSettings(
+      updated,
+      restaurantId: scopedRestaurantId,
+    );
+    _cached = updated;
+    await _saveCache(updated, restaurantId: scopedRestaurantId);
+    await _syncFirebase(updated);
+  }
+
+  Future<void> saveStoreProfile({
+    required String logoUrl,
+    required String restaurantDescription,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    await _persist(
+      current.copyWith(
+        logoUrl: logoUrl.trim(),
+        restaurantDescription: restaurantDescription.trim(),
+        updatedAt: DateTime.now().toUtc(),
+      ),
+      restaurantId: scopedRestaurantId,
+    );
+  }
+
+  Future<void> saveLoyaltySettings({
+    required CashbackType cashbackType,
+    required double cashbackValue,
+    required double minOrderForLoyalty,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    await _persist(
+      current.copyWith(
+        cashbackType: cashbackType,
+        cashbackValue: cashbackValue,
+        minOrderForLoyalty: minOrderForLoyalty,
+        updatedAt: DateTime.now().toUtc(),
+      ),
+      restaurantId: scopedRestaurantId,
+    );
+  }
+
+  Future<void> savePaymentMethods({
+    required List<PaymentMethodConfig> paymentMethods,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    await _persist(
+      current.copyWith(
+        paymentMethods: paymentMethods,
+        updatedAt: DateTime.now().toUtc(),
+      ),
+      restaurantId: scopedRestaurantId,
+    );
+  }
+
+  Future<void> saveSalesPlatforms({
+    required List<SalesPlatformConfig> salesPlatforms,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    await _persist(
+      current.copyWith(
+        salesPlatforms: salesPlatforms,
+        updatedAt: DateTime.now().toUtc(),
+      ),
+      restaurantId: scopedRestaurantId,
+    );
+  }
+
+  Future<void> savePosSettings(RestaurantSettings settings) async {
+    final scopedRestaurantId = SuperAdminScopeService.instance.effectiveRestaurantId;
+    await _persist(settings, restaurantId: scopedRestaurantId);
+  }
+
+  Future<void> saveEmailNotifications({
+    required String notificationEmail,
+    required bool notifyOnNewOrderEmail,
+    required bool notifyOnShiftCloseEmail,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    await _persist(
+      current.copyWith(
+        notificationEmail: notificationEmail.trim(),
+        notifyOnNewOrderEmail: notifyOnNewOrderEmail,
+        notifyOnShiftCloseEmail: notifyOnShiftCloseEmail,
+        updatedAt: DateTime.now().toUtc(),
+      ),
+      restaurantId: scopedRestaurantId,
+    );
   }
 
   Future<void> _syncFirebase(RestaurantSettings settings) async {

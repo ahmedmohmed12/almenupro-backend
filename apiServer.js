@@ -27,7 +27,10 @@ const {
   migrateSettingsShape,
   defaultSettingsPayload,
   sanitizeRestaurant,
+  sanitizeRestaurantAdmin,
   createRestaurantRecord,
+  updateRestaurantRecord,
+  normalizeRestaurantSlug,
   resolveRestaurantFromQuery,
   assertRestaurantAccess,
   nextNumericItemId,
@@ -687,9 +690,55 @@ const server = http.createServer(async (req, res) => {
     const auth = requireSuperAdmin(req, res);
     if (!auth) return;
 
-    const restaurants = (await readRestaurants()).map(sanitizeRestaurant);
+    const restaurants = (await readRestaurants()).map(sanitizeRestaurantAdmin);
     sendJson(res, 200, restaurants);
     return;
+  }
+
+  const restaurantByIdMatch = url.pathname.match(/^\/api\/restaurants\/([^/]+)$/);
+  if (restaurantByIdMatch && restaurantByIdMatch[1] !== 'public') {
+    const restaurantId = decodeURIComponent(restaurantByIdMatch[1]);
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
+    if (req.method === 'PATCH' || req.method === 'PUT') {
+      try {
+        const body = JSON.parse((await readBody(req)) || '{}');
+        const restaurants = await readRestaurants();
+        const index = restaurants.findIndex((entry) => entry.id === restaurantId);
+        if (index === -1) {
+          sendJson(res, 404, { error: 'Restaurant not found' });
+          return;
+        }
+
+        const nextSlug = normalizeRestaurantSlug(body.slug ?? restaurants[index].slug);
+        const slugTaken = restaurants.some(
+          (entry, idx) =>
+            idx !== index &&
+            String(entry.slug).toLowerCase() === String(nextSlug).toLowerCase(),
+        );
+        if (slugTaken) {
+          sendJson(res, 409, { error: 'Restaurant slug already exists' });
+          return;
+        }
+
+        restaurants[index] = updateRestaurantRecord(restaurants[index], body);
+        await writeRestaurants(restaurants);
+
+        const saved = restaurants[index];
+        sendJson(res, 200, {
+          ...sanitizeRestaurantAdmin(saved),
+          menuUrl: `/menu/${saved.slug}`,
+          persisted: true,
+        });
+      } catch (error) {
+        sendJson(res, 400, {
+          error: error.message || 'Invalid payload',
+          code: 'UPDATE_RESTAURANT_FAILED',
+        });
+      }
+      return;
+    }
   }
 
   const publicRestaurantMatch = url.pathname.match(
@@ -749,7 +798,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       sendJson(res, 201, {
-        ...sanitizeRestaurant(saved),
+        ...sanitizeRestaurantAdmin(saved),
         menuUrl: `/menu/${saved.slug}`,
         persisted: true,
       });
@@ -1718,6 +1767,46 @@ const server = http.createServer(async (req, res) => {
         updatedAt: new Date().toISOString(),
       });
       sendJson(res, 200, merged);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/loyalty/preview') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurantId = resolveRestaurantId(
+        auth,
+        body.restaurantId ||
+          body.restaurant_id ||
+          url.searchParams.get('restaurant_id') ||
+          req.headers['x-restaurant-id'],
+      );
+
+      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const orderTotal =
+        Number(body.orderTotal ?? body.order_total ?? 0) || 0;
+      const settings = await readSettings(restaurantId);
+      const { previewEarnedCashback } = require('./lib/loyaltyCashback');
+      sendJson(res, 200, previewEarnedCashback(orderTotal, settings));
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/analytics/upsell-events') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const events = Array.isArray(body.events) ? body.events : [];
+      sendJson(res, 200, { ok: true, received: events.length });
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
     }

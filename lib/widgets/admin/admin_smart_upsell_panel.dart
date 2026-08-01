@@ -45,8 +45,8 @@ class AdminSmartUpsellPanel extends StatelessWidget {
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'محرك Upsell المرحلة 2: اقتراحات ذكية حسب السلة، '
-                      'سايد إيتمز مربوطة، وإضافات سريعة محسّنة في الدفع.',
+                      'اضبط شريط التوصيل المجاني واقتراحات «حاجات تنور سفرتك» '
+                      'التي تظهر للعميل في شاشة الدفع.',
                       style: TextStyle(
                         fontSize: 14,
                         color: Color(0xFF555555),

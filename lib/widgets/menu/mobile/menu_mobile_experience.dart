@@ -48,9 +48,6 @@ class _MenuMobileExperienceState extends State<MenuMobileExperience> {
 
   String _categoryLabel(String category) {
     if (category == widget.strings.all) return widget.strings.all;
-    if (category == widget.strings.picksForYou) {
-      return widget.strings.picksForYou;
-    }
     for (final item in widget.allItems) {
       if (item.categoryName.trim() == category) {
         return item.localizedCategoryName(widget.localeCode);
@@ -60,9 +57,7 @@ class _MenuMobileExperienceState extends State<MenuMobileExperience> {
   }
 
   bool _isHotCategory(String category) {
-    return category == widget.strings.picksForYou ||
-        category.contains('🔥') ||
-        category.contains('ذوقك');
+    return category.contains('🔥') || category.contains('ذوقك');
   }
 
   @override

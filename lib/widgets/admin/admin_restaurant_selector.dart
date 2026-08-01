@@ -31,8 +31,8 @@ class AdminRestaurantSelector extends StatelessWidget {
           );
         }
 
-        return SizedBox(
-          width: double.infinity,
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
           child: DropdownButtonFormField<String>(
             value: scope.selectedRestaurantId,
             decoration: InputDecoration(

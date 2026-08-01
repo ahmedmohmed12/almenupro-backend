@@ -1,4 +1,8 @@
-import '../models/working_hours.dart';
+import 'loyalty_cashback.dart';
+import 'payment_method_config.dart';
+import 'pos_role.dart';
+import 'sales_platform_config.dart';
+import 'working_hours.dart';
 import '../utils/whatsapp_phone.dart';
 
 class RestaurantSettings {
@@ -13,6 +17,18 @@ class RestaurantSettings {
     this.impulseBumpItemIds = const [],
     this.impulseBumpMaxPrice = 2,
     this.smartRecommendationsEnabled = true,
+    this.logoUrl = '',
+    this.restaurantDescription = '',
+    this.cashbackType = CashbackType.percentage,
+    this.cashbackValue = 0,
+    this.minOrderForLoyalty = 0,
+    this.paymentMethods = const [],
+    this.salesPlatforms = const [],
+    this.posRoles = const [],
+    this.posAutoLockMinutes = 5,
+    this.notificationEmail = '',
+    this.notifyOnNewOrderEmail = true,
+    this.notifyOnShiftCloseEmail = false,
   });
 
   final String whatsappNumber;
@@ -21,13 +37,22 @@ class RestaurantSettings {
   final WorkingHoursSettings workingHours;
   final DateTime? updatedAt;
   final bool smartUpsellEnabled;
-  /// Minimum cart subtotal for free delivery. `0` disables the feature.
   final double freeDeliveryThreshold;
   final List<int> impulseBumpItemIds;
-  /// Used to auto-pick impulse items when [impulseBumpItemIds] is empty.
   final double impulseBumpMaxPrice;
-  /// Cart-aware smart recommendations in checkout (Phase 2).
   final bool smartRecommendationsEnabled;
+  final String logoUrl;
+  final String restaurantDescription;
+  final CashbackType cashbackType;
+  final double cashbackValue;
+  final double minOrderForLoyalty;
+  final List<PaymentMethodConfig> paymentMethods;
+  final List<SalesPlatformConfig> salesPlatforms;
+  final List<PosRole> posRoles;
+  final int posAutoLockMinutes;
+  final String notificationEmail;
+  final bool notifyOnNewOrderEmail;
+  final bool notifyOnShiftCloseEmail;
 
   String get fullWhatsappNumber {
     final combined = WhatsAppPhone.combine(whatsappCountryCode, whatsappPhone);
@@ -40,12 +65,26 @@ class RestaurantSettings {
   bool get hasFreeDeliveryGoal =>
       smartUpsellEnabled && freeDeliveryThreshold > 0;
 
+  List<PaymentMethodConfig> get configuredPaymentMethods =>
+      PaymentMethodCatalog.mergeWithDefaults(paymentMethods);
+
+  List<SalesPlatformConfig> get resolvedSalesPlatforms =>
+      PlatformCatalog.mergeWithDefaults(salesPlatforms);
+
+  List<PosRole> get resolvedPosRoles {
+    if (posRoles.isEmpty) return PosRole.defaults();
+    return posRoles;
+  }
+
   factory RestaurantSettings.defaults() {
     return RestaurantSettings(
       whatsappCountryCode: WhatsAppPhone.defaultCountryCode,
       whatsappPhone: '',
       whatsappNumber: '',
       workingHours: WorkingHoursSettings.defaults(),
+      paymentMethods: PaymentMethodConfig.defaults(),
+      salesPlatforms: SalesPlatformConfig.defaults(),
+      posRoles: PosRole.defaults(),
     );
   }
 
@@ -79,6 +118,16 @@ class RestaurantSettings {
         json['impulse_bump_item_ids'] as List<dynamic>? ??
         [];
 
+    final rawPaymentMethods = json['paymentMethods'] as List<dynamic>? ??
+        json['payment_methods'] as List<dynamic>? ??
+        [];
+    final rawSalesPlatforms = json['salesPlatforms'] as List<dynamic>? ??
+        json['sales_platforms'] as List<dynamic>? ??
+        [];
+    final rawPosRoles = json['posRoles'] as List<dynamic>? ??
+        json['pos_roles'] as List<dynamic>? ??
+        [];
+
     return RestaurantSettings(
       whatsappCountryCode: countryCode,
       whatsappPhone: phone,
@@ -102,6 +151,41 @@ class RestaurantSettings {
               (json['impulse_bump_max_price'] as num?)?.toDouble() ??
               2,
       smartRecommendationsEnabled: json['smartRecommendationsEnabled'] != false,
+      logoUrl: json['logoUrl']?.toString() ?? json['logo_url']?.toString() ?? '',
+      restaurantDescription: json['restaurantDescription']?.toString() ??
+          json['restaurant_description']?.toString() ??
+          json['description']?.toString() ??
+          '',
+      cashbackType: CashbackType.fromStorage(
+        json['cashbackType']?.toString() ?? json['cashback_type']?.toString(),
+      ),
+      cashbackValue: (json['cashbackValue'] as num?)?.toDouble() ??
+          (json['cashback_value'] as num?)?.toDouble() ??
+          0,
+      minOrderForLoyalty: (json['minOrderForLoyalty'] as num?)?.toDouble() ??
+          (json['min_order_for_loyalty'] as num?)?.toDouble() ??
+          0,
+      paymentMethods: rawPaymentMethods
+          .whereType<Map>()
+          .map((row) => PaymentMethodConfig.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      salesPlatforms: rawSalesPlatforms
+          .whereType<Map>()
+          .map((row) => SalesPlatformConfig.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      posRoles: rawPosRoles
+          .whereType<Map>()
+          .map((row) => PosRole.fromJson(Map<String, dynamic>.from(row)))
+          .where((role) => role.id.isNotEmpty)
+          .toList(),
+      posAutoLockMinutes: (json['posAutoLockMinutes'] as num?)?.toInt() ??
+          (json['pos_auto_lock_minutes'] as num?)?.toInt() ??
+          5,
+      notificationEmail: json['notificationEmail']?.toString() ??
+          json['notification_email']?.toString() ??
+          '',
+      notifyOnNewOrderEmail: json['notifyOnNewOrderEmail'] != false,
+      notifyOnShiftCloseEmail: json['notifyOnShiftCloseEmail'] == true,
     );
   }
 
@@ -116,6 +200,18 @@ class RestaurantSettings {
     List<int>? impulseBumpItemIds,
     double? impulseBumpMaxPrice,
     bool? smartRecommendationsEnabled,
+    String? logoUrl,
+    String? restaurantDescription,
+    CashbackType? cashbackType,
+    double? cashbackValue,
+    double? minOrderForLoyalty,
+    List<PaymentMethodConfig>? paymentMethods,
+    List<SalesPlatformConfig>? salesPlatforms,
+    List<PosRole>? posRoles,
+    int? posAutoLockMinutes,
+    String? notificationEmail,
+    bool? notifyOnNewOrderEmail,
+    bool? notifyOnShiftCloseEmail,
   }) {
     final nextCountry = whatsappCountryCode ?? this.whatsappCountryCode;
     final nextPhone = whatsappPhone ?? this.whatsappPhone;
@@ -135,6 +231,19 @@ class RestaurantSettings {
       impulseBumpMaxPrice: impulseBumpMaxPrice ?? this.impulseBumpMaxPrice,
       smartRecommendationsEnabled:
           smartRecommendationsEnabled ?? this.smartRecommendationsEnabled,
+      logoUrl: logoUrl ?? this.logoUrl,
+      restaurantDescription: restaurantDescription ?? this.restaurantDescription,
+      cashbackType: cashbackType ?? this.cashbackType,
+      cashbackValue: cashbackValue ?? this.cashbackValue,
+      minOrderForLoyalty: minOrderForLoyalty ?? this.minOrderForLoyalty,
+      paymentMethods: paymentMethods ?? this.paymentMethods,
+      salesPlatforms: salesPlatforms ?? this.salesPlatforms,
+      posRoles: posRoles ?? this.posRoles,
+      posAutoLockMinutes: posAutoLockMinutes ?? this.posAutoLockMinutes,
+      notificationEmail: notificationEmail ?? this.notificationEmail,
+      notifyOnNewOrderEmail: notifyOnNewOrderEmail ?? this.notifyOnNewOrderEmail,
+      notifyOnShiftCloseEmail:
+          notifyOnShiftCloseEmail ?? this.notifyOnShiftCloseEmail,
     );
   }
 
@@ -148,6 +257,18 @@ class RestaurantSettings {
         'impulseBumpItemIds': impulseBumpItemIds,
         'impulseBumpMaxPrice': impulseBumpMaxPrice,
         'smartRecommendationsEnabled': smartRecommendationsEnabled,
+        'logoUrl': logoUrl,
+        'restaurantDescription': restaurantDescription,
+        'cashbackType': cashbackType.storageValue,
+        'cashbackValue': cashbackValue,
+        'minOrderForLoyalty': minOrderForLoyalty,
+        'paymentMethods': configuredPaymentMethods.map((m) => m.toJson()).toList(),
+        'salesPlatforms': resolvedSalesPlatforms.map((p) => p.toJson()).toList(),
+        'posRoles': resolvedPosRoles.map((role) => role.toJson()).toList(),
+        'posAutoLockMinutes': posAutoLockMinutes,
+        'notificationEmail': notificationEmail,
+        'notifyOnNewOrderEmail': notifyOnNewOrderEmail,
+        'notifyOnShiftCloseEmail': notifyOnShiftCloseEmail,
         if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
       };
 }

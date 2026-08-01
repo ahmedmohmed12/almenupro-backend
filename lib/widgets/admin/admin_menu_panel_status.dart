@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/api_service.dart';
 import 'admin_sidebar.dart';
 
 /// Live status reported by [AdminMenuPanel] to the dashboard shell.
@@ -20,25 +21,6 @@ class AdminMenuPanelStatus {
 
   bool get isHealthy =>
       !loading && errorMessage == null && apiOnline && !savingOrder;
-
-  @override
-  bool operator ==(Object other) {
-    return other is AdminMenuPanelStatus &&
-        other.loading == loading &&
-        other.apiOnline == apiOnline &&
-        other.errorMessage == errorMessage &&
-        other.savingOrder == savingOrder &&
-        other.itemCount == itemCount;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-        loading,
-        apiOnline,
-        errorMessage,
-        savingOrder,
-        itemCount,
-      );
 }
 
 /// Compact menu status shown above the sidebar collapse control — only when needed.
@@ -146,4 +128,25 @@ class AdminMenuSidebarFooter extends StatelessWidget {
     }
     return const Color(0xFF81C784);
   }
+}
+
+/// Tiny success chip for optional manual peek — not used when healthy (hidden).
+class AdminMenuPanelStatusReporter {
+  static AdminMenuPanelStatus fromPanelState({
+    required bool loading,
+    required bool apiOnline,
+    String? errorMessage,
+    required bool savingOrder,
+    required int itemCount,
+  }) {
+    return AdminMenuPanelStatus(
+      loading: loading,
+      apiOnline: apiOnline,
+      errorMessage: errorMessage,
+      savingOrder: savingOrder,
+      itemCount: itemCount,
+    );
+  }
+
+  static String get apiBaseLabel => ApiService.baseUrl;
 }

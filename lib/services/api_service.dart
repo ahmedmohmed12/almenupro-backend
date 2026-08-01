@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import '../models/customer.dart';
 import '../models/customer_checkout_profile.dart';
 import '../models/delivery_zone.dart';
+import '../models/loyalty_cashback.dart';
 import '../models/menu_item.dart';
 
 import '../models/order.dart';
@@ -76,6 +77,18 @@ class ApiService {
         ...AdminAuthService.instance.authHeaders,
         ...SuperAdminScopeService.instance.scopeHeaders,
       };
+
+  Future<bool> validateAuthSession() async {
+    if (!AdminAuthService.instance.isLoggedIn) return false;
+    try {
+      final response = await http
+          .get(_uri('/auth/me'), headers: _jsonHeaders)
+          .timeout(_fetchTimeout);
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 
   String _scopedRestaurantId({String? restaurantId}) {
     if (restaurantId != null && restaurantId.isNotEmpty) {
@@ -208,35 +221,35 @@ class ApiService {
 
 
   Future<Restaurant> createRestaurant({
-
     required String name,
-
     required String slug,
-
     required String adminPassword,
-
+    String ownerName = '',
+    String phone = '',
+    RestaurantStatus status = RestaurantStatus.active,
+    SubscriptionPlan subscriptionPlan = SubscriptionPlan.free,
+    SubscriptionStatus subscriptionStatus = SubscriptionStatus.active,
+    DateTime? subscriptionExpiresAt,
+    String subscriptionNotes = '',
   }) async {
-
     final response = await http
-
         .post(
-
           _uri('/restaurants'),
-
           headers: _jsonHeaders,
-
           body: jsonEncode({
-
             'name': name,
-
             'slug': slug,
-
             'adminPassword': adminPassword,
-
+            if (ownerName.isNotEmpty) 'ownerName': ownerName,
+            if (phone.isNotEmpty) 'phone': phone,
+            'status': status.apiValue,
+            'subscriptionPlan': subscriptionPlan.apiValue,
+            'subscriptionStatus': subscriptionStatus.apiValue,
+            if (subscriptionExpiresAt != null)
+              'subscriptionExpiresAt': subscriptionExpiresAt.toUtc().toIso8601String(),
+            if (subscriptionNotes.isNotEmpty) 'subscriptionNotes': subscriptionNotes,
           }),
-
         )
-
         .timeout(_fetchTimeout);
 
 
@@ -277,10 +290,60 @@ class ApiService {
 
 
     return Restaurant.fromJson(Map<String, dynamic>.from(decoded));
-
   }
 
+  Future<Restaurant> updateRestaurant({
+    required String id,
+    required String name,
+    required String slug,
+    String ownerName = '',
+    String phone = '',
+    RestaurantStatus status = RestaurantStatus.active,
+    SubscriptionPlan subscriptionPlan = SubscriptionPlan.free,
+    SubscriptionStatus subscriptionStatus = SubscriptionStatus.active,
+    DateTime? subscriptionExpiresAt,
+    String subscriptionNotes = '',
+    String? adminPassword,
+  }) async {
+    final response = await http
+        .patch(
+          _uri('/restaurants/$id'),
+          headers: _jsonHeaders,
+          body: jsonEncode({
+            'name': name,
+            'slug': slug,
+            if (ownerName.isNotEmpty) 'ownerName': ownerName,
+            if (phone.isNotEmpty) 'phone': phone,
+            'status': status.apiValue,
+            'subscriptionPlan': subscriptionPlan.apiValue,
+            'subscriptionStatus': subscriptionStatus.apiValue,
+            if (subscriptionExpiresAt != null)
+              'subscriptionExpiresAt': subscriptionExpiresAt.toUtc().toIso8601String(),
+            if (subscriptionNotes.isNotEmpty) 'subscriptionNotes': subscriptionNotes,
+            if (adminPassword != null && adminPassword.isNotEmpty)
+              'adminPassword': adminPassword,
+          }),
+        )
+        .timeout(_fetchTimeout);
 
+    if (response.statusCode != 200) {
+      String message = 'فشل في تحديث المطعم (${response.statusCode})';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['error'] != null) {
+          message = decoded['error'].toString();
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return Restaurant.fromJson(Map<String, dynamic>.from(decoded));
+  }
 
   Future<Restaurant> fetchPublicRestaurant(String slug) async {
     final cleanSlug = slug.trim().toLowerCase();
@@ -1368,6 +1431,52 @@ class ApiService {
     if (response.statusCode != 200) {
       throw Exception('فشل في حذف منطقة التوصيل (${response.statusCode})');
     }
+  }
+
+  Future<void> logUpsellEvents(List<Map<String, dynamic>> events) async {
+    if (events.isEmpty) return;
+
+    final response = await http
+        .post(
+          _uri('/analytics/upsell-events'),
+          headers: {
+            ..._publicHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'events': events}),
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Upsell event logging failed (${response.statusCode})');
+    }
+  }
+
+  Future<LoyaltyCashbackPreview> calculateLoyaltyCashback({
+    required double orderTotal,
+    String? restaurantId,
+  }) async {
+    final scopedId = _scopedRestaurantId(restaurantId: restaurantId);
+    final query = <String, String>{'restaurant_id': scopedId};
+
+    final response = await http
+        .post(
+          _uri('/loyalty/preview', query),
+          headers: _jsonHeaders,
+          body: jsonEncode({'orderTotal': orderTotal}),
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في حساب الكاش باك (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return LoyaltyCashbackPreview.fromMap(Map<String, dynamic>.from(decoded));
   }
 
 }

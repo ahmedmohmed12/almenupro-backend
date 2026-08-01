@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -5,6 +7,7 @@ import '../../models/customer.dart';
 import '../../models/order.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import 'admin_breakpoints.dart';
 import 'order_status_chip.dart';
 
 class AdminCustomersPanel extends StatefulWidget {
@@ -49,80 +52,83 @@ class _AdminCustomersPanelState extends State<AdminCustomersPanel> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _CustomersHeader(onRefresh: _reloadCustomers),
-        Expanded(
-          child: FutureBuilder<List<Customer>>(
-            future: _customersFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF6B1124)),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'خطأ في تحميل العملاء: ${snapshot.error}',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                );
-              }
-
-              final customers = snapshot.data ?? [];
-              if (customers.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.people_outline,
-                            size: 56, color: Colors.grey.shade400),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'لا يوجد عملاء مسجلون بعد',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF6B1124),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'سيُسجَّل العملاء تلقائياً عند إتمام أول طلب.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: customers.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final customer = customers[index];
-                  return _CustomerListCard(
-                    customer: customer,
-                    onTap: () => _openCustomer(customer.id),
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _CustomersHeader(onRefresh: _reloadCustomers),
+          Expanded(
+            child: FutureBuilder<List<Customer>>(
+              future: _customersFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF6B1124)),
                   );
-                },
-              );
-            },
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'خطأ في تحميل العملاء: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+
+                final customers = snapshot.data ?? [];
+                if (customers.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people_outline,
+                              size: 56, color: Colors.grey.shade400),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'لا يوجد عملاء مسجلون بعد',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6B1124),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'سيُسجَّل العملاء تلقائياً عند إتمام أول طلب.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: customers.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final customer = customers[index];
+                    return _CustomerListCard(
+                      customer: customer,
+                      onTap: () => _openCustomer(customer.id),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -173,96 +179,99 @@ class _AdminCustomerDetailViewState extends State<AdminCustomerDetailView> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('d/M/yyyy • HH:mm');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: widget.onBack,
-                icon: const Icon(Icons.arrow_forward),
-                tooltip: 'رجوع',
-              ),
-              const Expanded(
-                child: Text(
-                  'ملف العميل',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF6B1124),
-                  ),
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.arrow_forward),
+                  tooltip: 'رجوع',
                 ),
-              ),
-              IconButton(
-                onPressed: _reload,
-                icon: const Icon(Icons.refresh, color: AppTheme.brandOrange),
-                tooltip: 'تحديث',
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: FutureBuilder<CustomerDetailData>(
-            future: _detailFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF6B1124)),
-                );
-              }
-
-              if (snapshot.hasError || !snapshot.hasData) {
-                return Center(
-                  child: Text('تعذر تحميل بيانات العميل: ${snapshot.error}'),
-                );
-              }
-
-              final detail = snapshot.data!;
-              final customer = detail.customer;
-              final orders = _parseOrders(detail);
-
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _CustomerProfileCard(customer: customer),
-                  const SizedBox(height: 20),
-                  Text(
-                    'سجل الطلبات (${orders.length})',
-                    style: const TextStyle(
-                      fontSize: 18,
+                const Expanded(
+                  child: Text(
+                    'ملف العميل',
+                    style: TextStyle(
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF6B1124),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  if (orders.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text('لا توجد طلبات سابقة لهذا العميل.'),
-                    )
-                  else
-                    ...orders.map(
-                      (order) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _CustomerOrderCard(
-                          order: order,
-                          dateFormat: dateFormat,
-                        ),
+                ),
+                IconButton(
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh, color: AppTheme.brandOrange),
+                  tooltip: 'تحديث',
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<CustomerDetailData>(
+              future: _detailFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF6B1124)),
+                  );
+                }
+
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return Center(
+                    child: Text('تعذر تحميل بيانات العميل: ${snapshot.error}'),
+                  );
+                }
+
+                final detail = snapshot.data!;
+                final customer = detail.customer;
+                final orders = _parseOrders(detail);
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    _CustomerProfileCard(customer: customer),
+                    const SizedBox(height: 20),
+                    Text(
+                      'سجل الطلبات (${orders.length})',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF6B1124),
                       ),
                     ),
-                ],
-              );
-            },
+                    const SizedBox(height: 12),
+                    if (orders.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text('لا توجد طلبات سابقة لهذا العميل.'),
+                      )
+                    else
+                      ...orders.map(
+                        (order) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _CustomerOrderCard(
+                            order: order,
+                            dateFormat: dateFormat,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

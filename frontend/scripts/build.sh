@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.20.2 (menu admin sidebar status footer)"
+echo "Almenupro frontend build v1.40.0 (POS sidebar + reports tenant fix)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=menu-admin-sidebar-status-v1.20.2
+  --dart-define=BUILD_FEATURE=pos-sidebar-reports-v1.40.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -36,8 +36,10 @@ cp -r "$ROOT/build/web/." "$FRONTEND_DIR/dist/"
 cp "$FRONTEND_DIR/landing/index.html" "$FRONTEND_DIR/dist/landing.html"
 cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
-BUILD_ID="1.20.2-menu-admin-sidebar-status-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["menu-admin-sidebar-status","menu-admin-status-bottom","smart-upsell-phase2","smart-recommendations-engine","advanced-linked-sides","checkout-impulse-bumps-v2","smart-upsell-sidebar","smart-upsell-phase1","menu-addons-side-items","profile-logout-dropdown","menu-edit-reorder","collapsible-sidebar","admin-pos-top","picks-for-you","brand-logo"]}\n' "$BUILD_ID" \
+cp "$FRONTEND_DIR/middleware.js" "$FRONTEND_DIR/dist/middleware.js"
+
+BUILD_ID="1.40.0-pos-sidebar-reports-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["pos-sidebar-rbac","reports-tenant-fix","analytics-api","shift-reports","food-cost-report","pos-redesign","smart-upsell-analytics"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 # Cache-bust bootstrap loader so browsers fetch the latest main.dart.js bundle.

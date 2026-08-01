@@ -12,21 +12,12 @@
           "data/**",
           "uploads/menu/**",
           "public/menu-images/**",
-          "lib/menuImageStorage.js",
-          "lib/talabatScraper.js"
+          "lib/menuImageStorage.js"
         ]
       }
     }
   ],
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/apiServer.js"
-    },
-    {
-      "source": "/menu-images/(.*)",
-      "destination": "/apiServer.js"
-    },
     {
       "source": "/api/(.*)",
       "destination": "/apiServer.js"
@@ -45,8 +36,8 @@
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, PUT, DELETE, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Restaurant-Id" }
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, PUT, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
   ]

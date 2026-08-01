@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,6 +38,10 @@ class AdminAuthService {
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return;
       _session = AdminSession.fromJson(Map<String, dynamic>.from(decoded));
+      final valid = await ApiService.instance.validateAuthSession();
+      if (!valid) {
+        await logout();
+      }
     } catch (_) {
       _session = null;
     }

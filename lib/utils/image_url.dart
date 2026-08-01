@@ -20,43 +20,21 @@ bool isLegacyTalabatImageUrl(String url) {
 
 bool isLocalMenuImagePath(String url) {
   final trimmed = url.trim();
-  return trimmed.startsWith('/menu-images/') ||
-      trimmed.startsWith('/api/uploads/menu/');
+  return trimmed.startsWith('/api/uploads/menu/');
 }
 
-bool isBackendImageProxyPath(String url) {
-  return url.trim().contains('/api/image-proxy');
-}
-
-String? localMenuImageFilename(String url) {
-  final trimmed = url.trim();
-  if (!isLocalMenuImagePath(trimmed)) return null;
-  final parts = trimmed.split('/');
-  return parts.isEmpty ? null : parts.last;
-}
-
-/// Builds a browser-loadable image URL from API payloads or stored paths.
+/// Normalizes menu image paths for display. Prefers locally hosted Almenupro URLs
+/// and ignores legacy Talabat CDN links that should be migrated on the server.
 String resolveImageUrl(String url) {
   final trimmed = url.trim();
   if (trimmed.isEmpty) return trimmed;
 
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
-  }
-
-  if (isBackendImageProxyPath(trimmed)) {
-    return trimmed.startsWith('/')
-        ? '$menuImageApiOrigin$trimmed'
-        : trimmed;
-  }
-
-  final filename = localMenuImageFilename(trimmed);
-  if (filename != null && filename.isNotEmpty) {
-    return '$menuImageApiOrigin/menu-images/$filename';
+  if (isLocalMenuImagePath(trimmed)) {
+    return '$menuImageApiOrigin$trimmed';
   }
 
   if (isLegacyTalabatImageUrl(trimmed)) {
-    return '$menuImageApiOrigin/api/image-proxy?url=${Uri.encodeComponent(trimmed)}';
+    return '';
   }
 
   if (trimmed.startsWith('/')) {
@@ -66,15 +44,11 @@ String resolveImageUrl(String url) {
   return trimmed;
 }
 
-/// Parses API payloads — keeps local paths, proxy paths, and absolute URLs.
+/// Used when parsing API payloads — keeps local paths, drops legacy CDN URLs.
 String normalizeMenuImageUrl(Object? raw) {
   final value = (raw ?? '').toString().trim();
   if (value.isEmpty) return '';
-  if (value.startsWith('http://') || value.startsWith('https://')) {
-    return value;
-  }
   if (isLocalMenuImagePath(value)) return value;
-  if (isBackendImageProxyPath(value)) return value;
-  if (isLegacyTalabatImageUrl(value)) return value;
+  if (isLegacyTalabatImageUrl(value)) return '';
   return value;
 }

@@ -1,0 +1,205 @@
+import 'package:flutter/material.dart';
+
+import '../../../services/super_admin_scope_service.dart';
+import '../../../utils/admin_settings_url.dart';
+import '../admin_loyalty_settings_card.dart';
+import '../admin_payment_settings_card.dart';
+import '../admin_platform_settings_card.dart';
+import '../admin_pos_roles_staff_card.dart';
+import '../admin_responsive_layout.dart';
+import '../admin_sound_settings_card.dart';
+import '../admin_store_profile_card.dart';
+import '../admin_working_hours_card.dart';
+import 'admin_email_notifications_card.dart';
+import 'admin_settings_tab.dart';
+import 'admin_whatsapp_settings_section.dart';
+
+class AdminSettingsTabbedPanel extends StatefulWidget {
+  const AdminSettingsTabbedPanel({
+    super.key,
+    required this.isSuperAdmin,
+    this.restaurantLabel,
+  });
+
+  final bool isSuperAdmin;
+  final String? restaurantLabel;
+
+  @override
+  State<AdminSettingsTabbedPanel> createState() =>
+      _AdminSettingsTabbedPanelState();
+}
+
+class _AdminSettingsTabbedPanelState extends State<AdminSettingsTabbedPanel> {
+  static const burgundy = Color(0xFF6B1124);
+
+  late AdminSettingsTab _activeTab;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeTab = readSettingsTabFromUrl();
+  }
+
+  void _selectTab(AdminSettingsTab tab) {
+    if (_activeTab == tab) return;
+    setState(() => _activeTab = tab);
+    writeSettingsTabToUrl(tab);
+  }
+
+  IconData _iconFor(AdminSettingsTab tab) {
+    switch (tab) {
+      case AdminSettingsTab.whatsapp:
+        return Icons.chat_bubble_outline;
+      case AdminSettingsTab.store:
+        return Icons.storefront_outlined;
+      case AdminSettingsTab.loyalty:
+        return Icons.card_giftcard_outlined;
+      case AdminSettingsTab.email:
+        return Icons.mail_outline;
+      case AdminSettingsTab.platforms:
+        return Icons.hub_outlined;
+      case AdminSettingsTab.paymentMethods:
+        return Icons.payments_outlined;
+      case AdminSettingsTab.roles:
+        return Icons.admin_panel_settings_outlined;
+      case AdminSettingsTab.workingHours:
+        return Icons.schedule_outlined;
+      case AdminSettingsTab.audioNotifications:
+        return Icons.notifications_active_outlined;
+    }
+  }
+
+  Widget _buildTabButton(AdminSettingsTab tab) {
+    final selected = _activeTab == tab;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _selectTab(tab),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? burgundy : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? burgundy : Colors.grey.shade300,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: burgundy.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _iconFor(tab),
+                size: 18,
+                color: selected ? Colors.white : burgundy,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  tab.labelAr,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.grey.shade800,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveTabContent() {
+    switch (_activeTab) {
+      case AdminSettingsTab.whatsapp:
+        return const AdminWhatsappSettingsSection();
+      case AdminSettingsTab.store:
+        return const AdminStoreProfileCard();
+      case AdminSettingsTab.loyalty:
+        return const AdminLoyaltySettingsCard();
+      case AdminSettingsTab.email:
+        return const AdminEmailNotificationsCard();
+      case AdminSettingsTab.platforms:
+        return const AdminPlatformSettingsCard();
+      case AdminSettingsTab.paymentMethods:
+        return const AdminPaymentSettingsCard();
+      case AdminSettingsTab.roles:
+        return const AdminPosRolesStaffCard();
+      case AdminSettingsTab.workingHours:
+        return const AdminWorkingHoursCard();
+      case AdminSettingsTab.audioNotifications:
+        return const AdminSoundSettingsCard();
+    }
+  }
+
+  List<AdminSettingsTab> get _visibleTabs {
+    return AdminSettingsTab.sidebarItems(isSuperAdmin: widget.isSuperAdmin);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = SuperAdminScopeService.instance;
+    final restaurantLabel = widget.isSuperAdmin
+        ? (scope.selectedRestaurantName ?? '—')
+        : (widget.restaurantLabel ?? 'المطعم');
+
+    return AdminResponsivePage(
+      scrollable: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'إعدادات المحل والواتساب',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: burgundy,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.isSuperAdmin
+                ? 'المطعم الحالي: $restaurantLabel'
+                : 'اضبط إعدادات محلّك من التبويبات أدناه',
+          ),
+          if (widget.isSuperAdmin && !scope.hasSelection) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'اختر مطعماً من قائمة «المطاعم» أولاً.',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ],
+          const SizedBox(height: 20),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _visibleTabs.map(_buildTabButton).toList(),
+            ),
+          ),
+          const SizedBox(height: 20),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: KeyedSubtree(
+              key: ValueKey(_activeTab.id),
+              child: _buildActiveTabContent(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

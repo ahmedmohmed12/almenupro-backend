@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/order.dart';
-import '../../services/admin_order_monitor_service.dart';
 import '../../services/orders_service.dart';
+import '../../utils/order_sound.dart';
 import 'order_status_chip.dart';
-import 'admin_corner_toast.dart';
-import 'admin_breakpoints.dart';
 
 class AdminOrdersPanel extends StatefulWidget {
-  const AdminOrdersPanel({super.key});
+  const AdminOrdersPanel({
+    super.key,
+    this.onPendingCountChanged,
+  });
+
+  final ValueChanged<int>? onPendingCountChanged;
 
   @override
   State<AdminOrdersPanel> createState() => AdminOrdersPanelState();
@@ -18,7 +21,8 @@ class AdminOrdersPanel extends StatefulWidget {
 class AdminOrdersPanelState extends State<AdminOrdersPanel>
     with SingleTickerProviderStateMixin {
   final _ordersService = OrdersService.instance;
-  final _monitor = AdminOrderMonitorService.instance;
+  final Set<String> _knownOrderIds = {};
+  var _initialized = false;
 
   late final TabController _tabController;
 
@@ -39,23 +43,56 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
   }
 
   Future<void> _updateStatus(String orderId, OrderStatus status) async {
-    await _monitor.acknowledgeOrder(orderId);
-
     try {
       await _ordersService.updateOrderStatus(orderId, status);
       if (!mounted) return;
-      AdminCornerToast.success(
-        context,
-        'تم: ${status.arabicLabel}',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم تحديث الحالة: ${status.arabicLabel}')),
       );
     } catch (error) {
       if (!mounted) return;
-      AdminCornerToast.error(context, 'تعذر تحديث الطلب');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث الطلب: $error')),
+      );
     }
   }
 
-  Future<void> _stopAlertLoop() async {
-    await _monitor.stopAllAlerts();
+  void _handleOrdersUpdate(List<Order> orders) {
+    final pendingCount =
+        orders.where((order) => order.status == OrderStatus.pending).length;
+    widget.onPendingCountChanged?.call(pendingCount);
+
+    if (!_initialized) {
+      _knownOrderIds
+        ..clear()
+        ..addAll(orders.map((order) => order.id));
+      _initialized = true;
+      return;
+    }
+
+    for (final order in orders) {
+      if (order.status != OrderStatus.pending) continue;
+      if (_knownOrderIds.contains(order.id)) continue;
+
+      _knownOrderIds.add(order.id);
+      playNewOrderSound();
+
+      if (!mounted) continue;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 4),
+          content: Text(
+            '🔔 طلب جديد #${order.invoiceNumber ?? order.id.substring(0, 6)} '
+            'من ${order.customerName}',
+          ),
+        ),
+      );
+    }
+
+    _knownOrderIds
+      ..clear()
+      ..addAll(orders.map((order) => order.id));
   }
 
   List<Order> _activeOrders(List<Order> orders) {
@@ -98,6 +135,9 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
         }
 
         final orders = snapshot.data ?? [];
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleOrdersUpdate(orders);
+        });
 
         final activeOrders = _activeOrders(orders);
         final archivedOrders = _archivedOrders(orders);
@@ -105,68 +145,44 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ValueListenableBuilder<bool>(
-              valueListenable: _monitor.alertLoopActive,
-              builder: (context, isAlertLooping, _) {
-                return _OrdersPageHeader(
-                  activeCount: activeOrders.length,
-                  archivedCount: archivedOrders.length,
-                  pendingCount: orders
-                      .where((order) => order.status == OrderStatus.pending)
-                      .length,
-                  isAlertLooping: isAlertLooping,
-                  onStopAlert: _stopAlertLoop,
-                );
-              },
+            _OrdersPageHeader(
+              activeCount: activeOrders.length,
+              archivedCount: archivedOrders.length,
+              pendingCount: orders
+                  .where((order) => order.status == OrderStatus.pending)
+                  .length,
             ),
             if (_ordersService.isDemoMode) const _DemoOrdersBanner(),
             Material(
               color: Colors.white,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < AdminBreakpoints.compact;
-                  return TabBar(
-                    controller: _tabController,
-                    isScrollable: compact,
-                    labelColor: const Color(0xFF6B1124),
-                    unselectedLabelColor: Colors.grey.shade600,
-                    indicatorColor: const Color(0xFFD49A00),
-                    indicatorWeight: 3,
-                    tabAlignment: compact ? TabAlignment.start : TabAlignment.fill,
-                    tabs: [
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.fiber_new_outlined, size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              compact
-                                  ? 'جديدة (${activeOrders.length})'
-                                  : 'الطلبات الجديدة (${activeOrders.length})',
-                            ),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.inventory_2_outlined, size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              compact
-                                  ? 'سابقة (${archivedOrders.length})'
-                                  : 'الطلبات السابقة (${archivedOrders.length})',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              child: TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF6B1124),
+                unselectedLabelColor: Colors.grey.shade600,
+                indicatorColor: const Color(0xFFD49A00),
+                indicatorWeight: 3,
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.fiber_new_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text('الطلبات الجديدة (${activeOrders.length})'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.inventory_2_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text('الطلبات السابقة (${archivedOrders.length})'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -205,22 +221,16 @@ class _OrdersPageHeader extends StatelessWidget {
     required this.activeCount,
     required this.archivedCount,
     required this.pendingCount,
-    required this.isAlertLooping,
-    required this.onStopAlert,
   });
 
   final int activeCount;
   final int archivedCount;
   final int pendingCount;
-  final bool isAlertLooping;
-  final VoidCallback onStopAlert;
 
   @override
   Widget build(BuildContext context) {
-    final padding = AdminBreakpoints.pagePadding(context);
-
     return Container(
-      padding: EdgeInsets.fromLTRB(padding, 16, padding, 12),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
       color: const Color(0xFFF4F6F8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +238,7 @@ class _OrdersPageHeader extends StatelessWidget {
           const Text(
             'إدارة الطلبات',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Color(0xFF6B1124),
             ),
@@ -261,20 +271,6 @@ class _OrdersPageHeader extends StatelessWidget {
                 value: '$archivedCount',
                 color: Colors.brown,
               ),
-              if (isAlertLooping)
-                ActionChip(
-                  avatar: Icon(Icons.volume_off, color: Colors.red.shade700),
-                  label: Text(
-                    'إيقاف التنبيه',
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  backgroundColor: Colors.red.shade50,
-                  side: BorderSide(color: Colors.red.shade200),
-                  onPressed: onStopAlert,
-                ),
             ],
           ),
         ],
@@ -463,14 +459,8 @@ class _AdminOrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final itemLines = order.items
         .map(
-          (item) {
-            final addons = item.selectedOptions
-                .map((option) => '  + ${option.group}: ${option.name}')
-                .join('\n');
-            final base =
-                '${item.quantity}x ${item.name} (${item.lineTotal.toStringAsFixed(3)} د.ك)';
-            return addons.isEmpty ? base : '$base\n$addons';
-          },
+          (item) =>
+              '${item.quantity}x ${item.name} (${item.lineTotal.toStringAsFixed(3)} د.ك)',
         )
         .join('\n');
     final nextStatus = readOnly ? null : order.status.nextStatus;
@@ -518,12 +508,6 @@ class _AdminOrderCard extends StatelessWidget {
             const SizedBox(height: 12),
             _InfoRow(icon: Icons.phone, text: order.phone),
             _InfoRow(icon: Icons.location_on, text: order.address),
-            if ((order.deliveryFee ?? 0) > 0)
-              _InfoRow(
-                icon: Icons.local_shipping_outlined,
-                text:
-                    'رسوم التوصيل: ${order.deliveryFee!.toStringAsFixed(3)} د.ك',
-              ),
             _InfoRow(icon: Icons.payment, text: paymentLabel),
             const SizedBox(height: 10),
             Text(
@@ -531,56 +515,22 @@ class _AdminOrderCard extends StatelessWidget {
               style: TextStyle(color: Colors.grey.shade800, height: 1.5),
             ),
             const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < AdminBreakpoints.compact;
-                if (compact) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if ((order.subtotal ?? 0) > 0 &&
-                          (order.deliveryFee ?? 0) > 0) ...[
-                        Text(
-                          'المجموع: ${order.subtotal!.toStringAsFixed(3)} + توصيل ${order.deliveryFee!.toStringAsFixed(3)} د.ك',
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                        const SizedBox(height: 4),
-                      ],
-                      Text(
-                        '${order.totalPrice.toStringAsFixed(3)} د.ك',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.brown,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        dateFormat.format(order.createdAt.toLocal()),
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Text(
-                      '${order.totalPrice.toStringAsFixed(3)} د.ك',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.brown,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      dateFormat.format(order.createdAt.toLocal()),
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                  ],
-                );
-              },
+            Row(
+              children: [
+                Text(
+                  '${order.totalPrice.toStringAsFixed(3)} د.ك',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.brown,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  dateFormat.format(order.createdAt.toLocal()),
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ],
             ),
             if (nextStatus != null && nextLabel != null) ...[
               const SizedBox(height: 14),

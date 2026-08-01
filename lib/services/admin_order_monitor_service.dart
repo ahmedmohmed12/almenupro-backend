@@ -65,10 +65,8 @@ class AdminOrderMonitorService {
     pendingCount.value = 0;
   }
 
-  Future<void> acknowledgeOrder(String orderId) async {
-    await OrderAlertSoundService.instance.acknowledgeOrder(orderId);
-    _syncAlertLoopFlag();
-  }
+  Future<void> acknowledgeOrder(String orderId) =>
+      OrderAlertSoundService.instance.acknowledgeOrder(orderId);
 
   Future<void> stopAllAlerts() async {
     await OrderAlertSoundService.instance.stopAllAlerts();

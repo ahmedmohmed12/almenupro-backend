@@ -36,6 +36,7 @@ import '../widgets/admin/admin_super_restaurants_panel.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
 import '../widgets/admin/admin_smart_upsell_panel.dart';
+import '../widgets/admin/settings/admin_settings_tabbed_panel.dart';
 import '../widgets/admin/admin_working_hours_card.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -472,7 +473,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     const SizedBox(height: 8),
                     AdminItemAddonsEditor(
                       options: addonOptions,
-                      currentItemId: int.tryParse(editingItemId?.toString() ?? ''),
                       onChanged: (next) =>
                           setDialogState(() => addonOptions = next),
                     ),
@@ -481,7 +481,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     const SizedBox(height: 8),
                     AdminItemLinkedSidesEditor(
                       linkedItemIds: linkedItemIds,
-                      currentItemId: int.tryParse(editingItemId?.toString() ?? ''),
                       onChanged: (next) =>
                           setDialogState(() => linkedItemIds = next),
                     ),
@@ -1005,7 +1004,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         showOrderNotifications: false,
         restaurantLabel: _restaurantLabel,
         onMenuTap: onMenuTap,
-        onLogout: _logout,
       );
     }
 
@@ -1018,7 +1016,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           restaurantLabel: _restaurantLabel,
           pendingOrdersCount: pendingCount,
           onMenuTap: onMenuTap,
-          onLogout: _logout,
           onNotificationsTap: () {
             setState(() => _selectedIndex = AdminSidebar.ordersIndex);
             _ordersPanelKey.currentState?.selectNewOrdersTab();
@@ -1053,9 +1050,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onAddItem: () => _showItemDialog(),
             onEditItem: (record) => _showItemDialog(record: record),
             onDeleteItem: _deleteItem,
-            canImportTalabat: false,
-            canManageItems: SuperAdminScopeService.instance.hasSelection,
-            onStatusChanged: _onMenuPanelStatusChanged,
+            canImportTalabat: SuperAdminScopeService.instance.hasSelection,
+            onAutofillTalabat: SuperAdminScopeService.instance.hasSelection
+                ? _showAutofillDialog
+                : () {},
           );
         case AdminSidebar.superRestaurantsIndex:
           return const AdminSuperRestaurantsPanel();
@@ -1066,7 +1064,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         case AdminSidebar.superSmartUpsellIndex:
           return const AdminSmartUpsellPanel();
         case AdminSidebar.superSettingsIndex:
-          return _buildSettingsTab();
+          return AdminSettingsTabbedPanel(
+            isSuperAdmin: true,
+            restaurantLabel: _restaurantLabel,
+          );
         default:
           return _buildDeliveryZonesPanel();
       }
@@ -1082,9 +1083,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onAddItem: () => _showItemDialog(),
           onEditItem: (record) => _showItemDialog(record: record),
           onDeleteItem: _deleteItem,
-          canImportTalabat: false,
-          canManageItems: true,
-          onStatusChanged: _onMenuPanelStatusChanged,
+          canImportTalabat: true,
+          onAutofillTalabat: _showAutofillDialog,
         );
       case AdminSidebar.deliveryZonesIndex:
         return _buildDeliveryZonesPanel();
@@ -1093,7 +1093,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case AdminSidebar.smartUpsellIndex:
         return const AdminSmartUpsellPanel();
       case AdminSidebar.settingsIndex:
-        return _buildSettingsTab();
+        return AdminSettingsTabbedPanel(
+          isSuperAdmin: false,
+          restaurantLabel: _restaurantLabel,
+        );
       case AdminSidebar.posIndex:
         return AdminPosPanel(
           onOrderSubmitted: () {

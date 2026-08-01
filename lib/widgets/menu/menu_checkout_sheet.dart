@@ -5,27 +5,16 @@ import 'package:provider/provider.dart';
 
 import '../../data/kuwait_governorates.dart';
 import '../../l10n/app_strings.dart';
-import '../../models/customer_checkout_profile.dart';
 import '../../models/customer_restaurant_context.dart';
 import '../../models/delivery_address_details.dart';
 import '../../models/delivery_zone.dart';
-import '../../models/menu_item.dart';
-import '../../models/restaurant_settings.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/api_service.dart';
-import '../../services/customer_checkout_cache_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
-import '../../models/upsell_recommendation.dart';
-import '../../utils/upsell_item_resolver.dart';
 import '../../utils/whatsapp_launcher.dart';
 import '../../utils/whatsapp_order_message.dart';
-import '../../utils/whatsapp_phone.dart';
-import 'checkout_impulse_bumps.dart';
-import 'checkout_smart_recommendations.dart';
-import 'customization_dialog.dart';
-import 'free_delivery_progress_bar.dart';
 
 class MenuCheckoutSheet extends StatefulWidget {
   const MenuCheckoutSheet({super.key, this.restaurantContext});
@@ -53,7 +42,6 @@ class MenuCheckoutSheet extends StatefulWidget {
 
 class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _scrollController = ScrollController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _blockController = TextEditingController();
@@ -62,61 +50,28 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   final _houseController = TextEditingController();
   final _floorController = TextEditingController();
 
-  final _nameFocus = FocusNode();
-  final _phoneFocus = FocusNode();
-  final _blockFocus = FocusNode();
-  final _streetFocus = FocusNode();
-  final _avenueFocus = FocusNode();
-  final _houseFocus = FocusNode();
-  final _floorFocus = FocusNode();
-
   var _paymentMethod = 'كاش';
   var _submitting = false;
   var _loadingZones = true;
-  var _lookupInProgress = false;
-  var _profileAutofilled = false;
-  var _loadingWhatsapp = true;
-  var _hasWhatsapp = false;
-
-  String _whatsappNumber = '';
-
-  Timer? _lookupDebounce;
-  String? _lastLookupPhone;
 
   List<DeliveryZone> _zones = [];
   String? _selectedGovernorate;
   DeliveryZone? _selectedZone;
-  List<MenuItem> _menuItems = [];
-  List<Map<String, dynamic>> _serverRecommendationHints = const [];
-  List<int> _topItemIds = const [];
-  String _lastCartSignature = '';
 
-  RestaurantSettings get _settings =>
-      widget.restaurantContext?.settings ?? RestaurantSettings.defaults();
-
-  double get _baseDeliveryFee => _selectedZone?.deliveryFee ?? 0;
-
-  double _effectiveDeliveryFee(double subtotal) {
-    if (_settings.hasFreeDeliveryGoal &&
-        subtotal >= _settings.freeDeliveryThreshold &&
-        _baseDeliveryFee > 0) {
-      return 0;
-    }
-    return _baseDeliveryFee;
-  }
-
-  bool _hasFreeDeliveryApplied(double subtotal) =>
-      _settings.hasFreeDeliveryGoal &&
-      subtotal >= _settings.freeDeliveryThreshold &&
-      _baseDeliveryFee > 0;
+  static const _defaultWhatsappNumber = '96594774950';
 
   String get _restaurantName =>
       widget.restaurantContext?.name ?? 'Molten Cookies';
+
+  String get _whatsappNumber =>
+      widget.restaurantContext?.whatsappNumber ?? _defaultWhatsappNumber;
 
   String get _restaurantId =>
       widget.restaurantContext?.id ?? ApiService.defaultRestaurantId;
 
   String? get _restaurantSlug => widget.restaurantContext?.slug;
+
+  double get _deliveryFee => _selectedZone?.deliveryFee ?? 0;
 
   List<String> get _availableGovernorates {
     if (_zones.isEmpty) return kuwaitGovernorates;
@@ -131,109 +86,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
         .where((zone) => zone.governorate == _selectedGovernorate)
         .toList()
       ..sort((a, b) => a.areaName.compareTo(b.areaName));
-  }
-
-  void _syncDefaultArea() {
-    if (_zones.isEmpty) {
-      _selectedZone = null;
-      return;
-    }
-
-    final areas = _areasForGovernorate;
-    if (areas.isEmpty) {
-      _selectedZone = null;
-      return;
-    }
-
-    final currentIsValid = _selectedZone != null &&
-        areas.any((zone) => zone.id == _selectedZone!.id);
-    if (!currentIsValid) {
-      _selectedZone = areas.first;
-    }
-  }
-
-  void _showFeedback(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-        backgroundColor: AppTheme.brandMaroon,
-      ),
-    );
-  }
-
-  void _scrollToAddressFields() {
-    if (!_scrollController.hasClients) return;
-    unawaited(
-      _scrollController.animateTo(
-        280,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOut,
-      ),
-    );
-  }
-
-  bool _validateBeforeSubmit(AppStrings strings) {
-    FocusScope.of(context).unfocus();
-
-    final isValid = _formKey.currentState?.validate() ?? false;
-    if (!isValid) {
-      _showFeedback(strings.fillRequiredFields);
-      _scrollToAddressFields();
-      return false;
-    }
-
-    if (_zones.isNotEmpty) {
-      if (_selectedGovernorate == null || _selectedGovernorate!.trim().isEmpty) {
-        _showFeedback(strings.selectGovernorateAndArea);
-        _scrollToAddressFields();
-        return false;
-      }
-
-      if (_areasForGovernorate.isEmpty) {
-        _showFeedback(strings.noAreasForGovernorate);
-        _scrollToAddressFields();
-        return false;
-      }
-
-      if (_selectedZone == null) {
-        _showFeedback(strings.selectGovernorateAndArea);
-        _scrollToAddressFields();
-        return false;
-      }
-    }
-
-    if (!_hasWhatsapp || _whatsappNumber.trim().isEmpty) {
-      _showFeedback(strings.whatsappNotConfiguredCheckout);
-      return false;
-    }
-
-    return true;
-  }
-
-  Future<void> _resolveWhatsappNumber() async {
-    var number = widget.restaurantContext?.whatsappNumber ?? '';
-
-    if (number.trim().isEmpty) {
-      try {
-        final settings = await ApiService.instance.fetchPublicSettings(
-          slug: _restaurantSlug,
-          restaurantId: _restaurantId,
-        );
-        number = settings.fullWhatsappNumber;
-      } catch (error) {
-        debugPrint('Failed to resolve restaurant WhatsApp: $error');
-      }
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _whatsappNumber = number.trim();
-      _hasWhatsapp = _whatsappNumber.isNotEmpty;
-      _loadingWhatsapp = false;
-    });
   }
 
   DeliveryAddressDetails get _addressDetails => DeliveryAddressDetails(
@@ -265,153 +117,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   @override
   void initState() {
     super.initState();
-    _phoneController.addListener(_onPhoneChanged);
-    _whatsappNumber = widget.restaurantContext?.whatsappNumber ?? '';
-    _hasWhatsapp = _whatsappNumber.trim().isNotEmpty;
-    unawaited(_resolveWhatsappNumber());
-    unawaited(_bootstrapCheckout());
-  }
-
-  Future<void> _bootstrapCheckout() async {
-    await Future.wait([
-      _loadDeliveryZones(),
-      _loadMenuItems(),
-      _loadUpsellData(),
-    ]);
-    final lastPhone =
-        await CustomerCheckoutCacheService.instance.loadLastPhone(_restaurantId);
-    if (!mounted || lastPhone == null || lastPhone.trim().isEmpty) return;
-    if (_phoneController.text.trim().isNotEmpty) return;
-    _phoneController.text = lastPhone.trim();
-  }
-
-  void _onPhoneChanged() {
-    final digits = WhatsAppPhone.digitsOnly(_phoneController.text);
-    if (digits.length < 8) {
-      _lookupDebounce?.cancel();
-      if (_profileAutofilled) {
-        setState(() => _profileAutofilled = false);
-      }
-      return;
-    }
-
-    if (digits == _lastLookupPhone && _profileAutofilled) return;
-
-    _lookupDebounce?.cancel();
-    _lookupDebounce = Timer(const Duration(milliseconds: 600), () {
-      unawaited(_lookupCustomerProfile(digits));
-    });
-  }
-
-  Future<void> _lookupCustomerProfile(String normalizedPhone) async {
-    if (_lookupInProgress && _lastLookupPhone == normalizedPhone) return;
-
-    if (!mounted) return;
-    setState(() {
-      _lookupInProgress = true;
-      _lastLookupPhone = normalizedPhone;
-    });
-
-    try {
-      var profile = await CustomerCheckoutCacheService.instance.loadProfile(
-        _restaurantId,
-        normalizedPhone,
-      );
-
-      profile ??= await ApiService.instance.fetchCustomerCheckoutProfile(
-        phone: normalizedPhone,
-        restaurantId: _restaurantId,
-        slug: _restaurantSlug,
-      );
-
-      if (profile != null && profile.hasUsableData) {
-        await CustomerCheckoutCacheService.instance.saveProfile(
-          _restaurantId,
-          profile,
-        );
-      }
-
-      if (!mounted || profile == null || !profile.hasUsableData) return;
-
-      final resolvedProfile = profile;
-      setState(() => _applyProfile(resolvedProfile));
-      _showFeedback(AppStrings.of(context).profileLoaded);
-    } finally {
-      if (mounted) {
-        setState(() => _lookupInProgress = false);
-      }
-    }
-  }
-
-  void _applyProfile(CustomerCheckoutProfile profile) {
-    if (profile.customerName.trim().isNotEmpty) {
-      _nameController.text = profile.customerName.trim();
-    }
-
-    _blockController.text = profile.addressDetails.block;
-    _streetController.text = profile.addressDetails.street;
-    _avenueController.text = profile.addressDetails.avenue;
-    _houseController.text = profile.addressDetails.houseNumber;
-    _floorController.text = profile.addressDetails.floorApartment;
-
-    if (profile.governorate.trim().isNotEmpty) {
-      _selectedGovernorate = profile.governorate.trim();
-    }
-
-    DeliveryZone? matchedZone;
-    final zoneId = profile.deliveryZoneId?.trim();
-    if (zoneId != null && zoneId.isNotEmpty) {
-      for (final zone in _zones) {
-        if (zone.id == zoneId) {
-          matchedZone = zone;
-          break;
-        }
-      }
-    }
-
-    if (matchedZone == null && profile.areaName.trim().isNotEmpty) {
-      for (final zone in _zones) {
-        final sameArea = zone.areaName.trim() == profile.areaName.trim();
-        final sameGov = profile.governorate.isEmpty ||
-            zone.governorate.trim() == profile.governorate.trim();
-        if (sameArea && sameGov) {
-          matchedZone = zone;
-          break;
-        }
-      }
-    }
-
-    if (matchedZone != null) {
-      _selectedGovernorate = matchedZone.governorate;
-      _selectedZone = matchedZone;
-    } else {
-      _syncDefaultArea();
-    }
-
-    if (profile.paymentMethod.trim().isNotEmpty) {
-      _paymentMethod = profile.paymentMethod.trim();
-    }
-
-    _profileAutofilled = true;
-  }
-
-  CustomerCheckoutProfile _currentProfile() {
-    return CustomerCheckoutProfile(
-      phone: _phoneController.text.trim(),
-      customerName: _nameController.text.trim(),
-      governorate: _selectedZone?.governorate ?? _selectedGovernorate ?? '',
-      areaName: _selectedZone?.areaName ?? '',
-      deliveryZoneId: _selectedZone?.id,
-      addressDetails: _addressDetails,
-      paymentMethod: _paymentMethod,
-    );
-  }
-
-  Future<void> _persistProfile() async {
-    await CustomerCheckoutCacheService.instance.saveProfile(
-      _restaurantId,
-      _currentProfile(),
-    );
+    unawaited(_loadDeliveryZones());
   }
 
   Future<void> _loadDeliveryZones() async {
@@ -427,7 +133,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
         if (_availableGovernorates.isNotEmpty) {
           _selectedGovernorate ??= _availableGovernorates.first;
         }
-        _syncDefaultArea();
       });
     } catch (_) {
       if (!mounted) return;
@@ -435,100 +140,8 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     }
   }
 
-  Future<void> _loadMenuItems() async {
-    try {
-      final slug = _restaurantSlug;
-      final items = slug != null && slug.isNotEmpty
-          ? await ApiService.instance.fetchPublicItems(
-              slug: slug,
-              restaurantId: _restaurantId,
-            )
-          : await ApiService.instance.fetchItems(restaurantId: _restaurantId);
-      if (!mounted) return;
-      setState(() => _menuItems = items);
-      await _refreshRecommendations();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _menuItems = const []);
-    }
-  }
-
-  Future<void> _loadUpsellData() async {
-    try {
-      final topIds = await ApiService.instance.fetchTopMenuItemIds(
-        slug: _restaurantSlug,
-        restaurantId: _restaurantId,
-      );
-      if (!mounted) return;
-      setState(() => _topItemIds = topIds);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _topItemIds = const []);
-    }
-  }
-
-  Future<void> _refreshRecommendations() async {
-    if (!mounted || !_settings.smartRecommendationsEnabled) return;
-    final cart = context.read<CartProvider>();
-    final cartIds = cart.items.map((item) => item.menuItem.id).toList();
-    if (cartIds.isEmpty) {
-      if (mounted) setState(() => _serverRecommendationHints = const []);
-      return;
-    }
-
-    try {
-      final hints = await ApiService.instance.fetchRecommendations(
-        slug: _restaurantSlug,
-        restaurantId: _restaurantId,
-        cartItemIds: cartIds,
-        subtotal: cart.totalPrice,
-      );
-      if (!mounted) return;
-      setState(() => _serverRecommendationHints = hints);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _serverRecommendationHints = const []);
-    }
-  }
-
-  Future<void> _handleUpsellAdd(UpsellRecommendation recommendation) async {
-    final item = recommendation.item;
-    if (item.hasCustomizations) {
-      await showCustomizationDialog(
-        context,
-        item,
-        allMenuItems: _menuItems,
-      );
-      if (!mounted) return;
-      await _refreshRecommendations();
-      return;
-    }
-    if (!mounted) return;
-    context.read<CartProvider>().addMenuItem(item);
-    await _refreshRecommendations();
-    if (!mounted) return;
-    final locale = context.read<LocaleProvider>().localeCode;
-    final strings = AppStrings.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(strings.addedToCart(item.localizedName(locale))),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _focusNext(FocusNode node) {
-    FocusScope.of(context).requestFocus(node);
-  }
-
-  void _unfocusKeyboard() {
-    FocusScope.of(context).unfocus();
-  }
-
   @override
   void dispose() {
-    _lookupDebounce?.cancel();
-    _phoneController.removeListener(_onPhoneChanged);
     _nameController.dispose();
     _phoneController.dispose();
     _blockController.dispose();
@@ -536,104 +149,92 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     _avenueController.dispose();
     _houseController.dispose();
     _floorController.dispose();
-    _nameFocus.dispose();
-    _phoneFocus.dispose();
-    _blockFocus.dispose();
-    _streetFocus.dispose();
-    _avenueFocus.dispose();
-    _houseFocus.dispose();
-    _floorFocus.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _submit(CartProvider cart, AppStrings strings) async {
-    if (_submitting) return;
-    if (!_validateBeforeSubmit(strings)) return;
+    if (!_formKey.currentState!.validate()) return;
+    if (_zones.isNotEmpty && _selectedZone == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.selectGovernorateAndArea)),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
 
-    try {
-      final subtotal = cart.totalPrice;
-      final deliveryFee = _effectiveDeliveryFee(subtotal);
-      final grandTotal = subtotal + deliveryFee;
-      final invoiceNumber =
-          DateTime.now().millisecondsSinceEpoch.toString().substring(5);
-      final now = DateTime.now();
-      final orderTime =
-          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final subtotal = cart.totalPrice;
+    final grandTotal = subtotal + _deliveryFee;
+    final invoiceNumber =
+        DateTime.now().millisecondsSinceEpoch.toString().substring(5);
+    final now = DateTime.now();
+    final orderTime =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-      final addressArabic = _formattedAddressArabic();
-      final addressEnglish = _formattedAddressEnglish();
+    final addressArabic = _formattedAddressArabic();
+    final addressEnglish = _formattedAddressEnglish();
 
-      final message = WhatsAppOrderMessage.build(
-        restaurantName: _restaurantName,
-        invoiceNumber: invoiceNumber,
-        customerName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        paymentMethod: _paymentMethod,
-        orderTime: orderTime,
-        cartItems: cart.items,
-        subtotal: subtotal,
-        deliveryFee: deliveryFee,
-        grandTotal: grandTotal,
-        addressArabic: addressArabic,
-        addressEnglish: addressEnglish,
+    final message = WhatsAppOrderMessage.build(
+      restaurantName: _restaurantName,
+      invoiceNumber: invoiceNumber,
+      customerName: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      paymentMethod: _paymentMethod,
+      orderTime: orderTime,
+      cartItems: cart.items,
+      subtotal: subtotal,
+      deliveryFee: _deliveryFee,
+      grandTotal: grandTotal,
+      addressArabic: addressArabic,
+      addressEnglish: addressEnglish,
+    );
+
+    final opened = await openWhatsAppChat(
+      phone: _whatsappNumber,
+      message: message,
+    );
+
+    if (opened) {
+      try {
+        await OrdersService.instance.submitOrderFromCart(
+          cartItems: List.from(cart.items),
+          customerName: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          address: addressArabic,
+          paymentMethod: _paymentMethod,
+          invoiceNumber: invoiceNumber,
+          restaurantId: _restaurantId,
+          deliveryFee: _deliveryFee,
+          governorate: _selectedZone?.governorate ?? _selectedGovernorate,
+          areaName: _selectedZone?.areaName,
+          deliveryZoneId: _selectedZone?.id,
+          addressDetails: _addressDetails,
+        );
+      } catch (error) {
+        debugPrint('Order backend sync failed: $error');
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() => _submitting = false);
+
+    if (opened) {
+      cart.clear();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.orderSentViaWhatsapp)),
       );
-
-      final opened = await openWhatsAppChat(
-        phone: _whatsappNumber,
-        message: message,
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.whatsappOpenFailed(_whatsappNumber))),
       );
-
-      if (opened) {
-        try {
-          await OrdersService.instance.submitOrderFromCart(
-            cartItems: List.from(cart.items),
-            customerName: _nameController.text.trim(),
-            phone: _phoneController.text.trim(),
-            address: addressArabic,
-            paymentMethod: _paymentMethod,
-            invoiceNumber: invoiceNumber,
-            restaurantId: _restaurantId,
-            deliveryFee: deliveryFee,
-            governorate: _selectedZone?.governorate ?? _selectedGovernorate,
-            areaName: _selectedZone?.areaName,
-            deliveryZoneId: _selectedZone?.id,
-            addressDetails: _addressDetails,
-          );
-          await _persistProfile();
-        } catch (error) {
-          debugPrint('Order backend sync failed: $error');
-        }
-      }
-
-      if (!mounted) return;
-
-      if (opened) {
-        cart.clear();
-        Navigator.pop(context);
-        _showFeedback(strings.orderSentViaWhatsapp);
-      } else {
-        _showFeedback(strings.whatsappOpenFailed(_whatsappNumber));
-      }
-    } catch (error, stackTrace) {
-      debugPrint('Checkout submit failed: $error\n$stackTrace');
-      if (mounted) {
-        _showFeedback(strings.orderSubmitFailed);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _submitting = false);
-      }
     }
   }
 
   Widget _buildTotals(CartProvider cart, AppStrings strings) {
     final subtotal = cart.totalPrice;
-    final deliveryFee = _effectiveDeliveryFee(subtotal);
-    final grandTotal = subtotal + deliveryFee;
-    final freeApplied = _hasFreeDeliveryApplied(subtotal);
+    final grandTotal = subtotal + _deliveryFee;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -652,10 +253,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
           const SizedBox(height: 6),
           _TotalRow(
             label: strings.deliveryFee,
-            value: deliveryFee,
+            value: _deliveryFee,
             currency: strings.currency,
             highlight: _selectedZone != null,
-            originalValue: freeApplied ? _baseDeliveryFee : null,
           ),
           const Divider(height: 20),
           _TotalRow(
@@ -674,64 +274,21 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     final cart = context.watch<CartProvider>();
     final locale = context.watch<LocaleProvider>();
     final strings = AppStrings(locale.localeCode);
-    final cartSignature =
-        cart.items.map((item) => '${item.menuItem.id}:${item.quantity}').join('|');
-    if (cartSignature != _lastCartSignature) {
-      _lastCartSignature = cartSignature;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_refreshRecommendations());
-      });
-    }
-    final subtotal = cart.totalPrice;
-    final deliveryFee = _effectiveDeliveryFee(subtotal);
-    final grandTotal = subtotal + deliveryFee;
-    final cartItemIds = cart.items.map((item) => item.menuItem.id).toSet();
-    final cartMenuItems = cart.items.map((item) => item.menuItem).toList();
-
-    final smartRecommendations = UpsellItemResolver.smartRecommendations(
-      allItems: _menuItems,
-      cartItems: cartMenuItems,
-      settings: _settings,
-      cartItemIds: cartItemIds,
-      topItemIds: _topItemIds,
-      subtotal: subtotal,
-      serverHints: _serverRecommendationHints,
-    );
-
-    final smartIds = smartRecommendations.map((entry) => entry.item.id).toSet();
-    final impulseRecommendations = UpsellItemResolver.impulseBumpRecommendations(
-      allItems: _menuItems,
-      settings: _settings,
-      cartItemIds: cartItemIds,
-      excludeIds: smartIds,
-    );
-
-    String? impulseHint;
-    if (_settings.hasFreeDeliveryGoal &&
-        subtotal > 0 &&
-        subtotal < _settings.freeDeliveryThreshold) {
-      final remaining = (_settings.freeDeliveryThreshold - subtotal)
-          .clamp(0, double.infinity)
-          .toStringAsFixed(3);
-      impulseHint = strings.freeDeliveryRemaining(remaining);
-    }
+    final grandTotal = cart.totalPrice + _deliveryFee;
 
     return Directionality(
       textDirection: locale.textDirection,
-      child: Scaffold(
-        backgroundColor: AppTheme.brandSurface,
-        resizeToAvoidBottomInset: true,
-        body: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.92,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.92,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
                   child: Row(
@@ -767,31 +324,17 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                 const Divider(),
                 Expanded(
                   child: ListView(
-                    controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     children: [
                       ...cart.items.map(
-                        (item) {
-                          final addons = item.selectedOptions
-                              .map(
-                                (option) =>
-                                    '${option.group}: ${option.name} (+${option.price.toStringAsFixed(3)} ${strings.currency})',
-                              )
-                              .join(' • ');
-
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              item.menuItem.localizedName(locale.localeCode),
-                            ),
-                            subtitle: Text(
-                              [
-                                '${item.unitPrice.toStringAsFixed(3)} ${strings.currency}',
-                                if (addons.isNotEmpty) addons,
-                                if (item.specialNotes?.trim().isNotEmpty ?? false)
-                                  item.specialNotes!.trim(),
-                              ].join('\n'),
-                            ),
+                        (item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            item.menuItem.localizedName(locale.localeCode),
+                          ),
+                          subtitle: Text(
+                            '${item.unitPrice.toStringAsFixed(3)} ${strings.currency}',
+                          ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -812,99 +355,14 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                               ),
                             ],
                           ),
-                        );
-                        },
+                        ),
                       ),
-                      if (_settings.smartUpsellEnabled &&
-                          _settings.hasFreeDeliveryGoal)
-                        FreeDeliveryProgressBar(
-                          subtotal: subtotal,
-                          threshold: _settings.freeDeliveryThreshold,
-                          baseDeliveryFee: _baseDeliveryFee,
-                          strings: strings,
-                        ),
-                      if (_settings.smartUpsellEnabled &&
-                          _settings.smartRecommendationsEnabled &&
-                          smartRecommendations.isNotEmpty)
-                        CheckoutSmartRecommendations(
-                          recommendations: smartRecommendations,
-                          localeCode: locale.localeCode,
-                          strings: strings,
-                          onAddItem: (entry) => unawaited(_handleUpsellAdd(entry)),
-                        ),
-                      if (_settings.smartUpsellEnabled &&
-                          impulseRecommendations.isNotEmpty)
-                        CheckoutImpulseBumps(
-                          recommendations: impulseRecommendations,
-                          localeCode: locale.localeCode,
-                          strings: strings,
-                          freeDeliveryHint: impulseHint,
-                          onAddItem: (entry) => unawaited(_handleUpsellAdd(entry)),
-                        ),
                       const Divider(height: 32),
-                      if (_loadingWhatsapp)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 12),
-                          child: LinearProgressIndicator(color: AppTheme.brandOrange),
-                        )
-                      else if (!_hasWhatsapp)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppTheme.brandMaroon.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: AppTheme.brandMaroon.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.info_outline,
-                                color: AppTheme.brandMaroon,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  strings.whatsappNotConfiguredCheckout,
-                                  style: const TextStyle(
-                                    color: AppTheme.brandMaroon,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       TextFormField(
-                        controller: _phoneController,
-                        focusNode: _phoneFocus,
-                        autofocus: true,
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_nameFocus),
+                        controller: _nameController,
                         decoration: InputDecoration(
-                          labelText: strings.phone,
+                          labelText: strings.customerName,
                           border: const OutlineInputBorder(),
-                          suffixIcon: _lookupInProgress
-                              ? const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                )
-                              : _profileAutofilled
-                                  ? const Icon(
-                                      Icons.check_circle,
-                                      color: AppTheme.brandOrange,
-                                    )
-                                  : null,
-                          helperText:
-                              _lookupInProgress ? strings.lookingUpProfile : null,
                         ),
                         validator: (value) => value == null || value.trim().isEmpty
                             ? strings.required
@@ -912,12 +370,10 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
-                        controller: _nameController,
-                        focusNode: _nameFocus,
-                        textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_blockFocus),
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
                         decoration: InputDecoration(
-                          labelText: strings.customerName,
+                          labelText: strings.phone,
                           border: const OutlineInputBorder(),
                         ),
                         validator: (value) => value == null || value.trim().isEmpty
@@ -940,7 +396,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                         )
                       else ...[
                         DropdownButtonFormField<String>(
-                          key: ValueKey('gov-$_selectedGovernorate'),
                           initialValue: _selectedGovernorate,
                           decoration: InputDecoration(
                             labelText: strings.governorate,
@@ -958,7 +413,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                             setState(() {
                               _selectedGovernorate = value;
                               _selectedZone = null;
-                              _syncDefaultArea();
                             });
                           },
                           validator: (value) {
@@ -970,9 +424,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          key: ValueKey(
-                            'area-${_selectedGovernorate ?? ''}-${_selectedZone?.id ?? 'none'}',
-                          ),
                           initialValue: _selectedZone?.id,
                           decoration: InputDecoration(
                             labelText: strings.area,
@@ -1013,9 +464,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _blockController,
-                        focusNode: _blockFocus,
-                        textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_streetFocus),
                         decoration: InputDecoration(
                           labelText: strings.block,
                           border: const OutlineInputBorder(),
@@ -1027,9 +475,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _streetController,
-                        focusNode: _streetFocus,
-                        textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_avenueFocus),
                         decoration: InputDecoration(
                           labelText: strings.street,
                           border: const OutlineInputBorder(),
@@ -1041,9 +486,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _avenueController,
-                        focusNode: _avenueFocus,
-                        textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_houseFocus),
                         decoration: InputDecoration(
                           labelText: strings.avenue,
                           border: const OutlineInputBorder(),
@@ -1052,9 +494,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _houseController,
-                        focusNode: _houseFocus,
-                        textInputAction: TextInputAction.next,
-                        onFieldSubmitted: (_) => _focusNext(_floorFocus),
                         decoration: InputDecoration(
                           labelText: strings.houseNumber,
                           border: const OutlineInputBorder(),
@@ -1066,9 +505,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _floorController,
-                        focusNode: _floorFocus,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _unfocusKeyboard(),
                         decoration: InputDecoration(
                           labelText: strings.floorApartment,
                           border: const OutlineInputBorder(),
@@ -1110,9 +546,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                       backgroundColor: AppTheme.brandMaroon,
                       minimumSize: const Size.fromHeight(52),
                     ),
-                    onPressed: (_submitting || _loadingWhatsapp || !_hasWhatsapp)
-                        ? null
-                        : () => _submit(cart, strings),
+                    onPressed: _submitting ? null : () => _submit(cart, strings),
                     child: _submitting
                         ? const SizedBox(
                             width: 22,
@@ -1136,7 +570,6 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
           ),
         ),
       ),
-    ),
     );
   }
 }
@@ -1148,7 +581,6 @@ class _TotalRow extends StatelessWidget {
     required this.currency,
     this.isBold = false,
     this.highlight = false,
-    this.originalValue,
   });
 
   final String label;
@@ -1156,7 +588,6 @@ class _TotalRow extends StatelessWidget {
   final String currency;
   final bool isBold;
   final bool highlight;
-  final double? originalValue;
 
   @override
   Widget build(BuildContext context) {
@@ -1171,31 +602,13 @@ class _TotalRow extends StatelessWidget {
             ),
           ),
         ),
-        if (originalValue != null && value == 0) ...[
-          Text(
-            '${originalValue!.toStringAsFixed(3)} $currency',
-            style: TextStyle(
-              decoration: TextDecoration.lineThrough,
-              color: Colors.grey.shade500,
-              fontSize: 13,
-            ),
+        Text(
+          '${value.toStringAsFixed(3)} $currency',
+          style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            color: isBold ? AppTheme.brandMaroon : Colors.black87,
           ),
-          const SizedBox(width: 8),
-          Text(
-            'مجاني',
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              color: Colors.green.shade700,
-            ),
-          ),
-        ] else
-          Text(
-            '${value.toStringAsFixed(3)} $currency',
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              color: isBold ? AppTheme.brandMaroon : Colors.black87,
-            ),
-          ),
+        ),
       ],
     );
   }

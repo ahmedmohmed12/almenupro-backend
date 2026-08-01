@@ -29,6 +29,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
   String? _error;
 
   static const _burgundy = Color(0xFF6B1124);
+  static const _gold = Color(0xFFD49A00);
 
   @override
   void initState() {

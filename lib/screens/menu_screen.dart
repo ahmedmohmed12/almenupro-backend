@@ -1,283 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../l10n/app_strings.dart';
-import '../models/customer_restaurant_context.dart';
 import '../models/menu_item.dart';
-import '../models/restaurant.dart';
 import '../providers/cart_provider.dart';
-import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/menu/customization_dialog.dart';
 import '../widgets/menu/menu_checkout_sheet.dart';
-import '../widgets/menu/mobile/menu_mobile_experience.dart';
 import '../widgets/network_menu_image.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({super.key, this.restaurantSlug});
-
-  /// When null, loads the default restaurant menu (`/`).
-  final String? restaurantSlug;
+  const MenuScreen({super.key});
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuPageData {
-  const _MenuPageData({
-    required this.items,
-    this.context,
-    this.topItemIds = const [],
-  });
-
-  final List<MenuItem> items;
-  final CustomerRestaurantContext? context;
-  final List<int> topItemIds;
-}
-
 class _MenuScreenState extends State<MenuScreen> {
-  late Future<_MenuPageData> _pageFuture;
+  late Future<List<MenuItem>> _itemsFuture;
   String _selectedCategory = 'الكل';
-  CustomerRestaurantContext? _loadedContext;
 
   @override
   void initState() {
     super.initState();
-    final future = _loadPage();
-    _pageFuture = future;
-    future.then((page) {
-      if (mounted) setState(() => _loadedContext = page.context);
-    });
-  }
-
-  Future<_MenuPageData> _loadPage() async {
-    final slug = widget.restaurantSlug?.trim();
-    if (slug == null || slug.isEmpty) {
-      return _loadDefaultRestaurantPage();
-    }
-
-    final restaurant = await ApiService.instance.fetchPublicRestaurant(slug);
-    final settings = await ApiService.instance.fetchPublicSettings(
-      slug: slug,
-      restaurantId: restaurant.id,
-    );
-    final results = await Future.wait([
-      ApiService.instance.fetchPublicItems(
-        slug: slug,
-        restaurantId: restaurant.id,
-      ),
-      ApiService.instance.fetchTopMenuItemIds(
-        slug: slug,
-        restaurantId: restaurant.id,
-      ),
-    ]);
-    final items = results[0] as List<MenuItem>;
-    final topItemIds = results[1] as List<int>;
-    return _MenuPageData(
-      items: items,
-      topItemIds: topItemIds,
-      context: CustomerRestaurantContext(
-        restaurant: restaurant,
-        settings: settings,
-      ),
-    );
-  }
-
-  Future<_MenuPageData> _loadDefaultRestaurantPage() async {
-    const defaultSlug = 'molton-cookies';
-
-    try {
-      final restaurant =
-          await ApiService.instance.fetchPublicRestaurant(defaultSlug);
-      final settings = await ApiService.instance.fetchPublicSettings(
-        slug: defaultSlug,
-        restaurantId: restaurant.id,
-      );
-      final results = await Future.wait([
-        ApiService.instance.fetchPublicItems(
-          slug: defaultSlug,
-          restaurantId: restaurant.id,
-        ),
-        ApiService.instance.fetchTopMenuItemIds(
-          slug: defaultSlug,
-          restaurantId: restaurant.id,
-        ),
-      ]);
-      final items = results[0] as List<MenuItem>;
-      final topItemIds = results[1] as List<int>;
-      return _MenuPageData(
-        items: items,
-        topItemIds: topItemIds,
-        context: CustomerRestaurantContext(
-          restaurant: restaurant,
-          settings: settings,
-        ),
-      );
-    } catch (_) {
-      final settings = await ApiService.instance.fetchPublicSettings(
-        restaurantId: ApiService.defaultRestaurantId,
-      );
-      final results = await Future.wait([
-        ApiService.instance.fetchItems(
-          restaurantId: ApiService.defaultRestaurantId,
-        ),
-        ApiService.instance.fetchTopMenuItemIds(
-          restaurantId: ApiService.defaultRestaurantId,
-        ),
-      ]);
-      final items = results[0] as List<MenuItem>;
-      final topItemIds = results[1] as List<int>;
-      return _MenuPageData(
-        items: items,
-        topItemIds: topItemIds,
-        context: CustomerRestaurantContext(
-          restaurant: const Restaurant(
-            id: ApiService.defaultRestaurantId,
-            slug: defaultSlug,
-            name: 'Molten Cookies',
-          ),
-          settings: settings,
-        ),
-      );
-    }
-  }
-
-  Future<CustomerRestaurantContext?> _refreshRestaurantContext() async {
-    try {
-      final page = await _loadPage();
-      if (mounted) {
-        setState(() => _loadedContext = page.context);
-      }
-      return page.context;
-    } catch (_) {
-      return _loadedContext;
-    }
-  }
-
-  Future<void> _openCheckout() async {
-    final strings = AppStrings.of(context);
-    var contextData = _loadedContext;
-
-    if (contextData == null || !contextData.settings.hasWhatsappNumber) {
-      contextData = await _refreshRestaurantContext();
-    }
-
-    if (!mounted) return;
-
-    if (contextData == null || !contextData.settings.hasWhatsappNumber) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(strings.whatsappNotConfiguredForCustomers),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    await MenuCheckoutSheet.show(
-      context,
-      restaurantContext: contextData,
-    );
+    _itemsFuture = ApiService.instance.fetchItems();
   }
 
   Future<void> _reload() async {
-    final future = _loadPage();
     setState(() {
-      _pageFuture = future;
+      _itemsFuture = ApiService.instance.fetchItems();
     });
-    final page = await future;
-    if (mounted) {
-      setState(() => _loadedContext = page.context);
-    }
+    await _itemsFuture;
   }
 
-  Future<void> _addToCart(MenuItem item) async {
-    final strings = AppStrings.of(context);
-    final locale = context.read<LocaleProvider>().localeCode;
-
-    if (item.hasCustomizations) {
-      await showCustomizationDialog(context, item);
-      return;
-    }
-
+  void _addToCart(MenuItem item) {
     context.read<CartProvider>().addMenuItem(item);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(strings.addedToCart(item.localizedName(locale))),
+        content: Text('تمت إضافة "${item.name}" إلى السلة'),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  bool _isStaticPicksCategory(String category) {
-    final value = category.trim().toLowerCase();
-    return value.contains('ذوقك') || value.contains('picks for you');
-  }
-
-  List<String> _categories(
-    List<MenuItem> items,
-    AppStrings strings,
-    List<int> topItemIds,
-  ) {
-    final categories = <String>[strings.all];
-    if (topItemIds.isNotEmpty) {
-      categories.add(strings.picksForYou);
-    }
+  List<String> _categories(List<MenuItem> items) {
+    final categories = <String>{'الكل'};
     for (final item in items) {
-      final category = item.categoryName.trim();
-      if (category.isEmpty || _isStaticPicksCategory(category)) continue;
-      if (!categories.contains(category)) {
-        categories.add(category);
+      if (item.categoryName.trim().isNotEmpty) {
+        categories.add(item.categoryName.trim());
       }
     }
-    return categories;
+    return categories.toList();
   }
 
-  List<MenuItem> _filterItems(
-    List<MenuItem> items,
-    String category,
-    AppStrings strings,
-    List<int> topItemIds,
-  ) {
-    if (category == strings.all) return items;
-    if (category == strings.picksForYou) {
-      final byId = {for (final item in items) item.id: item};
-      return topItemIds
-          .map((id) => byId[id])
-          .whereType<MenuItem>()
-          .where((item) => item.isAvailable)
-          .toList();
-    }
+  List<MenuItem> _filteredItems(List<MenuItem> items) {
+    if (_selectedCategory == 'الكل') return items;
     return items
-        .where((item) => item.categoryName.trim() == category)
+        .where((item) => item.categoryName.trim() == _selectedCategory)
         .toList();
-  }
-
-  String _heroImageUrl(List<MenuItem> items) {
-    for (final item in items) {
-      if (item.imageUrl.trim().isNotEmpty) return item.imageUrl;
-    }
-    return '';
-  }
-
-  String _categoryTags(List<MenuItem> items, String localeCode, AppStrings strings) {
-    final names = <String>{};
-    for (final item in items) {
-      final label = item.localizedCategoryName(localeCode).trim();
-      if (label.isNotEmpty) names.add(label);
-    }
-    if (names.isEmpty) {
-      return strings.isArabic ? 'مأكولات، مشروبات، كويتي' : 'Food, Drinks, Kuwaiti';
-    }
-    return names.take(4).join(strings.isArabic ? '، ' : ', ');
-  }
-
-  bool _useMobileLayout(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    // Phone/narrow viewports — also catches mobile web without viewport meta.
-    return size.width < 900 || size.shortestSide < 600;
   }
 
   int _gridColumns(double width) {
@@ -290,15 +70,13 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final locale = context.watch<LocaleProvider>();
-    final strings = AppStrings(locale.localeCode);
 
     return Directionality(
-      textDirection: locale.textDirection,
+      textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppTheme.brandBackground,
-        body: FutureBuilder<_MenuPageData>(
-          future: _pageFuture,
+        body: FutureBuilder<List<MenuItem>>(
+          future: _itemsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -307,102 +85,45 @@ class _MenuScreenState extends State<MenuScreen> {
             }
 
             if (snapshot.hasError) {
-              final message = snapshot.error.toString();
-              final isNotFound = message.contains('404') ||
-                  message.contains('غير موجود') ||
-                  message.contains('Restaurant not found');
               return _ErrorState(
-                message: isNotFound
-                    ? strings.restaurantNotFound
-                    : message,
-                onRetry: isNotFound ? null : _reload,
-              );
-            }
-
-            final page = snapshot.data!;
-            final items = page.items;
-            final topItemIds = page.topItemIds;
-            if (items.isEmpty) {
-              return _ErrorState(
-                message: strings.noItemsAvailable,
+                message: snapshot.error.toString(),
                 onRetry: _reload,
               );
             }
 
-            final categories = _categories(items, strings, topItemIds);
-            final effectiveCategory = categories.contains(_selectedCategory)
-                ? _selectedCategory
-                : strings.all;
-            if (effectiveCategory != _selectedCategory) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  setState(() => _selectedCategory = effectiveCategory);
-                }
-              });
-            }
-            final filtered = _filterItems(
-              items,
-              effectiveCategory,
-              strings,
-              topItemIds,
-            );
-            final restaurantName =
-                page.context?.name ?? 'Molten Cookies';
-            final restaurantTagline = page.context != null
-                ? strings.menuTaglineFor(page.context!.name)
-                : strings.defaultTagline;
-
-            if (_useMobileLayout(context)) {
-              return MenuMobileExperience(
-                restaurantName: restaurantName,
-                heroImageUrl: _heroImageUrl(items),
-                categoryTags: _categoryTags(items, locale.localeCode, strings),
-                categories: categories,
-                items: filtered,
-                allItems: items,
-                localeCode: locale.localeCode,
-                strings: strings,
-                selectedCategory: effectiveCategory,
-                onCategorySelected: (value) {
-                  setState(() => _selectedCategory = value);
-                },
-                onAddToCart: _addToCart,
-                onRefresh: _reload,
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return _ErrorState(
+                message: 'لا توجد أصناف متاحة حالياً',
+                onRetry: _reload,
               );
             }
+
+            final categories = _categories(items);
+            final filtered = _filteredItems(items);
 
             return RefreshIndicator(
               color: AppTheme.brandOrange,
               onRefresh: _reload,
               child: CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(
-                    child: _MenuHeader(
-                      onRefresh: _reload,
-                      restaurantName: restaurantName,
-                      tagline: restaurantTagline,
-                    ),
-                  ),
+                  SliverToBoxAdapter(child: _MenuHeader(onRefresh: _reload)),
                   SliverToBoxAdapter(
                     child: _CategoryBar(
                       categories: categories,
-                      items: items,
-                      localeCode: locale.localeCode,
-                      allLabel: strings.all,
-                      picksForYouLabel: strings.picksForYou,
-                      selected: effectiveCategory,
+                      selected: _selectedCategory,
                       onSelected: (value) {
                         setState(() => _selectedCategory = value);
                       },
                     ),
                   ),
                   if (filtered.isEmpty)
-                    SliverFillRemaining(
+                    const SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
                         child: Text(
-                          strings.noItemsInCategory,
-                          style: const TextStyle(
+                          'لا توجد أصناف في هذا التصنيف',
+                          style: TextStyle(
                             color: AppTheme.brandBlack,
                             fontSize: 16,
                           ),
@@ -431,8 +152,6 @@ class _MenuScreenState extends State<MenuScreen> {
                               (context, index) {
                                 return _MenuItemCard(
                                   item: filtered[index],
-                                  localeCode: locale.localeCode,
-                                  strings: strings,
                                   onAddToCart: () => _addToCart(filtered[index]),
                                 );
                               },
@@ -452,8 +171,7 @@ class _MenuScreenState extends State<MenuScreen> {
             : _FloatingCartBar(
                 itemCount: cart.itemCount,
                 totalPrice: cart.totalPrice,
-                strings: strings,
-                onCheckout: _openCheckout,
+                onCheckout: () => MenuCheckoutSheet.show(context),
               ),
       ),
     );
@@ -464,13 +182,11 @@ class _FloatingCartBar extends StatelessWidget {
   const _FloatingCartBar({
     required this.itemCount,
     required this.totalPrice,
-    required this.strings,
     required this.onCheckout,
   });
 
   final int itemCount;
   final double totalPrice;
-  final AppStrings strings;
   final VoidCallback onCheckout;
 
   @override
@@ -515,18 +231,18 @@ class _FloatingCartBar extends StatelessWidget {
                   ),
                 ),
               ),
-              Expanded(
+              const Expanded(
                 child: Text(
-                  strings.continueOrder,
+                  'متابعة الطلب',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
               Text(
-                '${totalPrice.toStringAsFixed(3)} ${strings.currency}',
+                '${totalPrice.toStringAsFixed(3)} د.ك',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -541,15 +257,9 @@ class _FloatingCartBar extends StatelessWidget {
 }
 
 class _MenuHeader extends StatelessWidget {
-  const _MenuHeader({
-    required this.onRefresh,
-    required this.restaurantName,
-    required this.tagline,
-  });
+  const _MenuHeader({required this.onRefresh});
 
   final VoidCallback onRefresh;
-  final String restaurantName;
-  final String tagline;
 
   @override
   Widget build(BuildContext context) {
@@ -580,12 +290,12 @@ class _MenuHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    restaurantName,
+                    'Molten Cookies',
                     style: TextStyle(
                       color: AppTheme.brandBlack,
                       fontSize: 22,
@@ -594,7 +304,7 @@ class _MenuHeader extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    tagline,
+                    'قائمة الطعام — ميني بايتس وكوكيز',
                     style: TextStyle(
                       color: Color(0xFF666666),
                       fontSize: 13,
@@ -604,26 +314,7 @@ class _MenuHeader extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Language / اللغة',
-              onPressed: () => context.read<LocaleProvider>().toggle(),
-              icon: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppTheme.brandOrange),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  context.watch<LocaleProvider>().isArabic ? 'EN' : 'ع',
-                  style: const TextStyle(
-                    color: AppTheme.brandOrange,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              tooltip: context.watch<LocaleProvider>().isArabic ? 'تحديث' : 'Refresh',
+              tooltip: 'تحديث',
               onPressed: onRefresh,
               icon: const Icon(Icons.refresh_rounded, color: AppTheme.brandOrange),
             ),
@@ -637,38 +328,13 @@ class _MenuHeader extends StatelessWidget {
 class _CategoryBar extends StatelessWidget {
   const _CategoryBar({
     required this.categories,
-    required this.items,
-    required this.localeCode,
-    required this.allLabel,
-    required this.picksForYouLabel,
     required this.selected,
     required this.onSelected,
   });
 
   final List<String> categories;
-  final List<MenuItem> items;
-  final String localeCode;
-  final String allLabel;
-  final String picksForYouLabel;
   final String selected;
   final ValueChanged<String> onSelected;
-
-  bool _isHotCategory(String category) {
-    return category == picksForYouLabel ||
-        category.contains('🔥') ||
-        category.contains('ذوقك');
-  }
-
-  String _labelFor(String category) {
-    if (category == allLabel) return allLabel;
-    if (category == picksForYouLabel) return picksForYouLabel;
-    for (final item in items) {
-      if (item.categoryName.trim() == category) {
-        return item.localizedCategoryName(localeCode);
-      }
-    }
-    return category;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -682,17 +348,9 @@ class _CategoryBar extends StatelessWidget {
         itemBuilder: (context, index) {
           final category = categories[index];
           final isSelected = category == selected;
-          final isHot = _isHotCategory(category);
 
           return FilterChip(
-            avatar: isHot
-                ? Icon(
-                    Icons.local_fire_department,
-                    size: 16,
-                    color: isSelected ? Colors.white : AppTheme.brandOrange,
-                  )
-                : null,
-            label: Text(_labelFor(category)),
+            label: Text(category),
             selected: isSelected,
             showCheckmark: false,
             labelStyle: TextStyle(
@@ -721,21 +379,14 @@ class _CategoryBar extends StatelessWidget {
 class _MenuItemCard extends StatelessWidget {
   const _MenuItemCard({
     required this.item,
-    required this.localeCode,
-    required this.strings,
     required this.onAddToCart,
   });
 
   final MenuItem item;
-  final String localeCode;
-  final AppStrings strings;
   final VoidCallback onAddToCart;
 
   @override
   Widget build(BuildContext context) {
-    final displayName = item.localizedName(localeCode);
-    final displayDescription = item.localizedDescription(localeCode);
-
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -764,7 +415,7 @@ class _MenuItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      displayName,
+                      item.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -776,9 +427,9 @@ class _MenuItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      displayDescription.isNotEmpty
-                          ? displayDescription
-                          : strings.noDescription,
+                      item.description.isNotEmpty
+                          ? item.description
+                          : 'لا يوجد وصف',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -885,11 +536,11 @@ class _MenuItemImage extends StatelessWidget {
 class _ErrorState extends StatelessWidget {
   const _ErrorState({
     required this.message,
-    this.onRetry,
+    required this.onRetry,
   });
 
   final String message;
-  final VoidCallback? onRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -911,15 +562,14 @@ class _ErrorState extends StatelessWidget {
               style: const TextStyle(color: AppTheme.brandBlack),
             ),
             const SizedBox(height: 20),
-            if (onRetry != null)
-              FilledButton.icon(
-                onPressed: onRetry,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.brandOrange,
-                ),
-                icon: const Icon(Icons.refresh),
-                label: const Text('إعادة المحاولة'),
+            FilledButton.icon(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.brandOrange,
               ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
+            ),
           ],
         ),
       ),

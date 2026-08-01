@@ -51,9 +51,9 @@ class MenuGridItemCard extends StatelessWidget {
                     Positioned.fill(
                       child: _ItemImage(imageUrl: item.imageUrl),
                     ),
-                    PositionedDirectional(
+                    Positioned(
                       top: 8,
-                      start: 8,
+                      left: 8,
                       child: _AddButton(onPressed: onAdd),
                     ),
                   ],

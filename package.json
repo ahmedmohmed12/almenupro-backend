@@ -4,15 +4,9 @@
   "main": "apiServer.js",
   "scripts": {
     "start": "node apiServer.js",
-    "seed": "node seedFromTalabat.js",
-    "migrate:images": "node scripts/migrateMenuImages.js",
-    "prepare:uploads": "node scripts/preparePublicUploads.js",
-    "vercel-build": "node scripts/preparePublicUploads.js"
+    "seed": "node seedFromTalabat.js"
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "mongodb": "^6.16.0"
   }
 }
