@@ -21,6 +21,7 @@ import '../models/order.dart';
 import '../models/restaurant.dart';
 
 import '../models/restaurant_settings.dart';
+import '../models/smart_closing.dart';
 
 import 'admin_auth_service.dart';
 import 'super_admin_scope_service.dart';
@@ -702,7 +703,7 @@ class ApiService {
 
 
 
-  Future<Order> createOrder(
+  Future<OrderCreationResult> createOrder(
 
     Order order, {
 
@@ -753,8 +754,22 @@ class ApiService {
 
 
       final map = Map<String, dynamic>.from(decoded);
+      final orderMap = map['order'] is Map
+          ? Map<String, dynamic>.from(map['order'] as Map)
+          : map;
+      final savedOrder = Order.fromMap(
+        orderMap['id']?.toString() ?? order.id,
+        orderMap,
+      );
+      SmartClosingPayload? smartClosing;
+      if (map['smartClosing'] is Map || map['smart_closing'] is Map) {
+        final closingRaw = map['smartClosing'] ?? map['smart_closing'];
+        smartClosing = SmartClosingPayload.fromMap(
+          Map<String, dynamic>.from(closingRaw as Map),
+        );
+      }
 
-      return Order.fromMap(map['id']?.toString() ?? '', map);
+      return OrderCreationResult(order: savedOrder, smartClosing: smartClosing);
 
     } on TimeoutException {
 
@@ -1477,6 +1492,45 @@ class ApiService {
     }
 
     return LoyaltyCashbackPreview.fromMap(Map<String, dynamic>.from(decoded));
+  }
+
+  Future<SmartClosingPayload> fetchCheckoutClosingPreview({
+    required double subtotal,
+    required double deliveryFee,
+    required int cartItemCount,
+    String? phone,
+    String? restaurantId,
+    String? slug,
+    String orderType = 'Delivery',
+  }) async {
+    final query = _publicRestaurantQuery(slug: slug, restaurantId: restaurantId);
+    final response = await http
+        .post(
+          _uri('/smart-closing/checkout-preview', query),
+          headers: {
+            ..._publicHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'subtotal': subtotal,
+            'deliveryFee': deliveryFee,
+            'cartItemCount': cartItemCount,
+            if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+            'orderType': orderType,
+          }),
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل رسائل الإغلاق (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return SmartClosingPayload.fromMap(Map<String, dynamic>.from(decoded));
   }
 
 }

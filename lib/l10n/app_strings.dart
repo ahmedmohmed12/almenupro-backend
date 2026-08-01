@@ -126,6 +126,26 @@ class AppStrings {
       ? 'تعذر فتح الواتساب. رقم المطعم: $phone'
       : 'Could not open WhatsApp. Restaurant number: $phone';
 
+  String get estimatedTimeTitle =>
+      isArabic ? 'الوقت المتوقع' : 'Estimated time';
+  String get estimatedTimeHint => isArabic
+      ? 'نُحدّث الوقت حسب ضغط الطلبات ومنطقة التوصيل'
+      : 'Updated based on order volume and delivery zone';
+  String get orderConfirmedTitle =>
+      isArabic ? 'تم تأكيد طلبك!' : 'Order confirmed!';
+  String get loyaltyWalletLabel =>
+      isArabic ? 'رصيد محفظة الولاء' : 'Loyalty wallet balance';
+  String get cashbackEarnedLabel =>
+      isArabic ? 'كاش باك مكتسب' : 'Cashback earned';
+  String get nextOrderDiscountLabel =>
+      isArabic ? 'خصم طلبك القادم' : 'Next order discount';
+  String get gotIt => isArabic ? 'تمام' : 'Got it';
+  String get closingDontLeaveTitle =>
+      isArabic ? 'لا تفوّت طلبك!' : "Don't leave your order!";
+  String get closingDontLeaveBody => isArabic
+      ? 'سلتك جاهزة — أكّد الآن قبل تغيير الأسعار أو نفاد الأصناف'
+      : 'Your cart is ready — confirm now before items sell out';
+
   String paymentLabel(String value) {
     if (value == 'كاش' || value == 'Cash') return cash;
     return knet;

@@ -214,6 +214,15 @@ function normalizeSettings(raw) {
     impulseBumpMaxPrice:
       Number(source.impulseBumpMaxPrice ?? source.impulse_bump_max_price ?? 2) || 2,
     smartRecommendationsEnabled: source.smartRecommendationsEnabled !== false,
+    cashbackType: String(
+      source.cashbackType ?? source.cashback_type ?? 'PERCENTAGE',
+    ).toUpperCase(),
+    cashbackValue:
+      Number(source.cashbackValue ?? source.cashback_value ?? 0) || 0,
+    minOrderForLoyalty:
+      Number(source.minOrderForLoyalty ?? source.min_order_for_loyalty ?? 0) || 0,
+    loyaltyEnabled:
+      source.loyaltyEnabled !== false && source.loyalty_enabled !== false,
     updatedAt: source.updatedAt || new Date().toISOString(),
   };
 }
@@ -1660,7 +1669,26 @@ const server = http.createServer(async (req, res) => {
       const nextCustomers = upsertCustomerFromSource(customers, order, restaurantId);
       await writeCustomers(nextCustomers);
 
-      sendJson(res, 201, order);
+      const customerBefore = findCustomerByPhone(
+        nextCustomers,
+        restaurantId,
+        order.phone,
+      );
+      const settings = await readSettings(restaurantId);
+      const { applyPostCheckoutRewards } = require('./lib/smartClosingEngine');
+      const rewardResult = applyPostCheckoutRewards({
+        customers: nextCustomers,
+        order,
+        restaurantId,
+        settings,
+        customerBefore,
+      });
+      await writeCustomers(rewardResult.customers);
+
+      sendJson(res, 201, {
+        order,
+        smartClosing: rewardResult.smartClosing,
+      });
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
     }
@@ -1767,6 +1795,42 @@ const server = http.createServer(async (req, res) => {
         updatedAt: new Date().toISOString(),
       });
       sendJson(res, 200, merged);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/smart-closing/checkout-preview') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurants = await readRestaurants();
+      let restaurantId =
+        body.restaurantId ||
+        body.restaurant_id ||
+        resolveRestaurantFromQuery(url, restaurants);
+
+      if (!restaurantId && (body.restaurantSlug || body.restaurant_slug)) {
+        const slug = String(body.restaurantSlug || body.restaurant_slug).trim();
+        const match = restaurants.find(
+          (entry) => String(entry.slug || '').toLowerCase() === slug.toLowerCase(),
+        );
+        restaurantId = match ? match.id : null;
+      }
+
+      if (!restaurantId) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+        return;
+      }
+
+      const settings = await readSettings(restaurantId);
+      const customers = await readCustomers();
+      const phone = String(body.phone || '').trim();
+      const customer = phone
+        ? findCustomerByPhone(customers, restaurantId, phone)
+        : null;
+      const { buildCheckoutPreview } = require('./lib/smartClosingEngine');
+      sendJson(res, 200, buildCheckoutPreview({ customer, settings, body }));
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
     }

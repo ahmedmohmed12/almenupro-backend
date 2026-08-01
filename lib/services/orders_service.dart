@@ -1,6 +1,7 @@
 ﻿import '../models/cart_item.dart';
 import '../models/delivery_address_details.dart';
 import '../models/order.dart';
+import '../models/smart_closing.dart';
 import '../utils/firebase_config.dart';
 import 'firebase_service.dart';
 import 'orders_demo_service.dart';
@@ -30,7 +31,7 @@ class OrdersService {
     await OrdersDemoService.updateOrderStatus(orderId, status);
   }
 
-  Future<void> submitOrderFromCart({
+  Future<SmartClosingPayload?> submitOrderFromCart({
     required List<CartItem> cartItems,
     required String customerName,
     required String phone,
@@ -64,15 +65,16 @@ class OrdersService {
 
     if (usesFirebase) {
       await _firebase.addOrder(order);
-      return;
+      return null;
     }
 
-    final created = await ApiService.instance.createOrder(
+    final result = await ApiService.instance.createOrder(
       order,
       restaurantId: restaurantId,
     );
-    await OrdersDemoService.registerOrder(created);
+    await OrdersDemoService.registerOrder(result.order);
     await OrdersDemoService.refreshFromApi();
+    return result.smartClosing;
   }
 
   Future<void> refreshOrders() async {

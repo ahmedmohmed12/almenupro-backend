@@ -8,13 +8,23 @@ import '../../l10n/app_strings.dart';
 import '../../models/customer_restaurant_context.dart';
 import '../../models/delivery_address_details.dart';
 import '../../models/delivery_zone.dart';
+import '../../models/menu_item.dart';
+import '../../models/restaurant_settings.dart';
+import '../../models/smart_closing.dart';
+import '../../models/upsell_recommendation.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/orders_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/upsell_item_resolver.dart';
 import '../../utils/whatsapp_launcher.dart';
 import '../../utils/whatsapp_order_message.dart';
+import 'checkout_closing_banner.dart';
+import 'checkout_impulse_bumps.dart';
+import 'checkout_smart_recommendations.dart';
+import 'free_delivery_progress_bar.dart';
+import 'post_checkout_reward_sheet.dart';
 
 class MenuCheckoutSheet extends StatefulWidget {
   const MenuCheckoutSheet({super.key, this.restaurantContext});
@@ -57,6 +67,12 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   List<DeliveryZone> _zones = [];
   String? _selectedGovernorate;
   DeliveryZone? _selectedZone;
+
+  RestaurantSettings? _settings;
+  List<MenuItem> _menuItems = [];
+  SmartClosingPayload? _closingPreview;
+  var _loadingClosing = false;
+  Timer? _closingDebounce;
 
   static const _defaultWhatsappNumber = '96594774950';
 
@@ -118,6 +134,90 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
   void initState() {
     super.initState();
     unawaited(_loadDeliveryZones());
+    _phoneController.addListener(_scheduleClosingRefresh);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadUpsellContext());
+    });
+  }
+
+  Future<void> _loadUpsellContext() async {
+    try {
+      final settings = await ApiService.instance.fetchPublicSettings(
+        slug: _restaurantSlug,
+        restaurantId: _restaurantId,
+      );
+      final items = await ApiService.instance.fetchPublicItems(
+        slug: _restaurantSlug,
+        restaurantId: _restaurantId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _settings = settings;
+        _menuItems = items;
+      });
+      final cartCount = context.read<CartProvider>().itemCount;
+      await _refreshClosingPreview(cartItemCount: cartCount);
+    } catch (_) {}
+  }
+
+  void _scheduleClosingRefresh() {
+    _closingDebounce?.cancel();
+    _closingDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      _refreshClosingPreview(cartItemCount: context.read<CartProvider>().itemCount);
+    });
+  }
+
+  Future<void> _refreshClosingPreview({required int cartItemCount}) async {
+    final cart = context.read<CartProvider>();
+    setState(() => _loadingClosing = true);
+    try {
+      final preview = await ApiService.instance.fetchCheckoutClosingPreview(
+        subtotal: cart.totalPrice,
+        deliveryFee: _deliveryFee,
+        cartItemCount: cartItemCount,
+        phone: _phoneController.text.trim(),
+        restaurantId: _restaurantId,
+        slug: _restaurantSlug,
+      );
+      if (!mounted) return;
+      setState(() {
+        _closingPreview = preview;
+        _loadingClosing = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingClosing = false);
+    }
+  }
+
+  List<UpsellRecommendation> _smartRecommendationsFor(CartProvider cart) {
+    final settings = _settings;
+    if (settings == null) return const [];
+    final cartItemIds = cart.items.map((item) => item.menuItem.id).toSet();
+    return UpsellItemResolver.smartRecommendations(
+      allItems: _menuItems,
+      cartItems: cart.items.map((e) => e.menuItem).toList(),
+      settings: settings,
+      cartItemIds: cartItemIds,
+      subtotal: cart.totalPrice,
+    );
+  }
+
+  List<UpsellRecommendation> _impulseBumpsFor(CartProvider cart) {
+    final settings = _settings;
+    if (settings == null) return const [];
+    final cartItemIds = cart.items.map((item) => item.menuItem.id).toSet();
+    return UpsellItemResolver.impulseBumpRecommendations(
+      allItems: _menuItems,
+      settings: settings,
+      cartItemIds: cartItemIds,
+    );
+  }
+
+  void _addUpsellItem(UpsellRecommendation recommendation, CartProvider cart) {
+    cart.addMenuItem(recommendation.item);
+    _refreshClosingPreview(cartItemCount: cart.itemCount);
   }
 
   Future<void> _loadDeliveryZones() async {
@@ -142,6 +242,8 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
 
   @override
   void dispose() {
+    _closingDebounce?.cancel();
+    _phoneController.removeListener(_scheduleClosingRefresh);
     _nameController.dispose();
     _phoneController.dispose();
     _blockController.dispose();
@@ -195,8 +297,9 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
     );
 
     if (opened) {
+      SmartClosingPayload? smartClosing;
       try {
-        await OrdersService.instance.submitOrderFromCart(
+        smartClosing = await OrdersService.instance.submitOrderFromCart(
           cartItems: List.from(cart.items),
           customerName: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
@@ -209,23 +312,34 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
           areaName: _selectedZone?.areaName,
           deliveryZoneId: _selectedZone?.id,
           addressDetails: _addressDetails,
+          orderSource: 'menu_checkout',
         );
       } catch (error) {
         debugPrint('Order backend sync failed: $error');
       }
-    }
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() => _submitting = false);
-
-    if (opened) {
+      setState(() => _submitting = false);
       cart.clear();
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.orderSentViaWhatsapp)),
-      );
+
+      final closing = smartClosing ?? _closingPreview;
+      if (closing != null) {
+        await PostCheckoutRewardSheet.show(
+          context,
+          closing: closing,
+          strings: strings,
+          localeCode: context.read<LocaleProvider>().localeCode,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.orderSentViaWhatsapp)),
+        );
+      }
     } else {
+      if (!mounted) return;
+      setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(strings.whatsappOpenFailed(_whatsappNumber))),
       );
@@ -358,6 +472,40 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                         ),
                       ),
                       const Divider(height: 32),
+                      if (_closingPreview != null) ...[
+                        CheckoutClosingBanner(
+                          closing: _closingPreview!,
+                          localeCode: locale.localeCode,
+                        ),
+                        CheckoutEtaCard(
+                          closing: _closingPreview!,
+                          strings: strings,
+                          localeCode: locale.localeCode,
+                        ),
+                      ] else if (_loadingClosing)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 16),
+                          child: LinearProgressIndicator(),
+                        ),
+                      if (_settings != null && _settings!.hasFreeDeliveryGoal)
+                        FreeDeliveryProgressBar(
+                          subtotal: cart.totalPrice,
+                          threshold: _settings!.freeDeliveryThreshold,
+                          baseDeliveryFee: _deliveryFee,
+                          strings: strings,
+                        ),
+                      CheckoutSmartRecommendations(
+                        recommendations: _smartRecommendationsFor(cart),
+                        localeCode: locale.localeCode,
+                        strings: strings,
+                        onAddItem: (rec) => _addUpsellItem(rec, cart),
+                      ),
+                      CheckoutImpulseBumps(
+                        recommendations: _impulseBumpsFor(cart),
+                        localeCode: locale.localeCode,
+                        strings: strings,
+                        onAddItem: (rec) => _addUpsellItem(rec, cart),
+                      ),
                       TextFormField(
                         controller: _nameController,
                         decoration: InputDecoration(
@@ -452,6 +600,7 @@ class _MenuCheckoutSheetState extends State<MenuCheckoutSheet> {
                                       (zone) => zone.id == value,
                                     );
                                   });
+                                  _refreshClosingPreview(cartItemCount: cart.itemCount);
                                 },
                           validator: (value) {
                             if (_zones.isEmpty) return null;
