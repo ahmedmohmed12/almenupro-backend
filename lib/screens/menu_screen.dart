@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
+import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/menu/menu_checkout_sheet.dart';
@@ -70,9 +71,10 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final locale = context.watch<LocaleProvider>();
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: locale.textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.brandBackground,
         body: FutureBuilder<List<MenuItem>>(

@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
+import 'providers/cart_provider.dart';
+import 'providers/locale_provider.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/client_menu_page.dart';
 import 'screens/menu_screen.dart';
@@ -86,12 +89,35 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Almenupro',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      onGenerateRoute: _onGenerateRoute,
-      onUnknownRoute: _onGenerateRoute,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final locale = LocaleProvider();
+            unawaited(locale.load());
+            return locale;
+          },
+        ),
+      ],
+      child: Consumer<LocaleProvider>(
+        builder: (context, locale, _) {
+          return MaterialApp(
+            title: 'Almenupro',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(isArabic: locale.isArabic),
+            locale: Locale(locale.localeCode),
+            builder: (context, child) {
+              return Directionality(
+                textDirection: locale.textDirection,
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
+            onGenerateRoute: _onGenerateRoute,
+            onUnknownRoute: _onGenerateRoute,
+          );
+        },
+      ),
     );
   }
 }

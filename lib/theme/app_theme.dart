@@ -14,7 +14,11 @@ class AppTheme {
   static const Color brandPrimary = brandOrange;
   static const Color brandSecondary = brandMaroon;
 
-  static ThemeData light() {
+  static ThemeData light({bool isArabic = true}) {
+    final textThemeBuilder = isArabic
+        ? GoogleFonts.cairoTextTheme
+        : GoogleFonts.poppinsTextTheme;
+    final titleFont = isArabic ? GoogleFonts.cairo : GoogleFonts.poppins;
     final colorScheme = ColorScheme(
       brightness: Brightness.light,
       primary: brandOrange,
@@ -36,7 +40,7 @@ class AppTheme {
     );
 
     return base.copyWith(
-      textTheme: GoogleFonts.poppinsTextTheme(base.textTheme).apply(
+      textTheme: textThemeBuilder(base.textTheme).apply(
         bodyColor: brandBlack,
         displayColor: brandBlack,
       ),
@@ -45,7 +49,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.poppins(
+        titleTextStyle: titleFont(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: Colors.white,
@@ -109,7 +113,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         indicatorColor: brandOrange.withValues(alpha: 0.18),
         labelTextStyle: WidgetStateProperty.all(
-          GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+          titleFont(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
     );
