@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'cart_item.dart';
 import 'delivery_address_details.dart';
+import 'order_platform.dart';
 
 enum OrderType {
   delivery,
@@ -10,6 +11,11 @@ enum OrderType {
   String get label => switch (this) {
         OrderType.delivery => 'Delivery',
         OrderType.pickup => 'Pickup',
+      };
+
+  String get labelAr => switch (this) {
+        OrderType.delivery => 'توصيل',
+        OrderType.pickup => 'استلام',
       };
 
   static OrderType fromString(String? value) {
@@ -191,6 +197,9 @@ class Order {
   final double? walletDiscount;
   final String? targetKitchenId;
   final String? targetKitchenName;
+
+  String get sourceLabelAr =>
+      OrderPlatform.fromStorage(orderSource).arabicLabel;
 
   factory Order.fromMap(String id, Map<String, dynamic> map) {
     final rawItems = map['items'] as List<dynamic>? ?? [];

@@ -94,7 +94,9 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   void _removeZoneLocally(String zoneId) {
     if (zoneId.isEmpty) return;
-    _applyZonesLocally(_zones.where((zone) => zone.id != zoneId));
+    _applyZonesLocally(
+      _zones.where((zone) => zone.id != zoneId).toList(),
+    );
   }
 
   void _applyKitchensLocally(List<Kitchen> kitchens) {
