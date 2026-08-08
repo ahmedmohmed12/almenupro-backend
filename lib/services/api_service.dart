@@ -83,6 +83,19 @@ class ApiService {
         ...SuperAdminScopeService.instance.scopeHeaders,
       };
 
+  String _httpErrorMessage(http.Response response, String fallback) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map) {
+        final error = decoded['error'] ?? decoded['message'];
+        if (error != null && error.toString().trim().isNotEmpty) {
+          return error.toString();
+        }
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
   void _ensureAdminApiAccess(String action) {
     if (AdminAuthService.instance.isCashierSession) {
       throw Exception('غير مصرح للكاشير بتنفيذ: $action');
@@ -1508,11 +1521,10 @@ class ApiService {
             .timeout(_writeTimeout);
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception(
-        isUpdate
-            ? 'فشل في تحديث المطبخ (${response.statusCode})'
-            : 'فشل في إضافة المطبخ (${response.statusCode})',
-      );
+      final fallback = isUpdate
+          ? 'فشل في تحديث المطبخ (${response.statusCode})'
+          : 'فشل في إضافة المطبخ (${response.statusCode})';
+      throw Exception(_httpErrorMessage(response, fallback));
     }
     final decoded = jsonDecode(response.body);
     if (decoded is! Map) throw Exception('استجابة غير متوقعة من السيرفر');
@@ -1525,7 +1537,9 @@ class ApiService {
         .delete(_uri('/kitchens/$kitchenId'), headers: _jsonHeaders)
         .timeout(_writeTimeout);
     if (response.statusCode != 200) {
-      throw Exception('فشل في حذف المطبخ (${response.statusCode})');
+      throw Exception(
+        _httpErrorMessage(response, 'فشل في حذف المطبخ (${response.statusCode})'),
+      );
     }
   }
 

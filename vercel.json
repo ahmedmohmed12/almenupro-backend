@@ -2,8 +2,18 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "installCommand": "node scripts/preparePublicUploads.js",
-  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-api-v2')\"",
+  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-api-v3')\"",
   "builds": [
+    {
+      "src": "api/kitchens.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "data/**",
+          "lib/**/*.js"
+        ]
+      }
+    },
     {
       "src": "apiServer.js",
       "use": "@vercel/node",
@@ -27,6 +37,14 @@
       "destination": "/apiServer.js"
     },
     {
+      "source": "/api/kitchens",
+      "destination": "/api/kitchens.js"
+    },
+    {
+      "source": "/api/kitchens/:path*",
+      "destination": "/api/kitchens.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/apiServer.js"
     }
@@ -45,7 +63,7 @@
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, PUT, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Restaurant-Id" }
       ]
     }
   ]

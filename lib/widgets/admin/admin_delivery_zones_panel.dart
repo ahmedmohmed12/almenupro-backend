@@ -466,12 +466,49 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'مناطق التوصيل ورسومها',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: _burgundy,
+          Card(
+            color: _burgundy,
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'مناطق التوصيل ورسومها',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.canManage
+                              ? 'المطعم: $_restaurantLabel'
+                              : 'اختر مطعماً لإدارة مناطق التوصيل',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (widget.canManage)
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: _burgundy,
+                      ),
+                      onPressed: _saving ? null : () => _showZoneDialog(),
+                      icon: const Icon(Icons.add_location_alt_outlined),
+                      label: const Text('Add New Zone'),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -480,7 +517,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
             'يجب ربط كل منطقة بمطبخ من تبويب المطبخ.',
             style: TextStyle(color: Colors.black54),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           if (!widget.canManage)
             _messageCard(
               color: Colors.orange.shade50,
@@ -489,33 +526,11 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
                   'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
             )
           else ...[
-            Text(
-              'المطعم الحالي: $_restaurantLabel',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
+            if (_refreshing)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(minHeight: 2, color: _burgundy),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: _burgundy),
-                  onPressed: _saving ? null : () => _showZoneDialog(),
-                  icon: const Icon(Icons.add_location_alt_outlined),
-                  label: const Text('إضافة منطقة جديدة'),
-                ),
-                if (_refreshing) ...[
-                  const SizedBox(width: 12),
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 20),
             _buildZonesSection(),
           ],
         ],
