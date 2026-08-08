@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "installCommand": "node scripts/preparePublicUploads.js",
-  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-api-v3')\"",
+  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-api-v4')\"",
   "builds": [
     {
       "src": "api/kitchens.js",
