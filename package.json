@@ -3,7 +3,8 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "node apiServer.js",
+    "start": "node index.js",
+    "verify:vercel": "node scripts/verifyVercelDeploy.js",
     "seed": "node seedFromTalabat.js",
     "test:og": "node scripts/testOgMeta.js",
     "test:promo": "node scripts/testPersonalPromo.js",
