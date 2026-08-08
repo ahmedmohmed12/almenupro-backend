@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.48.0 (kitchens API + delivery zones fix)"
+echo "Almenupro frontend build v1.48.1 (kitchens/zones API + UI redeploy)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=restaurant-kitchen-v1.48.0
+  --dart-define=BUILD_FEATURE=restaurant-kitchen-v1.48.1
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -40,7 +40,7 @@ cp "$FRONTEND_DIR/middleware.js" "$FRONTEND_DIR/dist/middleware.js"
 
 node "$FRONTEND_DIR/scripts/prepareVercelOutput.js"
 
-BUILD_ID="1.43.0-kitchen-workflow-$(date -u +%Y%m%d%H%M%S)"
+BUILD_ID="1.48.1-kitchen-zones-$(date -u +%Y%m%d%H%M%S)"
 printf '{"build":"%s","features":["kitchen-management","kitchen-kds","zone-kitchen-mapping","cashier-attribution"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
