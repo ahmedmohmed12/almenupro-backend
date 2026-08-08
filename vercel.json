@@ -12,7 +12,7 @@
           "data/**",
           "uploads/menu/**",
           "public/menu-images/**",
-          "lib/menuImageStorage.js"
+          "lib/**/*.js"
         ]
       }
     }
