@@ -467,48 +467,35 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   @override
   Widget build(BuildContext context) {
-    // Keep scroll content outside Expanded (prevents blank panel on Flutter web).
-    return ColoredBox(
-      color: const Color(0xFFF4F6F8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight > 0 ? constraints.maxHeight - 48 : 400,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeaderCard(),
+          const SizedBox(height: 8),
+          const Text(
+            'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت. '
+            'يجب ربط كل منطقة بمطبخ من تبويب المطبخ.',
+            style: TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 16),
+          if (!widget.canManage)
+            _messageCard(
+              color: Colors.orange.shade50,
+              icon: Icons.store_outlined,
+              message:
+                  'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
+            )
+          else ...[
+            if (_refreshing)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(minHeight: 2, color: _burgundy),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeaderCard(),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت. '
-                    'يجب ربط كل منطقة بمطبخ من تبويب المطبخ.',
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 16),
-                  if (!widget.canManage)
-                    _messageCard(
-                      color: Colors.orange.shade50,
-                      icon: Icons.store_outlined,
-                      message:
-                          'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
-                    )
-                  else ...[
-                    if (_refreshing)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: LinearProgressIndicator(minHeight: 2, color: _burgundy),
-                      ),
-                    _buildZonesSection(),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
+            _buildZonesSection(),
+          ],
+        ],
       ),
     );
   }

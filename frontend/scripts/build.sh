@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.49.0 (native Vercel kitchens/zones API)"
+echo "Almenupro frontend build v1.50.0 (flat kitchens API + zones UI fix)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=restaurant-kitchen-v1.49.0
+  --dart-define=BUILD_FEATURE=restaurant-kitchen-v1.50.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "installCommand": "node scripts/preparePublicUploads.js",
-  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v9')\"",
+  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v10')\"",
   "builds": [
     {
       "src": "index.js",
@@ -17,7 +17,7 @@
       }
     },
     {
-      "src": "api/kitchens/index.js",
+      "src": "api/kitchens.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
@@ -27,44 +27,12 @@
       }
     },
     {
-      "src": "api/kitchens/[id].js",
+      "src": "api/delivery-zones.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
           "data/**",
           "lib/**/*.js"
-        ]
-      }
-    },
-    {
-      "src": "api/delivery-zones/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "lib/**/*.js"
-        ]
-      }
-    },
-    {
-      "src": "api/delivery-zones/[id].js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "lib/**/*.js"
-        ]
-      }
-    },
-    {
-      "src": "api/root.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "lib/**/*.js",
-          "uploads/menu/**",
-          "public/menu-images/**"
         ]
       }
     },
@@ -83,32 +51,28 @@
   ],
   "routes": [
     {
-      "src": "/",
-      "dest": "/index.js"
-    },
-    {
       "src": "/api/kitchens",
-      "dest": "/api/kitchens/index.js"
+      "dest": "/api/kitchens.js"
     },
     {
       "src": "/api/kitchens/(.*)",
-      "dest": "/api/kitchens/[id].js"
+      "dest": "/api/kitchens.js"
     },
     {
       "src": "/api/delivery-zones",
-      "dest": "/api/delivery-zones/index.js"
+      "dest": "/api/delivery-zones.js"
     },
     {
       "src": "/api/delivery-zones/(.*)",
-      "dest": "/api/delivery-zones/[id].js"
+      "dest": "/api/delivery-zones.js"
     },
     {
       "src": "/menu-images/(.*)",
-      "dest": "/api/root.js"
+      "dest": "/apiServer.js"
     },
     {
       "src": "/og/(.*)",
-      "dest": "/api/root.js"
+      "dest": "/apiServer.js"
     },
     {
       "src": "/api/(.*)",

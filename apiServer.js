@@ -1124,8 +1124,8 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       service: 'almenupro-api',
-      apiVersion: 'kitchen-zones-v9',
-      deployTag: 'kitchen-zones-v9-entrypoint',
+      apiVersion: 'kitchen-zones-v10',
+      deployTag: 'kitchen-zones-v10-flat-api',
       kitchensApi: true,
       deliveryZonesApi: true,
       kitchenCount: kitchens.length,
