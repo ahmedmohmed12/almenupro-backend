@@ -1,6 +1,8 @@
 ﻿import '../models/cart_item.dart';
 import '../models/delivery_address_details.dart';
+import '../models/delivery_notification.dart';
 import '../models/order.dart';
+import '../models/order_platform.dart';
 import '../models/smart_closing.dart';
 import '../utils/firebase_config.dart';
 import 'firebase_service.dart';
@@ -23,12 +25,15 @@ class OrdersService {
     return OrdersDemoService.watchOrders();
   }
 
-  Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
+  Future<OrderStatusUpdateResult?> updateOrderStatus(
+    String orderId,
+    OrderStatus status,
+  ) async {
     if (usesFirebase) {
       await _firebase.updateOrderStatus(orderId, status);
-      return;
+      return OrderStatusUpdateResult(orderId: orderId);
     }
-    await OrdersDemoService.updateOrderStatus(orderId, status);
+    return OrdersDemoService.updateOrderStatus(orderId, status);
   }
 
   Future<SmartClosingPayload?> submitOrderFromCart({
@@ -38,7 +43,8 @@ class OrdersService {
     required String address,
     required String paymentMethod,
     required String invoiceNumber,
-    String restaurantId = ApiService.defaultRestaurantId,
+    required String restaurantId,
+    String? restaurantSlug,
     double deliveryFee = 0,
     String? governorate,
     String? areaName,
@@ -46,7 +52,15 @@ class OrdersService {
     DeliveryAddressDetails addressDetails = const DeliveryAddressDetails(),
     String orderSource = 'pos',
     OrderType orderType = OrderType.delivery,
+    PlatformOrderMeta? platformMeta,
+    String? promoCode,
+    double promoDiscount = 0,
+    double walletAmount = 0,
+    double walletDiscount = 0,
+    String? targetKitchenId,
+    String? targetKitchenName,
   }) async {
+    final meta = platformMeta ?? const PlatformOrderMeta();
     final order = OrdersDemoService.orderFromCart(
       cartItems: cartItems,
       customerName: customerName,
@@ -61,6 +75,16 @@ class OrdersService {
       addressDetails: addressDetails,
       orderSource: orderSource,
       orderType: orderType,
+      externalOrderId: meta.externalOrderId,
+      platformGrossTotal: meta.platformGrossTotal,
+      platformCommission: meta.platformCommission,
+      platformCommissionPercent: meta.platformCommissionPercent,
+      promoCode: promoCode,
+      promoDiscount: promoDiscount,
+      walletAmount: walletAmount,
+      walletDiscount: walletDiscount,
+      targetKitchenId: targetKitchenId,
+      targetKitchenName: targetKitchenName,
     );
 
     if (usesFirebase) {
@@ -71,6 +95,7 @@ class OrdersService {
     final result = await ApiService.instance.createOrder(
       order,
       restaurantId: restaurantId,
+      restaurantSlug: restaurantSlug,
     );
     await OrdersDemoService.registerOrder(result.order);
     await OrdersDemoService.refreshFromApi();

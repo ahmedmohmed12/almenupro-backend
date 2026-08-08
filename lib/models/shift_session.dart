@@ -136,3 +136,51 @@ class ShiftSession {
     );
   }
 }
+
+class ShiftReportsMeta {
+  const ShiftReportsMeta({
+    this.total = 0,
+    this.openCount = 0,
+    this.dataState = '',
+    this.ordersInRange = 0,
+    this.ordersWithoutShift = 0,
+  });
+
+  final int total;
+  final int openCount;
+  final String dataState;
+  final int ordersInRange;
+  final int ordersWithoutShift;
+
+  factory ShiftReportsMeta.fromJson(Map<String, dynamic> json) {
+    return ShiftReportsMeta(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      openCount: (json['openCount'] as num?)?.toInt() ??
+          (json['open_count'] as num?)?.toInt() ??
+          0,
+      dataState: json['dataState']?.toString() ?? json['data_state']?.toString() ?? '',
+      ordersInRange: (json['ordersInRange'] as num?)?.toInt() ??
+          (json['orders_in_range'] as num?)?.toInt() ??
+          0,
+      ordersWithoutShift: (json['ordersWithoutShift'] as num?)?.toInt() ??
+          (json['orders_without_shift'] as num?)?.toInt() ??
+          0,
+    );
+  }
+}
+
+class ShiftReportsResult {
+  const ShiftReportsResult({
+    required this.shifts,
+    this.meta = const ShiftReportsMeta(),
+  });
+
+  final List<ShiftSession> shifts;
+  final ShiftReportsMeta meta;
+
+  List<ShiftSession> get closedShifts =>
+      shifts.where((shift) => !shift.isOpen).toList();
+
+  List<ShiftSession> get openShifts =>
+      shifts.where((shift) => shift.isOpen).toList();
+}

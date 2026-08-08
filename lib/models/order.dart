@@ -151,6 +151,16 @@ class Order {
     this.deliveryZoneId,
     this.addressDetails = const DeliveryAddressDetails(),
     this.orderSource,
+    this.externalOrderId,
+    this.platformGrossTotal,
+    this.platformCommission,
+    this.platformCommissionPercent,
+    this.promoCode,
+    this.promoDiscount,
+    this.walletCode,
+    this.walletDiscount,
+    this.targetKitchenId,
+    this.targetKitchenName,
   });
 
   final String id;
@@ -171,6 +181,16 @@ class Order {
   final String? deliveryZoneId;
   final DeliveryAddressDetails addressDetails;
   final String? orderSource;
+  final String? externalOrderId;
+  final double? platformGrossTotal;
+  final double? platformCommission;
+  final double? platformCommissionPercent;
+  final String? promoCode;
+  final double? promoDiscount;
+  final String? walletCode;
+  final double? walletDiscount;
+  final String? targetKitchenId;
+  final String? targetKitchenName;
 
   factory Order.fromMap(String id, Map<String, dynamic> map) {
     final rawItems = map['items'] as List<dynamic>? ?? [];
@@ -202,6 +222,25 @@ class Order {
       ),
       orderSource:
           map['orderSource']?.toString() ?? map['order_source']?.toString(),
+      externalOrderId: map['externalOrderId']?.toString() ??
+          map['external_order_id']?.toString(),
+      platformGrossTotal: (map['platformGrossTotal'] as num?)?.toDouble() ??
+          (map['platform_gross_total'] as num?)?.toDouble(),
+      platformCommission: (map['platformCommission'] as num?)?.toDouble() ??
+          (map['platform_commission'] as num?)?.toDouble(),
+      platformCommissionPercent:
+          (map['platformCommissionPercent'] as num?)?.toDouble() ??
+              (map['platform_commission_percent'] as num?)?.toDouble(),
+      promoCode: map['promoCode']?.toString() ?? map['promo_code']?.toString(),
+      promoDiscount: (map['promoDiscount'] as num?)?.toDouble() ??
+          (map['promo_discount'] as num?)?.toDouble(),
+      walletCode: map['walletCode']?.toString() ?? map['wallet_code']?.toString(),
+      walletDiscount: (map['walletDiscount'] as num?)?.toDouble() ??
+          (map['wallet_discount'] as num?)?.toDouble(),
+      targetKitchenId: map['targetKitchenId']?.toString() ??
+          map['target_kitchen_id']?.toString(),
+      targetKitchenName: map['targetKitchenName']?.toString() ??
+          map['target_kitchen_name']?.toString(),
     );
   }
 
@@ -257,6 +296,20 @@ class Order {
       if (paymentMethod != null && paymentMethod!.isNotEmpty)
         'paymentMethod': paymentMethod,
       if (orderSource != null && orderSource!.isNotEmpty) 'orderSource': orderSource,
+      if (externalOrderId != null && externalOrderId!.isNotEmpty)
+        'externalOrderId': externalOrderId,
+      if (platformGrossTotal != null) 'platformGrossTotal': platformGrossTotal,
+      if (platformCommission != null) 'platformCommission': platformCommission,
+      if (platformCommissionPercent != null)
+        'platformCommissionPercent': platformCommissionPercent,
+      if (promoCode != null && promoCode!.isNotEmpty) 'promoCode': promoCode,
+      if (promoDiscount != null && promoDiscount! > 0) 'promoDiscount': promoDiscount,
+      if (walletDiscount != null && walletDiscount! > 0) 'walletDiscount': walletDiscount,
+      if (walletDiscount != null && walletDiscount! > 0) 'walletAmount': walletDiscount,
+      if (targetKitchenId != null && targetKitchenId!.isNotEmpty)
+        'targetKitchenId': targetKitchenId,
+      if (targetKitchenName != null && targetKitchenName!.isNotEmpty)
+        'targetKitchenName': targetKitchenName,
     };
   }
 

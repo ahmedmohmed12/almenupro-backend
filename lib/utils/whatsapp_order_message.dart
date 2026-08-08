@@ -15,6 +15,12 @@ class WhatsAppOrderMessage {
     required double grandTotal,
     required String addressArabic,
     required String addressEnglish,
+    double promoDiscount = 0,
+    String? promoCodeApplied,
+    double walletDiscount = 0,
+    String? personalPromoCodeGranted,
+    double personalPromoDiscount = 0,
+    String orderNotes = '',
   }) {
     final itemsAr = StringBuffer();
     final itemsEn = StringBuffer();
@@ -36,8 +42,33 @@ class WhatsAppOrderMessage {
       if (addonsEn.isNotEmpty) itemsEn.writeln(addonsEn);
     }
 
-    final paymentAr = paymentMethod == 'K-Net' ? 'K-Net' : 'كاش';
-    final paymentEn = paymentMethod == 'K-Net' ? 'K-Net' : 'Cash';
+    final paymentAr = paymentMethod == 'K-Net'
+        ? 'K-Net'
+        : paymentMethod == 'محفظة'
+            ? 'محفظة الولاء'
+            : 'كاش';
+    final paymentEn = paymentMethod == 'K-Net'
+        ? 'K-Net'
+        : paymentMethod == 'محفظة'
+            ? 'Loyalty wallet'
+            : 'Cash';
+    final notesBlock = orderNotes.trim().isEmpty
+        ? ''
+        : '\n📝 *ملاحظات / Notes:* $orderNotes\n';
+    final promoAppliedBlock = promoDiscount > 0
+        ? '\n🏷️ *كود الخصم / Promo:* ${promoCodeApplied ?? ''}\n💸 *خصم / Discount:* -${promoDiscount.toStringAsFixed(3)} د.ك / KWD'
+        : '';
+    final walletAppliedBlock = walletDiscount > 0
+        ? '\n💼 *خصم المحفظة / Wallet discount:* -${walletDiscount.toStringAsFixed(3)} د.ك / KWD'
+        : '';
+    final promoGrantedBlock = personalPromoCodeGranted != null &&
+            personalPromoCodeGranted.trim().isNotEmpty &&
+            personalPromoDiscount > 0
+        ? '''
+
+🎁 *كود خصمك الشخصي للطلب القادم / Your personal promo for next order:*
+   *$personalPromoCodeGranted* — ${personalPromoDiscount.toStringAsFixed(3)} د.ك / KWD off'''
+        : '';
 
     return '''
 🧾 *فاتورة طلب جديدة - $restaurantName*
@@ -51,7 +82,7 @@ class WhatsAppOrderMessage {
    🇬🇧 $addressEnglish
 🚚 *رسوم التوصيل / Delivery fee:* ${deliveryFee.toStringAsFixed(3)} د.ك / KWD
 💳 *طريقة الدفع / Payment:* $paymentAr / $paymentEn
-
+$notesBlock
 🕒 *وقت الطلب / Order time:* $orderTime
 
 🛒 *تفاصيل الطلب / Order details:*
@@ -59,8 +90,9 @@ $itemsAr
 $itemsEn
 ----------------------------------
 🧮 *المجموع الفرعي / Subtotal:* ${subtotal.toStringAsFixed(3)} د.ك / KWD
-🚚 *التوصيل / Delivery:* ${deliveryFee.toStringAsFixed(3)} د.ك / KWD
+🚚 *التوصيل / Delivery:* ${deliveryFee.toStringAsFixed(3)} د.ك / KWD$promoAppliedBlock$walletAppliedBlock
 💰 *الإجمالي النهائي / Grand total:* ${grandTotal.toStringAsFixed(3)} د.ك / KWD
+$promoGrantedBlock
 ----------------------------------
 شكراً لطلبكم من $restaurantName! ❤️
 Thank you for ordering from $restaurantName! ❤️

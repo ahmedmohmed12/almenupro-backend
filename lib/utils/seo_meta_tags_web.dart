@@ -32,11 +32,17 @@ class SeoMetaTags {
     _setMetaName('description', metaDescription);
     _setMetaProperty('og:url', canonicalUrl);
     _setMetaProperty('og:type', 'website');
+    _setMetaProperty('og:site_name', cleanName);
+    _setMetaProperty('og:locale', 'ar_KW');
     _setMetaProperty('og:title', cleanName);
     _setMetaProperty('og:description', ogDescription);
     _setMetaProperty('og:image', imageUrl);
-    _setMetaProperty('og:image:width', '300');
-    _setMetaProperty('og:image:height', '300');
+    _setMetaProperty('og:image:alt', cleanName);
+    if (imageUrl.startsWith('https://')) {
+      _setMetaProperty('og:image:secure_url', imageUrl);
+    }
+    _setMetaProperty('og:image:width', '1200');
+    _setMetaProperty('og:image:height', '630');
     _setMetaName('twitter:card', 'summary_large_image');
     _setMetaName('twitter:title', cleanName);
     _setMetaName('twitter:description', metaDescription);
@@ -53,14 +59,18 @@ class SeoMetaTags {
     final raw = logoUrl?.trim() ?? '';
     if (raw.isEmpty) return fallback;
 
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
-      return raw;
+    if (raw.contains('/api/image-proxy')) {
+      if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+      return resolveImageUrl(raw);
     }
 
     if (raw.startsWith('/menu-images/') ||
-        raw.startsWith('/api/uploads/menu/') ||
-        raw.contains('/api/image-proxy')) {
+        raw.startsWith('/api/uploads/menu/')) {
       return resolveImageUrl(raw);
+    }
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return resolvePreviewImageUrl(raw);
     }
 
     if (raw.startsWith('/')) {

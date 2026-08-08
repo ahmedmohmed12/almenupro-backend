@@ -4,9 +4,16 @@
   "main": "apiServer.js",
   "scripts": {
     "start": "node apiServer.js",
-    "seed": "node seedFromTalabat.js"
+    "seed": "node seedFromTalabat.js",
+    "test:og": "node scripts/testOgMeta.js",
+    "test:promo": "node scripts/testPersonalPromo.js",
+    "test:wallet": "node scripts/testWalletPromo.js",
+    "test:delivery-whatsapp": "node scripts/testDeliveryWhatsApp.js"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "mongodb": "^7.5.0"
   }
 }

@@ -409,17 +409,29 @@ class _PlatformEditorDialogState extends State<_PlatformEditorDialog> {
 }
 
 class SalesPlatformBadge extends StatelessWidget {
-  const SalesPlatformBadge({super.key, required this.platform});
+  const SalesPlatformBadge({
+    super.key,
+    required this.platform,
+    this.compact = false,
+  });
 
   final SalesPlatformConfig platform;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Chip(
-      avatar: Icon(platform.icon, size: 16, color: platform.color),
+      visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+      padding: compact ? EdgeInsets.zero : null,
+      labelPadding: compact ? const EdgeInsets.symmetric(horizontal: 4) : null,
+      avatar: Icon(platform.icon, size: compact ? 14 : 16, color: platform.color),
       label: Text(
         platform.name,
-        style: TextStyle(color: platform.color, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: platform.color,
+          fontWeight: FontWeight.w600,
+          fontSize: compact ? 11 : null,
+        ),
       ),
       backgroundColor: platform.color.withValues(alpha: 0.12),
       side: BorderSide(color: platform.color.withValues(alpha: 0.35)),

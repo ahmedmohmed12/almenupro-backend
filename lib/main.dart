@@ -15,6 +15,7 @@ import 'services/menu_storage_service.dart';
 import 'services/molton_upload_service.dart';
 import 'services/seed_service.dart';
 import 'theme/app_theme.dart';
+import 'utils/app_route.dart';
 import 'utils/configure_url_strategy.dart';
 
 bool get _isFirebaseConfigured {
@@ -55,36 +56,40 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   static String _normalizeRoute(String? routeName) {
-    var route = (routeName == null || routeName.isEmpty) ? Uri.base.path : routeName;
-    if (route.endsWith('/') && route.length > 1) {
-      route = route.substring(0, route.length - 1);
-    }
-    return route.isEmpty ? '/' : route;
+    return AppRoute.normalize(
+      routeName,
+      fallbackPath: kIsWeb ? Uri.base.path : '/',
+    );
   }
 
   static Route<dynamic> _onGenerateRoute(RouteSettings settings) {
-    switch (_normalizeRoute(settings.name)) {
-      case '/admin':
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const AdminDashboard(),
-        );
-      case '/legacy-menu':
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const ClientMenuPage(),
-        );
-      case '/':
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const MenuScreen(),
-        );
-      default:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const MenuScreen(),
-        );
+    final route = _normalizeRoute(settings.name);
+
+    if (AppRoute.isAdminRoute(route)) {
+      return MaterialPageRoute(
+        settings: RouteSettings(name: route, arguments: settings.arguments),
+        builder: (_) => const AdminDashboard(),
+      );
     }
+
+    if (AppRoute.isLegacyMenuRoute(route)) {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const ClientMenuPage(),
+      );
+    }
+
+    if (AppRoute.isCustomerMenuRoute(route)) {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const MenuScreen(),
+      );
+    }
+
+    return MaterialPageRoute(
+      settings: settings,
+      builder: (_) => const MenuScreen(),
+    );
   }
 
   @override

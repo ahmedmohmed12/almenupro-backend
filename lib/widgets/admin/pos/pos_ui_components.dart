@@ -25,83 +25,119 @@ class PosMenuItemCard extends StatefulWidget {
 
 class _PosMenuItemCardState extends State<PosMenuItemCard> {
   var _pressed = false;
+  var _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1,
-        duration: const Duration(milliseconds: 90),
-        child: Container(
-          decoration: PosTheme.card(),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    NetworkMenuImage(imageUrl: item.imageUrl, fit: BoxFit.cover),
-                    if (item.hasCustomizations)
-                      Positioned(
-                        top: 6,
-                        left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(
-                            Icons.tune,
-                            size: 12,
-                            color: Colors.white,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : (_hovered ? 1.015 : 1),
+          duration: const Duration(milliseconds: 120),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            decoration: BoxDecoration(
+              color: PosTheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _hovered || _pressed
+                    ? PosTheme.accent.withValues(alpha: 0.45)
+                    : PosTheme.border,
+                width: _hovered || _pressed ? 1.5 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(_hovered ? 0x14000000 : 0x08000000),
+                  blurRadius: _hovered ? 14 : 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      NetworkMenuImage(
+                        imageUrl: item.imageUrl,
+                        fit: BoxFit.cover,
+                      ),
+                      if (item.hasCustomizations)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.tune,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Container(
-                color: PosTheme.surfaceAlt,
-                padding: EdgeInsets.all(widget.compact ? 6 : 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: widget.compact ? 11 : 13,
-                        height: 1.2,
-                      ),
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    color: PosTheme.surfaceAlt,
+                    padding: EdgeInsets.fromLTRB(
+                      widget.compact ? 8 : 12,
+                      widget.compact ? 6 : 10,
+                      widget.compact ? 8 : 12,
+                      widget.compact ? 6 : 10,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${item.price.toStringAsFixed(3)} د.ك',
-                      style: const TextStyle(
-                        color: PosTheme.accent,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          item.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: widget.compact ? 12 : 14,
+                            height: 1.2,
+                            color: AppTheme.brandBlack,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${item.price.toStringAsFixed(3)} د.ك',
+                          style: TextStyle(
+                            color: PosTheme.accent,
+                            fontWeight: FontWeight.w900,
+                            fontSize: widget.compact ? 12 : 14,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -211,7 +247,7 @@ class PosCategoryTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
@@ -250,6 +286,9 @@ class PosCategoryTile extends StatelessWidget {
 
 IconData posCategoryIcon(String category) {
   final value = category.toLowerCase();
+  if (value.contains('سريع') || value.contains('quick')) {
+    return Icons.bolt_rounded;
+  }
   if (value.contains('الكل')) return Icons.grid_view_rounded;
   if (value.contains('مبيع') || value.contains('🔥')) {
     return Icons.local_fire_department_rounded;
@@ -487,6 +526,36 @@ class PosPaymentChip extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.compact = true,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: PosCompactActionChip(
+        label: label,
+        icon: icon,
+        selected: selected,
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Dense chip matching platform ChoiceChip height for POS actions.
+class PosCompactActionChip extends StatefulWidget {
+  const PosCompactActionChip({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
   });
 
   final String label;
@@ -495,31 +564,59 @@ class PosPaymentChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<PosCompactActionChip> createState() => _PosCompactActionChipState();
+}
+
+class _PosCompactActionChipState extends State<PosCompactActionChip> {
+  var _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Expanded(
+    final selected = widget.selected;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: Material(
-        color: selected ? PosTheme.accent : PosTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: selected
+            ? PosTheme.accent
+            : (_hovered ? PosTheme.accentSoft : PosTheme.surface),
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            height: PosTheme.compactChipHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: selected ? PosTheme.accent : PosTheme.border,
+                color: selected
+                    ? PosTheme.accent
+                    : (_hovered
+                        ? PosTheme.accent.withValues(alpha: 0.4)
+                        : PosTheme.border),
               ),
             ),
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: selected ? Colors.white : PosTheme.textMuted),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: selected ? Colors.white : AppTheme.brandBlack,
+                Icon(
+                  widget.icon,
+                  size: 15,
+                  color: selected ? Colors.white : PosTheme.textMuted,
+                ),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? Colors.white : AppTheme.brandBlack,
+                    ),
                   ),
                 ),
               ],

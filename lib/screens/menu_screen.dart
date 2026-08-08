@@ -1,11 +1,18 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/customer_restaurant_context.dart';
 import '../models/menu_item.dart';
 import '../providers/cart_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/image_url.dart';
+import '../utils/restaurant_route.dart';
+import '../utils/seo_meta_tags.dart';
 import '../widgets/menu/menu_checkout_sheet.dart';
 import '../widgets/network_menu_image.dart';
 
@@ -19,22 +26,78 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> {
   late Future<List<MenuItem>> _itemsFuture;
   String _selectedCategory = 'الكل';
+  String? _menuSlug;
+  CustomerRestaurantContext? _restaurantContext;
+  String _restaurantName = 'Molten Cookies';
+  String _restaurantSubtitle = 'قائمة الطعام — ميني بايتس وكوكيز';
+  String? _logoUrl;
 
   @override
   void initState() {
     super.initState();
-    _itemsFuture = ApiService.instance.fetchItems();
+    _menuSlug = RestaurantRoute.parseSlug(
+      Uri.base.path,
+      query: kIsWeb ? Uri.base.queryParameters : null,
+    );
+    _itemsFuture = ApiService.instance.fetchItems(slug: _menuSlug);
+    final slug = _menuSlug ?? 'molton-cookies';
+    unawaited(_loadRestaurantMeta(slug));
+  }
+
+  Future<void> _loadRestaurantMeta(String slug) async {
+    try {
+      final restaurant = await ApiService.instance.fetchPublicRestaurant(slug);
+      final settings = await ApiService.instance.fetchPublicSettings(slug: slug);
+      if (!mounted) return;
+      final contextData = CustomerRestaurantContext(
+        restaurant: restaurant,
+        settings: settings,
+      );
+      setState(() {
+        _restaurantContext = contextData;
+        _restaurantName = restaurant.name;
+        _logoUrl = settings.logoUrl.trim().isNotEmpty
+            ? settings.logoUrl.trim()
+            : null;
+        if (settings.restaurantDescription.trim().isNotEmpty) {
+          _restaurantSubtitle = settings.restaurantDescription.trim();
+        }
+      });
+      context.read<CartProvider>().setRestaurantScope(
+            restaurantId: restaurant.id,
+            slug: slug,
+          );
+      SeoMetaTags.updateRestaurantMenu(
+        slug: slug,
+        name: restaurant.name,
+        description: settings.restaurantDescription,
+        logoUrl: settings.logoUrl,
+      );
+    } catch (_) {}
   }
 
   Future<void> _reload() async {
     setState(() {
-      _itemsFuture = ApiService.instance.fetchItems();
+      _itemsFuture = ApiService.instance.fetchItems(slug: _menuSlug);
     });
     await _itemsFuture;
+    final slug = _menuSlug ?? 'molton-cookies';
+    unawaited(_loadRestaurantMeta(slug));
   }
 
   void _addToCart(MenuItem item) {
-    context.read<CartProvider>().addMenuItem(item);
+    final ctx = _restaurantContext;
+    if (ctx == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('جاري تحميل بيانات المطعم...')),
+      );
+      return;
+    }
+    context.read<CartProvider>().addMenuItem(
+          item,
+          restaurantId: ctx.id,
+          restaurantSlug: ctx.slug,
+        );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('تمت إضافة "${item.name}" إلى السلة'),
@@ -109,7 +172,14 @@ class _MenuScreenState extends State<MenuScreen> {
               onRefresh: _reload,
               child: CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(child: _MenuHeader(onRefresh: _reload)),
+                  SliverToBoxAdapter(
+                    child: _MenuHeader(
+                      onRefresh: _reload,
+                      restaurantName: _restaurantName,
+                      subtitle: _restaurantSubtitle,
+                      logoUrl: _logoUrl,
+                    ),
+                  ),
                   SliverToBoxAdapter(
                     child: _CategoryBar(
                       categories: categories,
@@ -173,7 +243,21 @@ class _MenuScreenState extends State<MenuScreen> {
             : _FloatingCartBar(
                 itemCount: cart.itemCount,
                 totalPrice: cart.totalPrice,
-                onCheckout: () => MenuCheckoutSheet.show(context),
+                onCheckout: () {
+                  final ctx = _restaurantContext;
+                  if (ctx == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('جاري تحميل بيانات المطعم...'),
+                      ),
+                    );
+                    return;
+                  }
+                  MenuCheckoutSheet.show(
+                    context,
+                    restaurantContext: ctx,
+                  );
+                },
               ),
       ),
     );
@@ -259,9 +343,17 @@ class _FloatingCartBar extends StatelessWidget {
 }
 
 class _MenuHeader extends StatelessWidget {
-  const _MenuHeader({required this.onRefresh});
+  const _MenuHeader({
+    required this.onRefresh,
+    required this.restaurantName,
+    required this.subtitle,
+    this.logoUrl,
+  });
 
   final VoidCallback onRefresh;
+  final String restaurantName;
+  final String subtitle;
+  final String? logoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -278,36 +370,35 @@ class _MenuHeader extends StatelessWidget {
         bottom: false,
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.brandOrange.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.cookie_outlined,
-                color: AppTheme.brandOrange,
-                size: 28,
-              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: logoUrl != null && logoUrl!.isNotEmpty
+                  ? NetworkMenuImage(
+                      imageUrl: resolvePreviewImageUrl(logoUrl!),
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _headerIconPlaceholder(),
+                    )
+                  : _headerIconPlaceholder(),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Molten Cookies',
-                    style: TextStyle(
+                    restaurantName,
+                    style: const TextStyle(
                       color: AppTheme.brandBlack,
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
-                    'قائمة الطعام — ميني بايتس وكوكيز',
-                    style: TextStyle(
+                    subtitle,
+                    style: const TextStyle(
                       color: Color(0xFF666666),
                       fontSize: 13,
                     ),
@@ -322,6 +413,22 @@ class _MenuHeader extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _headerIconPlaceholder() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppTheme.brandOrange.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Icon(
+        Icons.cookie_outlined,
+        color: AppTheme.brandOrange,
+        size: 28,
       ),
     );
   }

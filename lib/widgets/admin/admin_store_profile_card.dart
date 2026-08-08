@@ -59,6 +59,15 @@ class _AdminStoreProfileCardState extends State<AdminStoreProfileCard> {
   }
 
   Future<void> _save() async {
+    final logoUrl = _logoUrlController.text.trim();
+    if (logoUrl.isNotEmpty && !isDirectOgImageUrl(logoUrl)) {
+      AdminCornerToast.error(
+        context,
+        'رابط الشعار يجب أن يكون صورة مباشرة (مثل .png أو .jpg) وليس رابط صفحة',
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       await RestaurantSettingsService.instance.saveStoreProfile(
@@ -79,8 +88,8 @@ class _AdminStoreProfileCardState extends State<AdminStoreProfileCard> {
   String? _previewImageUrl() {
     final raw = _logoUrlController.text.trim();
     if (raw.isEmpty) return null;
-    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-    return resolveImageUrl(raw);
+    if (!isDirectOgImageUrl(raw)) return null;
+    return resolvePreviewImageUrl(raw);
   }
 
   @override
@@ -145,12 +154,25 @@ class _AdminStoreProfileCardState extends State<AdminStoreProfileCard> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                'معاينة الشعار',
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'معاينة الشعار',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'إن لم تظهر الصورة، قد يكون الرابط منتهياً — جرّب رابطاً مباشراً أو صورة مرفوعة على المنصة',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

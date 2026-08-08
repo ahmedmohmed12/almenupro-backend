@@ -146,6 +146,84 @@ class AppStrings {
       ? 'سلتك جاهزة — أكّد الآن قبل تغيير الأسعار أو نفاد الأصناف'
       : 'Your cart is ready — confirm now before items sell out';
 
+  String get checkoutStepReview =>
+      isArabic ? 'مراجعة الطلب' : 'Review order';
+  String get checkoutStepDetails =>
+      isArabic ? 'بيانات التوصيل' : 'Delivery details';
+  String get continueToDetails =>
+      isArabic ? 'متابعة إلى بيانات التوصيل' : 'Continue to delivery details';
+  String get backToReview =>
+      isArabic ? 'رجوع لمراجعة الطلب' : 'Back to order review';
+  String get promoCodeLabel =>
+      isArabic ? 'كود الخصم الشخصي' : 'Personal promo code';
+  String get promoCodeHint =>
+      isArabic ? 'أدخل كود الخصم إن وُجد' : 'Enter your promo code if you have one';
+  String get applyPromoCode =>
+      isArabic ? 'تطبيق الكود' : 'Apply code';
+  String get walletAmountLabel =>
+      isArabic ? 'مبلغ الخصم من المحفظة' : 'Wallet amount to use';
+  String get walletAmountHint =>
+      isArabic ? 'أدخل المبلغ المراد خصمه' : 'Enter amount to deduct';
+  String get applyWalletAmount =>
+      isArabic ? 'تطبيق' : 'Apply';
+  String get useFullWalletBalance =>
+      isArabic ? 'استخدام الرصيد كاملاً' : 'Use full balance';
+  String get walletApplied =>
+      isArabic ? 'تم تطبيق رصيد المحفظة بنجاح' : 'Wallet balance applied successfully';
+  String get walletInvalid =>
+      isArabic ? 'المبلغ غير صالح أو يتجاوز الرصيد' : 'Invalid amount or exceeds balance';
+  String get walletAmountRequired =>
+      isArabic ? 'يرجى إدخال مبلغ من المحفظة' : 'Please enter a wallet amount';
+  String get walletEmpty =>
+      isArabic ? 'لا يوجد رصيد في المحفظة' : 'No wallet balance available';
+  String get walletLoadingBalance => isArabic
+      ? 'جاري جلب رصيد المحفظة...'
+      : 'Loading wallet balance...';
+  String get walletDiscountLabel =>
+      isArabic ? 'خصم المحفظة' : 'Wallet discount';
+  String walletAvailableBalance(String amount) => isArabic
+      ? 'رصيد المحفظة المتاح: $amount د.ك'
+      : 'Available wallet balance: $amount KWD';
+  String walletPayRemainderHint(String amount) => isArabic
+      ? 'يُخصم $amount د.ك من المحفظة — اختر طريقة دفع الباقي'
+      : '$amount KWD from wallet — select payment for the remainder';
+  String get walletCoversFullOrder => isArabic
+      ? 'المبلغ مغطى بالكامل من المحفظة'
+      : 'Order fully covered by wallet';
+  String get promoApplied =>
+      isArabic ? 'تم تطبيق كود الخصم بنجاح' : 'Promo code applied successfully';
+  String get promoInvalid =>
+      isArabic ? 'كود الخصم غير صالح' : 'Invalid promo code';
+  String get promoDiscountLabel =>
+      isArabic ? 'خصم الكود' : 'Promo discount';
+  String get personalPromoCodeLabel =>
+      isArabic ? 'كود خصمك الشخصي للطلب القادم' : 'Your personal promo for next order';
+  String personalPromoHint(String code, String amount) => isArabic
+      ? 'احفظ الكود *$code* — خصم $amount د.ك في طلبك القادم'
+      : 'Save code *$code* — $amount KWD off your next order';
+  String get copyPromoCode =>
+      isArabic ? 'نسخ الكود' : 'Copy code';
+  String get promoCodeCopied =>
+      isArabic ? 'تم نسخ كود الخصم' : 'Promo code copied';
+  String get savedPromoAvailable => isArabic
+      ? 'لديك كود خصم شخصي — اضغط تطبيق'
+      : 'You have a personal promo — tap Apply';
+  String get phoneFirstHint => isArabic
+      ? 'أدخل رقم هاتفك أولاً لاسترجاع بياناتك تلقائياً'
+      : 'Enter your phone first to auto-fill your saved details';
+  String get paymentSectionTitle =>
+      isArabic ? 'الدفع والمحفظة' : 'Payment & wallet';
+  String get walletPhoneHint => isArabic
+      ? 'أدخل رقم هاتفك لجلب رصيد المحفظة'
+      : 'Enter your phone to load wallet balance';
+  String get orderNotesLabel =>
+      isArabic ? 'ملاحظات الطلب (اختياري)' : 'Order notes (optional)';
+  String get orderNotesHint => isArabic
+      ? 'مثال: اتصل عند الوصول، بدون فلفل...'
+      : 'Example: call on arrival, no pepper...';
+  String get emptyCartCheckout =>
+      isArabic ? 'السلة فارغة — أضف أصنافاً أولاً' : 'Cart is empty — add items first';
+
   String paymentLabel(String value) {
     if (value == 'كاش' || value == 'Cash') return cash;
     return knet;

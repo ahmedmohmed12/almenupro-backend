@@ -15,4 +15,6 @@ class CustomerRestaurantContext {
   String get name => restaurant.name;
   String get id => restaurant.id;
   String get whatsappNumber => settings.whatsappNumber;
+  String get description => settings.restaurantDescription.trim();
+  String get logoUrl => settings.logoUrl.trim();
 }

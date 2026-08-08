@@ -38,7 +38,7 @@ class CustomerCheckoutCacheService {
       final profile = CustomerCheckoutProfile.fromMap(
         Map<String, dynamic>.from(decoded),
       );
-      return profile.hasUsableData ? profile : null;
+      return profile.hasUsableData || profile.hasWalletBalance ? profile : null;
     } catch (_) {
       return null;
     }

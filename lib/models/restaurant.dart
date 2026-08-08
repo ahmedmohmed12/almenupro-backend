@@ -249,23 +249,55 @@ class AdminSession {
     required this.role,
     this.restaurantId,
     this.restaurantName,
+    this.staffId,
+    this.staffName,
   });
 
   final String token;
   final AdminRole role;
   final String? restaurantId;
   final String? restaurantName;
+  final String? staffId;
+  final String? staffName;
 
   bool get isSuperAdmin => role.isSuperAdmin;
   bool get isRestaurantAdmin => role.isRestaurantAdmin;
+  bool get isCashier => role.isCashier;
 
   factory AdminSession.fromJson(Map<String, dynamic> json) {
     return AdminSession(
       token: json['token']?.toString() ?? '',
-      role: AdminRole.fromStorageKey(json['role']?.toString()) ??
-          AdminRole.restaurantAdmin,
-      restaurantId: json['restaurantId']?.toString(),
-      restaurantName: json['restaurantName']?.toString(),
+      role: _parseAdminRole(json),
+      restaurantId: json['restaurantId']?.toString() ??
+          json['restaurant_id']?.toString(),
+      restaurantName: json['restaurantName']?.toString() ??
+          json['restaurant_name']?.toString(),
+      staffId: json['staffId']?.toString() ?? json['staff_id']?.toString(),
+      staffName: json['staffName']?.toString() ?? json['staff_name']?.toString(),
     );
+  }
+
+  /// Resolves auth role from login/me payloads. Cashier login used to overwrite
+  /// `role` with a POS role object — prefer string authRole / staffId hints.
+  static AdminRole _parseAdminRole(Map<String, dynamic> json) {
+    final authRole = AdminRole.fromStorageKey(json['authRole']?.toString());
+    if (authRole != null) return authRole;
+
+    final staffId = json['staffId']?.toString() ?? json['staff_id']?.toString();
+    final hasStaff =
+        (staffId != null && staffId.isNotEmpty) || json['staff'] is Map;
+
+    final roleRaw = json['role'];
+    if (roleRaw is String) {
+      final parsed = AdminRole.fromStorageKey(roleRaw);
+      // Older clients persisted cashier JWT sessions as restaurant_admin.
+      if (parsed == AdminRole.restaurantAdmin && hasStaff) {
+        return AdminRole.cashier;
+      }
+      if (parsed != null) return parsed;
+    }
+
+    if (hasStaff) return AdminRole.cashier;
+    return AdminRole.restaurantAdmin;
   }
 }

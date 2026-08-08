@@ -38,6 +38,8 @@ cp "$FRONTEND_DIR/dist/index.html" "$FRONTEND_DIR/dist/404.html"
 
 cp "$FRONTEND_DIR/middleware.js" "$FRONTEND_DIR/dist/middleware.js"
 
+node "$FRONTEND_DIR/scripts/prepareVercelOutput.js"
+
 BUILD_ID="1.40.0-pos-sidebar-reports-$(date -u +%Y%m%d%H%M%S)"
 printf '{"build":"%s","features":["pos-sidebar-rbac","reports-tenant-fix","analytics-api","shift-reports","food-cost-report","pos-redesign","smart-upsell-analytics"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"

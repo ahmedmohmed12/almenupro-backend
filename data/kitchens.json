@@ -1,0 +1,30 @@
+[
+  {
+    "id": "kitchen_ardiya",
+    "restaurant_id": "rest_molton",
+    "name": "Al-Ardiya Kitchen",
+    "name_ar": "مطبخ العارضية",
+    "name_en": "Al-Ardiya Kitchen",
+    "code": "ARD",
+    "status": "active",
+    "is_default": true,
+    "sort_order": 1,
+    "kds_enabled": true,
+    "createdAt": "2026-08-08T12:00:00.000Z",
+    "updatedAt": "2026-08-08T12:00:00.000Z"
+  },
+  {
+    "id": "kitchen_sabah",
+    "restaurant_id": "rest_molton",
+    "name": "Sabah Al-Salem Kitchen",
+    "name_ar": "مطبخ صباح السالم",
+    "name_en": "Sabah Al-Salem Kitchen",
+    "code": "SBH",
+    "status": "active",
+    "is_default": false,
+    "sort_order": 2,
+    "kds_enabled": true,
+    "createdAt": "2026-08-08T12:00:00.000Z",
+    "updatedAt": "2026-08-08T12:00:00.000Z"
+  }
+]

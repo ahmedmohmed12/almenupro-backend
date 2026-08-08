@@ -12,11 +12,14 @@ const {
   DEFAULT_RESTAURANT_ID,
   loginSuperAdmin,
   loginRestaurantAdmin,
+  loginCashierSession,
+  findRestaurantByNameOrSlug,
   parseAuthHeader,
   verifyToken,
   buildAuthResponse,
   isSuperAdmin,
   isRestaurantAdmin,
+  isCashier,
   canAccessRestaurant,
   resolveRestaurantId,
   authError,
@@ -77,8 +80,43 @@ const {
   applyPostCheckoutRewards,
   buildCheckoutPreview,
 } = require('./lib/smartClosingEngine');
+const {
+  validatePersonalPromo,
+  redeemPersonalPromo,
+  round3: roundPromo3,
+} = require('./lib/personalPromoCodes');
+const {
+  validateWalletPromo,
+  validateWalletAmount,
+  redeemWalletPromo,
+  redeemWalletAmount,
+  generateWalletPromoCode,
+  readWalletBalance,
+} = require('./lib/walletPromoCodes');
+const {
+  buildDeliveryNotificationPayload,
+} = require('./lib/deliveryWhatsAppMessage');
+const { previewEarnedCashback, applyLoyaltyCashbackToOrder } = require('./lib/loyaltyCashback');
 const { computeTopMenuItems } = require('./lib/topItemsAnalytics');
+const { computeFoodCostReport } = require('./lib/foodCostReportAnalytics');
+const { computeDailySalesAnalytics } = require('./lib/platformSalesAnalytics');
+const { enrichPlatformRows } = require('./lib/platformChannelUtils');
+const { normalizeSalesPlatforms } = require('./lib/salesPlatforms');
+const { normalizePosRoles } = require('./lib/posPermissions');
+const { handlePosRoutes } = require('./lib/posRoutes');
+const {
+  buildRestaurantOgData,
+  buildOgMenuHtml,
+  DEFAULT_FRONTEND_ORIGIN,
+} = require('./lib/ogMenuMeta');
 const { computeCartRecommendations } = require('./lib/recommendationsAnalytics');
+const {
+  assignTargetKitchen,
+  getActiveKitchens,
+  getDefaultKitchen,
+  normalizeKitchen,
+  kitchenRestaurantId,
+} = require('./lib/kitchenRouting');
 const {
   initDataStore,
   usesMongo,
@@ -96,6 +134,13 @@ const {
   writeSettingsMap,
   readDeliveryZones,
   writeDeliveryZones,
+  readKitchens,
+  writeKitchens,
+  readStaffUsers,
+  writeStaffUsers,
+  readShiftSessions,
+  writeShiftSessions,
+  appendAuditEvents,
   ensureBilingualMenuItemsFast,
   ensureBilingualMenuItemsWithAutoTranslate,
 } = require('./lib/dataStore');
@@ -115,6 +160,15 @@ function sendJson(res, statusCode, payload) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Restaurant-Id',
   });
   res.end(JSON.stringify(payload));
+}
+
+function sendHtml(res, statusCode, html) {
+  res.writeHead(statusCode, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'public, max-age=300',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(html);
 }
 
 function requestOrigin(req) {
@@ -139,9 +193,15 @@ function isAllowedImageUrl(rawUrl) {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== 'https:') return false;
     const host = parsed.hostname.toLowerCase();
-    return [...ALLOWED_IMAGE_HOSTS].some(
-      (allowed) => host === allowed || host.endsWith(`.${allowed}`),
-    );
+    if (
+      [...ALLOWED_IMAGE_HOSTS].some(
+        (allowed) => host === allowed || host.endsWith(`.${allowed}`),
+      )
+    ) {
+      return true;
+    }
+    const path = parsed.pathname.toLowerCase();
+    return /\.(png|jpe?g|gif|webp|svg|avif|ico)(\?|$)/i.test(path);
   } catch {
     return false;
   }
@@ -218,6 +278,8 @@ function normalizeSettings(raw) {
     impulseBumpMaxPrice:
       Number(source.impulseBumpMaxPrice ?? source.impulse_bump_max_price ?? 2) || 2,
     smartRecommendationsEnabled: source.smartRecommendationsEnabled !== false,
+    smartClosingEnabled:
+      source.smartClosingEnabled !== false && source.smart_closing_enabled !== false,
     cashbackType: String(
       source.cashbackType ?? source.cashback_type ?? 'PERCENTAGE',
     ).toUpperCase(),
@@ -227,6 +289,25 @@ function normalizeSettings(raw) {
       Number(source.minOrderForLoyalty ?? source.min_order_for_loyalty ?? 0) || 0,
     loyaltyEnabled:
       source.loyaltyEnabled !== false && source.loyalty_enabled !== false,
+    logoUrl: String(source.logoUrl ?? source.logo_url ?? '').trim(),
+    restaurantDescription: String(
+      source.restaurantDescription ?? source.restaurant_description ?? '',
+    ).trim(),
+    salesPlatforms: normalizeSalesPlatforms(
+      source.salesPlatforms || source.sales_platforms,
+    ),
+    posRoles: normalizePosRoles(source.posRoles || source.pos_roles),
+    posAutoLockMinutes:
+      Number(source.posAutoLockMinutes ?? source.pos_auto_lock_minutes ?? 5) || 5,
+    notificationEmail: String(
+      source.notificationEmail ?? source.notification_email ?? '',
+    ).trim(),
+    notifyOnNewOrderEmail:
+      source.notifyOnNewOrderEmail !== false &&
+      source.notify_on_new_order_email !== false,
+    notifyOnShiftCloseEmail:
+      source.notifyOnShiftCloseEmail === true ||
+      source.notify_on_shift_close_email === true,
     updatedAt: source.updatedAt || new Date().toISOString(),
   };
 }
@@ -247,6 +328,27 @@ async function writeSettings(restaurantId, settings) {
   return map.byRestaurant[restaurantId];
 }
 
+function assertOrderItemsBelongToRestaurant(body, restaurantId, menuItems) {
+  const allowedIds = new Set(
+    (menuItems || []).map((entry) => String(entry.id)),
+  );
+  const orderItems = Array.isArray(body.items) ? body.items : [];
+  for (const line of orderItems) {
+    const menuItemId = String(
+      line.menuItemId ?? line.menu_item_id ?? '',
+    ).trim();
+    if (!menuItemId) continue;
+    if (!allowedIds.has(menuItemId)) {
+      return {
+        ok: false,
+        error: `Menu item ${menuItemId} does not belong to this restaurant`,
+        code: 'ORDER_ITEM_TENANT_MISMATCH',
+      };
+    }
+  }
+  return { ok: true };
+}
+
 function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
   const createdAt = raw.createdAt || new Date().toISOString();
   const items = Array.isArray(raw.items) ? raw.items : [];
@@ -256,8 +358,16 @@ function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
   );
   const subtotal = Number(raw.subtotal ?? raw.sub_total ?? itemsSubtotal) || 0;
   const deliveryFee = Number(raw.deliveryFee ?? raw.delivery_fee ?? 0) || 0;
+  const promoDiscount = roundPromo3(raw.promoDiscount ?? raw.promo_discount ?? 0);
+  const promoCode = String(raw.promoCode ?? raw.promo_code ?? '').trim();
+  const walletDiscount = roundPromo3(raw.walletDiscount ?? raw.wallet_discount ?? 0);
+  const walletCode = String(raw.walletCode ?? raw.wallet_code ?? '').trim();
   const totalFromBody = Number(raw.totalPrice ?? raw.total_price ?? 0) || 0;
-  const totalPrice = totalFromBody > 0 ? totalFromBody : subtotal + deliveryFee;
+  const computedTotal = Math.max(
+    0,
+    subtotal + deliveryFee - promoDiscount - walletDiscount,
+  );
+  const totalPrice = totalFromBody > 0 ? totalFromBody : computedTotal;
 
   const addressDetailsRaw = raw.addressDetails || raw.address_details || {};
   const addressDetails = {
@@ -307,6 +417,14 @@ function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
       items,
       subtotal,
       deliveryFee,
+      promoCode: promoCode || null,
+      promoDiscount,
+      promo_code: promoCode || null,
+      promo_discount: promoDiscount,
+      walletCode: walletCode || null,
+      walletDiscount,
+      wallet_code: walletCode || null,
+      wallet_discount: walletDiscount,
       totalPrice,
       orderType: String(raw.orderType || raw.order_type || 'Delivery'),
       status: String(raw.status || 'pending'),
@@ -314,18 +432,49 @@ function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
       invoiceNumber: raw.invoiceNumber?.toString() || raw.invoice_number?.toString() || null,
       paymentMethod: raw.paymentMethod?.toString() || raw.payment_method?.toString() || null,
       orderSource: String(raw.orderSource || raw.order_source || '').trim() || null,
+      externalOrderId: String(
+        raw.externalOrderId || raw.external_order_id || '',
+      ).trim() || null,
+      platformGrossTotal:
+        Number(raw.platformGrossTotal ?? raw.platform_gross_total ?? 0) || null,
+      platformCommission:
+        Number(raw.platformCommission ?? raw.platform_commission ?? 0) || null,
+      platformCommissionPercent:
+        Number(
+          raw.platformCommissionPercent ?? raw.platform_commission_percent ?? 0,
+        ) || null,
+      targetKitchenId:
+        String(raw.targetKitchenId || raw.target_kitchen_id || '').trim() || null,
+      target_kitchen_id:
+        String(raw.targetKitchenId || raw.target_kitchen_id || '').trim() || null,
+      targetKitchenName:
+        String(raw.targetKitchenName || raw.target_kitchen_name || '').trim() || null,
+      target_kitchen_name:
+        String(raw.targetKitchenName || raw.target_kitchen_name || '').trim() || null,
+      kitchenAssignment: raw.kitchenAssignment || raw.kitchen_assignment || null,
+      kitchen_assignment: raw.kitchenAssignment || raw.kitchen_assignment || null,
     },
     raw.restaurant_id || raw.restaurantId || restaurantId,
   );
 }
 
 function normalizeDeliveryZone(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
+  const defaultKitchenId = String(
+    raw.defaultKitchenId ||
+      raw.default_kitchen_id ||
+      raw.kitchenId ||
+      raw.kitchen_id ||
+      '',
+  ).trim();
+
   return ensureRestaurantId(
     {
       id: String(id),
       governorate: String(raw.governorate || raw.governorateName || '').trim(),
       areaName: String(raw.areaName || raw.area_name || '').trim(),
       deliveryFee: Number(raw.deliveryFee ?? raw.delivery_fee ?? 0) || 0,
+      defaultKitchenId: defaultKitchenId || null,
+      default_kitchen_id: defaultKitchenId || null,
       isActive:
         raw.isActive === false ||
         raw.is_active === false ||
@@ -357,6 +506,27 @@ function itemDisplayOrder(item, fallbackIndex = 0) {
   if (raw == null || raw === '') return fallbackIndex;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallbackIndex;
+}
+
+function parseOptionalCostPrice(body) {
+  const raw = body?.costPrice ?? body?.cost_price;
+  if (raw == null || raw === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function applyCostPriceFields(target, body) {
+  if (body == null) return;
+  if (body.costPrice != null || body.cost_price != null) {
+    const costPrice = parseOptionalCostPrice(body);
+    if (costPrice == null) {
+      delete target.costPrice;
+      delete target.cost_price;
+    } else {
+      target.costPrice = costPrice;
+      target.cost_price = costPrice;
+    }
+  }
 }
 
 function sortItemsByDisplayOrder(items) {
@@ -576,6 +746,14 @@ function requireAuth(req, res) {
   return auth;
 }
 
+function rejectCashier(auth, res, message = 'Cashiers cannot perform this admin action') {
+  if (isCashier(auth)) {
+    authError(res, 403, message);
+    return true;
+  }
+  return false;
+}
+
 function requireSuperAdmin(req, res) {
   const auth = requireAuth(req, res);
   if (!auth) return null;
@@ -629,6 +807,32 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  const posHandled = await handlePosRoutes(req, res, url, {
+    readBody,
+    sendJson,
+    authError,
+    parseAuthHeader,
+    requireAuth,
+    isSuperAdmin,
+    isCashier,
+    assertRestaurantAccess,
+    resolveScopedRestaurantId,
+    filterByRestaurant,
+    readSettings,
+    readRestaurants,
+    readStaffUsers,
+    writeStaffUsers,
+    readShiftSessions,
+    writeShiftSessions,
+    readOrders,
+    writeOrders,
+    appendAuditEvents,
+    DEFAULT_RESTAURANT_ID,
+    loginCashierSession,
+    findRestaurantByNameOrSlug,
+  });
+  if (posHandled) return;
+
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '')) {
     sendJson(res, 200, {
       ok: true,
@@ -642,6 +846,8 @@ const server = http.createServer(async (req, res) => {
         restaurantBySlug: '/api/restaurants/public/{slug}',
         menu: '/api/items?slug={slug}',
         topItems: '/api/analytics/top-items?slug={slug}',
+        foodCostReport: '/api/analytics/food-cost-report?restaurantId={id}&days=30',
+        dailySales: '/api/analytics/daily-sales?restaurantId={id}&days=7',
         recommendations: '/api/recommendations?slug={slug}&cart=1,2,3',
         customerLookup: '/api/customers/lookup?phone={phone}&slug={slug}',
         customers: '/api/customers',
@@ -659,6 +865,46 @@ const server = http.createServer(async (req, res) => {
   const menuImageMatch = url.pathname.match(/^\/menu-images\/([^/]+)$/);
   if (req.method === 'GET' && menuImageMatch) {
     serveMenuImage(res, decodeURIComponent(menuImageMatch[1]));
+    return;
+  }
+
+  const ogMenuMatch = url.pathname.match(/^\/og\/menu\/([^/]+)$/);
+  if (req.method === 'GET' && ogMenuMatch) {
+    const slug = decodeURIComponent(ogMenuMatch[1]).trim().toLowerCase();
+    const siteOrigin = String(url.searchParams.get('site') || DEFAULT_FRONTEND_ORIGIN).trim();
+    const restaurants = await readRestaurants();
+    const match = restaurants.find(
+      (entry) =>
+        String(entry.slug || '').toLowerCase() === slug &&
+        String(entry.status || 'active') !== 'inactive',
+    );
+
+    if (!match) {
+      sendHtml(
+        res,
+        404,
+        '<!DOCTYPE html><html lang="ar"><head><meta charset="UTF-8"><title>Not found</title></head><body>Restaurant not found</body></html>',
+      );
+      return;
+    }
+
+    const restaurantId = String(match.id);
+    const backendOrigin = requestOrigin(req);
+    const settings = await readSettings(restaurantId);
+    const items = filterByRestaurant(await readItems(), restaurantId);
+    const restaurant = {
+      ...sanitizeRestaurant(match),
+      logoUrl: settings.logoUrl,
+      restaurantDescription: settings.restaurantDescription,
+    };
+    const ogData = buildRestaurantOgData(restaurant, {
+      slug,
+      siteOrigin,
+      frontendOrigin: siteOrigin,
+      backendOrigin,
+      menuItems: mapItemsForPublicApi(items, backendOrigin),
+    });
+    sendHtml(res, 200, buildOgMenuHtml(ogData));
     return;
   }
 
@@ -925,6 +1171,73 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/analytics/daily-sales') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: false,
+    });
+    if (!restaurantId || !canAccessRestaurant(auth, restaurantId)) {
+      authError(res, 403, 'Access denied for this restaurant');
+      return;
+    }
+
+    const days = Number(url.searchParams.get('days') || 7);
+    const orders = filterByRestaurant(await readOrders(), restaurantId);
+    const settings = await readSettings(restaurantId);
+    const analytics = computeDailySalesAnalytics(orders, restaurantId, { days });
+    const platforms = enrichPlatformRows(
+      analytics.platforms,
+      settings.salesPlatforms || settings.sales_platforms || [],
+    );
+
+    sendJson(res, 200, {
+      ...analytics,
+      platforms,
+      restaurantId,
+      days,
+      meta: {
+        dataState: analytics.orderCount > 0 ? 'live' : 'no_orders',
+      },
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/analytics/food-cost-report') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: false,
+    });
+
+    if (!restaurantId) {
+      authError(res, 401, 'Restaurant context required');
+      return;
+    }
+
+    if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+      return;
+    }
+
+    const days = Number(url.searchParams.get('days') || 30);
+    const startDate =
+      url.searchParams.get('startDate') || url.searchParams.get('start_date');
+    const endDate =
+      url.searchParams.get('endDate') || url.searchParams.get('end_date');
+    const orders = filterByRestaurant(await readOrders(), restaurantId);
+    const menuItems = filterByRestaurant(await readItems(), restaurantId);
+    const result = computeFoodCostReport(orders, menuItems, restaurantId, {
+      days,
+      startDate,
+      endDate,
+    });
+
+    sendJson(res, 200, result);
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/recommendations') {
     const auth = parseAuthHeader(req);
     const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
@@ -1156,6 +1469,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/items') {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage menu items')) return;
 
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
@@ -1204,6 +1518,7 @@ const server = http.createServer(async (req, res) => {
         },
         restaurantId,
       );
+      applyCostPriceFields(item, body);
 
       if (!item.name && !item.name_ar && !item.name_en) {
         sendJson(res, 400, { error: 'Item name is required' });
@@ -1222,6 +1537,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'PUT' && url.pathname === '/api/items/reorder') {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage menu items')) return;
 
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
@@ -1279,6 +1595,7 @@ const server = http.createServer(async (req, res) => {
   if (itemMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage menu items')) return;
 
     try {
       const itemId = decodeURIComponent(itemMatch[1]);
@@ -1342,6 +1659,8 @@ const server = http.createServer(async (req, res) => {
         item.linked_item_ids = linked;
       }
 
+      applyCostPriceFields(item, body);
+
       await writeItems(items);
       sendJson(res, 200, item);
     } catch (error) {
@@ -1354,6 +1673,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'PATCH' && itemAvailabilityMatch) {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage menu items')) return;
 
     try {
       const itemId = decodeURIComponent(itemAvailabilityMatch[1]);
@@ -1384,6 +1704,144 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/kitchens') {
+    const auth = parseAuthHeader(req);
+    const restaurants = await readRestaurants();
+    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
+      allowPublicDefault: true,
+    });
+
+    if (!restaurantId) {
+      sendJson(res, 404, { error: 'Restaurant not found' });
+      return;
+    }
+
+    const includeInactive = url.searchParams.get('include_inactive') === '1';
+    const allKitchens = filterByRestaurant(await readKitchens(), restaurantId);
+    const kitchens = includeInactive
+      ? allKitchens
+      : allKitchens.filter((kitchen) => String(kitchen.status || 'active') === 'active');
+
+    kitchens.sort(
+      (a, b) =>
+        (Number(a.sort_order ?? a.sortOrder ?? 0) || 0) -
+        (Number(b.sort_order ?? b.sortOrder ?? 0) || 0),
+    );
+    sendJson(res, 200, kitchens);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/kitchens') {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage kitchens')) return;
+
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const restaurantId = resolveRestaurantId(
+        auth,
+        body.restaurantId ||
+          body.restaurant_id ||
+          req.headers['x-restaurant-id'],
+      );
+
+      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const name = String(body.name || body.name_ar || body.nameAr || '').trim();
+      if (!name) {
+        sendJson(res, 400, { error: 'Kitchen name is required' });
+        return;
+      }
+
+      const id = `kitchen_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const kitchen = normalizeKitchen(body, id, restaurantId);
+      kitchen.name = name;
+
+      const kitchens = await readKitchens();
+      if (kitchen.is_default || kitchen.isDefault) {
+        for (const entry of kitchens) {
+          if (kitchenRestaurantId(entry) === String(restaurantId)) {
+            entry.is_default = false;
+            entry.isDefault = false;
+          }
+        }
+      }
+
+      kitchens.push(kitchen);
+      await writeKitchens(kitchens);
+      sendJson(res, 201, kitchen);
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  const kitchenMatch = url.pathname.match(/^\/api\/kitchens\/([^/]+)$/);
+  if (kitchenMatch) {
+    const kitchenId = decodeURIComponent(kitchenMatch[1]);
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage kitchens')) return;
+
+    const kitchens = await readKitchens();
+    const index = kitchens.findIndex((kitchen) => String(kitchen.id) === kitchenId);
+    if (index === -1) {
+      sendJson(res, 404, { error: 'Kitchen not found' });
+      return;
+    }
+
+    const existing = kitchens[index];
+    const restaurantId = String(
+      existing.restaurant_id || existing.restaurantId || DEFAULT_RESTAURANT_ID,
+    );
+    if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+      return;
+    }
+
+    if (req.method === 'PUT') {
+      try {
+        const body = JSON.parse((await readBody(req)) || '{}');
+        const next = normalizeKitchen({ ...existing, ...body }, kitchenId, restaurantId);
+        if (next.is_default || next.isDefault) {
+          for (let i = 0; i < kitchens.length; i += 1) {
+            if (kitchenRestaurantId(kitchens[i]) === restaurantId) {
+              kitchens[i].is_default = kitchens[i].id === kitchenId;
+              kitchens[i].isDefault = kitchens[i].id === kitchenId;
+            }
+          }
+        }
+        kitchens[index] = next;
+        await writeKitchens(kitchens);
+        sendJson(res, 200, next);
+      } catch (error) {
+        sendJson(res, 400, { error: error.message || 'Invalid payload' });
+      }
+      return;
+    }
+
+    if (req.method === 'DELETE') {
+      const activeOrders = (await readOrders()).some(
+        (order) =>
+          String(order.target_kitchen_id || order.targetKitchenId || '') === kitchenId &&
+          String(order.restaurant_id || order.restaurantId) === restaurantId &&
+          !['delivered', 'cancelled'].includes(String(order.status || '').toLowerCase()),
+      );
+      if (activeOrders) {
+        sendJson(res, 409, {
+          error: 'Cannot delete kitchen with active orders',
+          code: 'KITCHEN_HAS_ACTIVE_ORDERS',
+        });
+        return;
+      }
+      kitchens.splice(index, 1);
+      await writeKitchens(kitchens);
+      sendJson(res, 200, { ok: true, id: kitchenId });
+      return;
+    }
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/delivery-zones') {
     const auth = parseAuthHeader(req);
     const restaurants = await readRestaurants();
@@ -1406,6 +1864,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/delivery-zones') {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot manage delivery zones')) return;
 
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
@@ -1642,6 +2101,150 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/promo/validate') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const phone = normalizePhoneDigits(body.phone);
+      const promoCode = String(body.promoCode ?? body.promo_code ?? '').trim();
+      const restaurants = await readRestaurants();
+      let restaurantId =
+        body.restaurantId ||
+        body.restaurant_id ||
+        resolveRestaurantFromQuery(url, restaurants);
+
+      if (!restaurantId && (body.restaurantSlug || body.restaurant_slug || body.slug)) {
+        const slug = String(
+          body.restaurantSlug || body.restaurant_slug || body.slug,
+        )
+          .trim()
+          .toLowerCase();
+        const match = restaurants.find(
+          (entry) => String(entry.slug || '').toLowerCase() === slug,
+        );
+        restaurantId = match ? match.id : null;
+      }
+
+      if (!restaurantId) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+        return;
+      }
+      if (!phone || phone.length < 8) {
+        sendJson(res, 400, { error: 'Invalid phone number' });
+        return;
+      }
+
+      const subtotal = Number(body.subtotal ?? body.sub_total ?? 0) || 0;
+      const deliveryFee = Number(body.deliveryFee ?? body.delivery_fee ?? 0) || 0;
+      const orderTotal = subtotal + deliveryFee;
+      const customers = await ensureCustomersMigrated();
+      const result = validatePersonalPromo({
+        customers,
+        restaurantId,
+        phone,
+        code: promoCode,
+        orderTotal,
+      });
+
+      if (!result.valid) {
+        sendJson(res, 400, {
+          valid: false,
+          error: result.error,
+          message: result.message,
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        valid: true,
+        promoCode: result.promoCode,
+        discount: result.discount,
+        message: result.message,
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/wallet/validate') {
+    try {
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const phone = normalizePhoneDigits(body.phone);
+      const walletAmount = roundPromo3(
+        body.walletAmount ?? body.wallet_amount ?? body.walletDiscount ?? body.wallet_discount ?? 0,
+      );
+      const restaurants = await readRestaurants();
+      let restaurantId =
+        body.restaurantId ||
+        body.restaurant_id ||
+        resolveRestaurantFromQuery(url, restaurants);
+
+      if (!restaurantId && (body.restaurantSlug || body.restaurant_slug || body.slug)) {
+        const slug = String(
+          body.restaurantSlug || body.restaurant_slug || body.slug,
+        )
+          .trim()
+          .toLowerCase();
+        const match = restaurants.find(
+          (entry) => String(entry.slug || '').toLowerCase() === slug,
+        );
+        restaurantId = match ? match.id : null;
+      }
+
+      if (!restaurantId) {
+        sendJson(res, 404, { error: 'Restaurant not found' });
+        return;
+      }
+      if (!phone || phone.length < 8) {
+        sendJson(res, 400, { error: 'Invalid phone number' });
+        return;
+      }
+      if (walletAmount <= 0) {
+        sendJson(res, 400, {
+          valid: false,
+          error: 'invalid_amount',
+          message: 'Wallet amount must be greater than zero',
+        });
+        return;
+      }
+
+      const subtotal = Number(body.subtotal ?? body.sub_total ?? 0) || 0;
+      const deliveryFee = Number(body.deliveryFee ?? body.delivery_fee ?? 0) || 0;
+      const promoDiscount = roundPromo3(body.promoDiscount ?? body.promo_discount ?? 0);
+      const orderTotal = Math.max(0, subtotal + deliveryFee - promoDiscount);
+      const customers = await ensureCustomersMigrated();
+      const result = validateWalletAmount({
+        customers,
+        restaurantId,
+        phone,
+        amount: walletAmount,
+        orderTotal,
+      });
+
+      if (!result.valid) {
+        sendJson(res, 400, {
+          valid: false,
+          error: result.error,
+          message: result.message,
+        });
+        return;
+      }
+
+      sendJson(res, 200, {
+        valid: true,
+        walletAmount: result.walletAmount,
+        discount: result.discount,
+        walletBalance: result.walletBalance,
+        remainingBalance: result.remainingBalance,
+        coversFullOrder: result.coversFullOrder,
+        message: result.message,
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/orders') {
     try {
       const body = JSON.parse((await readBody(req)) || '{}');
@@ -1663,30 +2266,161 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 404, { error: 'Restaurant not found' });
         return;
       }
+
+      const tenantMenuItems = filterByRestaurant(await readItems(), restaurantId);
+      const itemCheck = assertOrderItemsBelongToRestaurant(
+        body,
+        restaurantId,
+        tenantMenuItems,
+      );
+      if (!itemCheck.ok) {
+        sendJson(res, 400, {
+          error: itemCheck.error,
+          code: itemCheck.code,
+        });
+        return;
+      }
+
       const id = `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const order = normalizeOrder(body, id, restaurantId);
+      let customers = await readCustomers();
+      const promoCodeInput = String(body.promoCode ?? body.promo_code ?? '').trim();
+      const walletAmountInput = roundPromo3(
+        body.walletAmount ?? body.wallet_amount ?? body.walletDiscount ?? body.wallet_discount ?? 0,
+      );
+      const phoneDigits = normalizePhoneDigits(body.phone);
+      const subtotalPreview =
+        Number(body.subtotal ?? body.sub_total ?? 0) ||
+        (Array.isArray(body.items)
+          ? body.items.reduce(
+              (sum, item) => sum + (Number(item.lineTotal ?? item.line_total) || 0),
+              0,
+            )
+          : 0);
+      const deliveryFeePreview = Number(body.deliveryFee ?? body.delivery_fee ?? 0) || 0;
+      let orderTotalAfterPromo = subtotalPreview + deliveryFeePreview;
+
+      if (promoCodeInput && phoneDigits.length >= 8) {
+        const promoResult = validatePersonalPromo({
+          customers,
+          restaurantId,
+          phone: phoneDigits,
+          code: promoCodeInput,
+          orderTotal: orderTotalAfterPromo,
+        });
+        if (!promoResult.valid) {
+          sendJson(res, 400, {
+            error: promoResult.message || 'Invalid promo code',
+            code: 'INVALID_PROMO_CODE',
+          });
+          return;
+        }
+        body.promoCode = promoResult.promoCode;
+        body.promoDiscount = promoResult.discount;
+        body.promo_code = promoResult.promoCode;
+        body.promo_discount = promoResult.discount;
+        orderTotalAfterPromo = Math.max(
+          0,
+          orderTotalAfterPromo - promoResult.discount,
+        );
+      }
+
+      if (walletAmountInput > 0 && phoneDigits.length >= 8) {
+        const walletResult = validateWalletAmount({
+          customers,
+          restaurantId,
+          phone: phoneDigits,
+          amount: walletAmountInput,
+          orderTotal: orderTotalAfterPromo,
+        });
+        if (!walletResult.valid) {
+          sendJson(res, 400, {
+            error: walletResult.message || 'Invalid wallet amount',
+            code: 'INVALID_WALLET_AMOUNT',
+          });
+          return;
+        }
+        body.walletAmount = walletResult.walletAmount;
+        body.walletDiscount = walletResult.discount;
+        body.wallet_amount = walletResult.walletAmount;
+        body.wallet_discount = walletResult.discount;
+        orderTotalAfterPromo = Math.max(
+          0,
+          orderTotalAfterPromo - walletResult.discount,
+        );
+        if (walletResult.coversFullOrder) {
+          body.paymentMethod = body.paymentMethod || body.payment_method || 'محفظة';
+          body.payment_method = body.paymentMethod;
+        }
+      }
+
+      body.totalPrice = orderTotalAfterPromo;
+      body.total_price = orderTotalAfterPromo;
+
+      let order = normalizeOrder(body, id, restaurantId);
+
+      const authHeader = parseAuthHeader(req);
+      try {
+        const kitchenFields = await assignTargetKitchen({
+          body,
+          restaurantId,
+          auth: authHeader,
+          deliveryZoneId: order.deliveryZoneId || order.delivery_zone_id,
+        });
+        order = { ...order, ...kitchenFields };
+      } catch (kitchenError) {
+        sendJson(res, 422, {
+          error: kitchenError.message || 'Kitchen assignment failed',
+          code: kitchenError.code || 'KITCHEN_ASSIGNMENT_FAILED',
+        });
+        return;
+      }
+
       const orders = await readOrders();
       orders.unshift(order);
       await writeOrders(orders);
 
-      const customers = await readCustomers();
       const nextCustomers = upsertCustomerFromSource(customers, order, restaurantId);
-      await writeCustomers(nextCustomers);
-
+      let rewardCustomers = nextCustomers;
+      if (promoCodeInput) {
+        rewardCustomers = redeemPersonalPromo(rewardCustomers, {
+          restaurantId,
+          phone: order.phone,
+          code: promoCodeInput,
+        });
+      }
+      if (walletAmountInput > 0 && roundPromo3(order.walletDiscount ?? order.wallet_discount ?? 0) > 0) {
+        rewardCustomers = redeemWalletAmount(rewardCustomers, {
+          restaurantId,
+          phone: order.phone,
+          amount: roundPromo3(order.walletDiscount ?? order.wallet_discount ?? 0),
+          orderId: order.id,
+        });
+      }
       const customerBefore = findCustomerByPhone(
-        nextCustomers,
+        rewardCustomers,
         restaurantId,
         order.phone,
       );
       const settings = await readSettings(restaurantId);
       const rewardResult = applyPostCheckoutRewards({
-        customers: nextCustomers,
+        customers: rewardCustomers,
         order,
         restaurantId,
         settings,
         customerBefore,
       });
       await writeCustomers(rewardResult.customers);
+
+      if ((rewardResult.rewards?.earnedCashback ?? 0) > 0) {
+        const now = new Date().toISOString();
+        order.earnedCashback = rewardResult.rewards.earnedCashback;
+        order.loyaltyCashbackApplied = true;
+        order.loyalty_cashback_applied = true;
+        order.loyaltyCashbackAppliedAt = now;
+        order.loyalty_cashback_applied_at = now;
+        orders[0] = order;
+        await writeOrders(orders);
+      }
 
       sendJson(res, 201, {
         order,
@@ -1699,6 +2433,74 @@ const server = http.createServer(async (req, res) => {
   }
 
   const orderStatusMatch = url.pathname.match(/^\/api\/orders\/([^/]+)\/status$/);
+  const orderKitchenMatch = url.pathname.match(/^\/api\/orders\/([^/]+)\/kitchen$/);
+  if (req.method === 'PATCH' && orderKitchenMatch) {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    try {
+      const orderId = decodeURIComponent(orderKitchenMatch[1]);
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const targetKitchenId = String(
+        body.targetKitchenId || body.target_kitchen_id || '',
+      ).trim();
+
+      if (!targetKitchenId) {
+        sendJson(res, 400, { error: 'targetKitchenId is required', code: 'MISSING_KITCHEN' });
+        return;
+      }
+
+      const orders = await readOrders();
+      const index = orders.findIndex((order) => String(order.id) === orderId);
+      if (index === -1) {
+        sendJson(res, 404, { error: 'Order not found' });
+        return;
+      }
+
+      const order = orders[index];
+      const restaurantId = String(order.restaurant_id || order.restaurantId || DEFAULT_RESTAURANT_ID);
+      if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
+        return;
+      }
+
+      const kitchens = await getActiveKitchens(restaurantId);
+      const kitchen = kitchens.find((entry) => String(entry.id) === targetKitchenId);
+      if (!kitchen) {
+        sendJson(res, 400, { error: 'Invalid target kitchen', code: 'INVALID_TARGET_KITCHEN' });
+        return;
+      }
+
+      const previousKitchenId =
+        order.target_kitchen_id || order.targetKitchenId || null;
+      const now = new Date().toISOString();
+      const assignment = {
+        source: 'dispatch_manual',
+        assigned_at: now,
+        assigned_by_id: auth.staffId || auth.id || null,
+        assigned_by_name: auth.name || auth.cashierName || null,
+        overridden: previousKitchenId != null && previousKitchenId !== targetKitchenId,
+        previous_kitchen_id: previousKitchenId,
+      };
+
+      orders[index] = {
+        ...order,
+        targetKitchenId: kitchen.id,
+        target_kitchen_id: kitchen.id,
+        targetKitchenName: kitchen.name_en || kitchen.name || kitchen.name_ar,
+        target_kitchen_name: kitchen.name_en || kitchen.name || kitchen.name_ar,
+        kitchenAssignment: assignment,
+        kitchen_assignment: assignment,
+        updatedAt: now,
+      };
+
+      await writeOrders(orders);
+      sendJson(res, 200, { order: orders[index] });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Invalid payload' });
+    }
+    return;
+  }
+
   if (req.method === 'PATCH' && orderStatusMatch) {
     try {
       const orderId = decodeURIComponent(orderStatusMatch[1]);
@@ -1734,7 +2536,51 @@ const server = http.createServer(async (req, res) => {
 
       orders[index] = { ...orders[index], status: nextStatus };
       await writeOrders(orders);
-      sendJson(res, 200, orders[index]);
+
+      let deliveryNotification = null;
+      if (String(nextStatus).toLowerCase() === 'delivered') {
+        const order = orders[index];
+        let customers = await ensureCustomersMigrated();
+        const settings = await readSettings(restaurantId);
+        const cashbackResult = applyLoyaltyCashbackToOrder(
+          order,
+          settings,
+          customers,
+          restaurantId,
+        );
+        if (cashbackResult.applied) {
+          orders[index] = cashbackResult.order;
+          customers = cashbackResult.customers;
+          await writeOrders(orders);
+          await writeCustomers(customers);
+        } else if (
+          cashbackResult.order?.loyaltyCashbackApplied === true ||
+          cashbackResult.order?.loyalty_cashback_applied === true
+        ) {
+          orders[index] = cashbackResult.order;
+          await writeOrders(orders);
+        }
+
+        const customer = findCustomerByPhone(customers, restaurantId, order.phone);
+        const restaurants = await readRestaurants();
+        const restaurantMatch = restaurants.find(
+          (entry) => String(entry.id) === String(restaurantId),
+        );
+        deliveryNotification = buildDeliveryNotificationPayload({
+          order: orders[index],
+          customer,
+          restaurantName: restaurantMatch?.name || 'المطعم',
+          restaurantWhatsapp: settings.whatsappNumber,
+          settings,
+          previewEarnedCashback,
+          restaurantId,
+        });
+      }
+
+      sendJson(res, 200, {
+        order: orders[index],
+        deliveryNotification,
+      });
     } catch (error) {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
     }
@@ -1770,6 +2616,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'PUT' && url.pathname === '/api/settings') {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    if (rejectCashier(auth, res, 'Cashiers cannot update restaurant settings')) return;
 
     try {
       const body = JSON.parse((await readBody(req)) || '{}');

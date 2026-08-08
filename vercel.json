@@ -19,6 +19,14 @@
   ],
   "rewrites": [
     {
+      "source": "/menu-images/(.*)",
+      "destination": "/apiServer.js"
+    },
+    {
+      "source": "/og/(.*)",
+      "destination": "/apiServer.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/apiServer.js"
     }

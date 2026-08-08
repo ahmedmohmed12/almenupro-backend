@@ -7,6 +7,8 @@ class SmartClosingRewards {
     this.walletBalance = 0,
     this.isFirstOrder = false,
     this.qualifiesForCashback = false,
+    this.personalPromoCode = '',
+    this.personalPromoDiscount = 0,
   });
 
   final double earnedCashback;
@@ -14,6 +16,8 @@ class SmartClosingRewards {
   final double walletBalance;
   final bool isFirstOrder;
   final bool qualifiesForCashback;
+  final String personalPromoCode;
+  final double personalPromoDiscount;
 
   factory SmartClosingRewards.fromMap(Map<String, dynamic>? map) {
     if (map == null) return const SmartClosingRewards();
@@ -29,11 +33,20 @@ class SmartClosingRewards {
       isFirstOrder: map['isFirstOrder'] == true || map['is_first_order'] == true,
       qualifiesForCashback:
           map['qualifiesForCashback'] == true || map['qualifies_for_cashback'] == true,
+      personalPromoCode: map['personalPromoCode']?.toString() ??
+          map['personal_promo_code']?.toString() ??
+          '',
+      personalPromoDiscount:
+          (map['personalPromoDiscount'] as num?)?.toDouble() ??
+              (map['personal_promo_discount'] as num?)?.toDouble() ??
+              0,
     );
   }
 
   bool get hasAnyReward =>
-      earnedCashback > 0 || welcomeDiscountForNextOrder > 0;
+      earnedCashback > 0 ||
+      welcomeDiscountForNextOrder > 0 ||
+      personalPromoCode.trim().isNotEmpty;
 }
 
 class SmartClosingPayload {
@@ -128,4 +141,73 @@ class OrderCreationResult {
 
   final Order order;
   final SmartClosingPayload? smartClosing;
+}
+
+class WalletValidationResult {
+  const WalletValidationResult({
+    required this.valid,
+    this.walletAmount = 0,
+    this.discount = 0,
+    this.walletBalance = 0,
+    this.remainingBalance = 0,
+    this.coversFullOrder = false,
+    this.message = '',
+    this.error = '',
+  });
+
+  final bool valid;
+  final double walletAmount;
+  final double discount;
+  final double walletBalance;
+  final double remainingBalance;
+  final bool coversFullOrder;
+  final String message;
+  final String error;
+
+  factory WalletValidationResult.fromMap(Map<String, dynamic> map) {
+    return WalletValidationResult(
+      valid: map['valid'] == true,
+      walletAmount: (map['walletAmount'] as num?)?.toDouble() ??
+          (map['wallet_amount'] as num?)?.toDouble() ??
+          (map['discount'] as num?)?.toDouble() ??
+          0,
+      discount: (map['discount'] as num?)?.toDouble() ?? 0,
+      walletBalance: (map['walletBalance'] as num?)?.toDouble() ??
+          (map['wallet_balance'] as num?)?.toDouble() ??
+          0,
+      remainingBalance: (map['remainingBalance'] as num?)?.toDouble() ??
+          (map['remaining_balance'] as num?)?.toDouble() ??
+          0,
+      coversFullOrder:
+          map['coversFullOrder'] == true || map['covers_full_order'] == true,
+      message: map['message']?.toString() ?? '',
+      error: map['error']?.toString() ?? '',
+    );
+  }
+}
+
+class PromoValidationResult {
+  const PromoValidationResult({
+    required this.valid,
+    this.promoCode = '',
+    this.discount = 0,
+    this.message = '',
+    this.error = '',
+  });
+
+  final bool valid;
+  final String promoCode;
+  final double discount;
+  final String message;
+  final String error;
+
+  factory PromoValidationResult.fromMap(Map<String, dynamic> map) {
+    return PromoValidationResult(
+      valid: map['valid'] == true,
+      promoCode: map['promoCode']?.toString() ?? map['promo_code']?.toString() ?? '',
+      discount: (map['discount'] as num?)?.toDouble() ?? 0,
+      message: map['message']?.toString() ?? '',
+      error: map['error']?.toString() ?? '',
+    );
+  }
 }

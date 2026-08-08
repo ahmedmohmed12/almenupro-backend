@@ -6,6 +6,7 @@ import '../../services/restaurant_settings_service.dart';
 import '../../services/super_admin_scope_service.dart';
 import 'admin_corner_toast.dart';
 import 'admin_responsive_layout.dart';
+import 'pos/admin_cashier_management_section.dart';
 
 class AdminPosRolesStaffCard extends StatefulWidget {
   const AdminPosRolesStaffCard({super.key});
@@ -17,7 +18,7 @@ class AdminPosRolesStaffCard extends StatefulWidget {
 class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
   static const burgundy = Color(0xFF6B1124);
 
-  var _loading = true;
+  var _loadingRoles = true;
   var _savingRoles = false;
   List<PosRole> _roles = PosRole.defaults();
   int _autoLockMinutes = 5;
@@ -25,7 +26,7 @@ class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadRoles();
     SuperAdminScopeService.instance.addListener(_onScopeChanged);
   }
 
@@ -35,7 +36,7 @@ class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
     super.dispose();
   }
 
-  void _onScopeChanged() => _load();
+  void _onScopeChanged() => _loadRoles();
 
   PosRole _normalizeRole(PosRole role) {
     return role.copyWith(
@@ -43,8 +44,8 @@ class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
     );
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _loadRoles() async {
+    setState(() => _loadingRoles = true);
     try {
       final settings = await RestaurantSettingsService.instance.load(
         restaurantId: SuperAdminScopeService.instance.effectiveRestaurantId,
@@ -53,18 +54,19 @@ class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
       setState(() {
         _roles = settings.resolvedPosRoles.map(_normalizeRole).toList();
         _autoLockMinutes = settings.posAutoLockMinutes;
-        _loading = false;
+        _loadingRoles = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() => _loadingRoles = false);
     }
   }
 
   Future<void> _saveRoles() async {
     setState(() => _savingRoles = true);
     try {
-      final scopedRestaurantId = SuperAdminScopeService.instance.effectiveRestaurantId;
+      final scopedRestaurantId =
+          SuperAdminScopeService.instance.effectiveRestaurantId;
       final current = await RestaurantSettingsService.instance.load(
         restaurantId: scopedRestaurantId,
       );
@@ -102,60 +104,76 @@ class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator(color: burgundy))
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const AdminSectionHeader(
-                    icon: Icons.admin_panel_settings,
-                    title: 'أدوار وصلاحيات POS',
-                    subtitle:
-                        'كل صلاحية في النظام لها مفتاح تحكم — لا صلاحيات مخفية',
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: _autoLockMinutes,
-                    decoration: const InputDecoration(
-                      labelText: 'قفل تلقائي بعد (دقائق)',
-                      border: OutlineInputBorder(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // No outer Card wrapper — form card sits flush near the top.
+        AdminCashierManagementSection(
+          roles: _roles,
+        ),
+        const SizedBox(height: 12),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: _loadingRoles
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: CircularProgressIndicator(color: burgundy),
                     ),
-                    items: const [3, 5, 10, 15, 30]
-                        .map(
-                          (m) => DropdownMenuItem(
-                            value: m,
-                            child: Text('$m دقائق'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _autoLockMinutes = value ?? 5),
-                  ),
-                  const SizedBox(height: 16),
-                  ..._roles.map((role) => _buildRoleTile(role)),
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: FilledButton.icon(
-                      onPressed: _savingRoles ? null : _saveRoles,
-                      icon: _savingRoles
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const AdminSectionHeader(
+                        icon: Icons.admin_panel_settings,
+                        title: 'أدوار وصلاحيات POS',
+                        subtitle:
+                            'كل صلاحية في النظام لها مفتاح تحكم — لا صلاحيات مخفية',
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _autoLockMinutes,
+                        decoration: const InputDecoration(
+                          labelText: 'قفل تلقائي بعد (دقائق)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [3, 5, 10, 15, 30]
+                            .map(
+                              (m) => DropdownMenuItem(
+                                value: m,
+                                child: Text('$m دقائق'),
                               ),
                             )
-                          : const Icon(Icons.save),
-                      label: const Text('حفظ التغييرات'),
-                    ),
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _autoLockMinutes = value ?? 5),
+                      ),
+                      const SizedBox(height: 16),
+                      ..._roles.map((role) => _buildRoleTile(role)),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: FilledButton.icon(
+                          onPressed: _savingRoles ? null : _saveRoles,
+                          icon: _savingRoles
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.save),
+                          label: const Text('حفظ التغييرات'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-      ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -164,7 +182,10 @@ class _AdminPosRolesStaffCardState extends State<AdminPosRolesStaffCard> {
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.hardEdge,
       child: ExpansionTile(
-        title: Text(role.nameAr, style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+          role.nameAr,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         subtitle: Text(role.nameEn),
         children: PosPermissionCategory.values
             .map((category) => _buildCategoryGroup(role, category))

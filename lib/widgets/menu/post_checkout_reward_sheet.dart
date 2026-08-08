@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../models/smart_closing.dart';
@@ -38,10 +39,22 @@ class _PostCheckoutRewardContent extends StatelessWidget {
   final AppStrings strings;
   final String localeCode;
 
+  Future<void> _copyPromoCode(BuildContext context, String code) async {
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(strings.promoCodeCopied)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rewards = closing.rewards;
     final message = closing.postCheckoutMessageFor(localeCode);
+    final promoCode = rewards.personalPromoCode.trim();
+    final promoDiscount = rewards.personalPromoDiscount > 0
+        ? rewards.personalPromoDiscount
+        : rewards.welcomeDiscountForNextOrder;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -86,6 +99,62 @@ class _PostCheckoutRewardContent extends StatelessWidget {
               color: AppTheme.brandBlack,
             ),
           ),
+          if (promoCode.isNotEmpty && promoDiscount > 0) ...[
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.brandMaroon.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppTheme.brandMaroon.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    strings.personalPromoCodeLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.brandMaroon,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SelectableText(
+                    promoCode,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      color: AppTheme.brandMaroon,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    strings.personalPromoHint(
+                      promoCode,
+                      promoDiscount.toStringAsFixed(3),
+                    ),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _copyPromoCode(context, promoCode),
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: Text(strings.copyPromoCode),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (rewards.hasAnyReward) ...[
             const SizedBox(height: 20),
             _RewardTile(
@@ -103,7 +172,7 @@ class _PostCheckoutRewardContent extends StatelessWidget {
                 highlight: true,
               ),
             ],
-            if (rewards.welcomeDiscountForNextOrder > 0) ...[
+            if (rewards.welcomeDiscountForNextOrder > 0 && promoCode.isEmpty) ...[
               const SizedBox(height: 10),
               _RewardTile(
                 icon: Icons.local_offer_outlined,

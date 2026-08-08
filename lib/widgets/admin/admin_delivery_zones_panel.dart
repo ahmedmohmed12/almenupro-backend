@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/kuwait_governorates.dart';
 import '../../models/delivery_zone.dart';
+import '../../models/kitchen.dart';
 import '../../services/admin_auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/super_admin_scope_service.dart';
+import 'admin_kitchens_panel.dart';
 
 /// Admin UI for managing per-restaurant delivery zones and fees.
 class AdminDeliveryZonesPanel extends StatefulWidget {
@@ -24,12 +28,13 @@ class AdminDeliveryZonesPanel extends StatefulWidget {
 
 class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
   var _loading = true;
+  var _refreshing = false;
   var _saving = false;
   List<DeliveryZone> _zones = [];
+  List<Kitchen> _kitchens = const [];
   String? _error;
 
   static const _burgundy = Color(0xFF6B1124);
-  static const _gold = Color(0xFFD49A00);
 
   @override
   void initState() {
@@ -58,12 +63,53 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     return AdminAuthService.instance.restaurantName ?? _restaurantId;
   }
 
-  Future<void> _loadZones() async {
+  int _compareZones(DeliveryZone a, DeliveryZone b) {
+    final gov = a.governorate.compareTo(b.governorate);
+    if (gov != 0) return gov;
+    return a.areaName.compareTo(b.areaName);
+  }
+
+  List<DeliveryZone> _sortedZones(Iterable<DeliveryZone> zones) {
+    return zones.toList()..sort(_compareZones);
+  }
+
+  void _applyZonesLocally(List<DeliveryZone> zones, {String? error}) {
+    if (!mounted) return;
+    setState(() {
+      _zones = _sortedZones(zones);
+      _loading = false;
+      _refreshing = false;
+      if (error != null) _error = error;
+    });
+  }
+
+  void _upsertZoneLocally(DeliveryZone zone) {
+    if (zone.id.isEmpty) return;
+    final next = [
+      ..._zones.where((existing) => existing.id != zone.id),
+      zone,
+    ];
+    _applyZonesLocally(next);
+  }
+
+  void _removeZoneLocally(String zoneId) {
+    if (zoneId.isEmpty) return;
+    _applyZonesLocally(_zones.where((zone) => zone.id != zoneId));
+  }
+
+  void _applyKitchensLocally(List<Kitchen> kitchens) {
+    if (!mounted) return;
+    setState(() => _kitchens = kitchens);
+  }
+
+  Future<void> _loadZones({bool silent = false}) async {
     if (!widget.canManage) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _refreshing = false;
         _zones = [];
+        _kitchens = const [];
         _error = null;
       });
       return;
@@ -71,29 +117,41 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
     if (!mounted) return;
     setState(() {
-      _loading = true;
-      _error = null;
+      if (silent) {
+        _refreshing = true;
+      } else {
+        _loading = true;
+        _error = null;
+      }
     });
 
     try {
-      final zones = await ApiService.instance.fetchDeliveryZones(
-        restaurantId: _restaurantId,
-      );
+      final results = await Future.wait([
+        ApiService.instance.fetchDeliveryZones(
+          restaurantId: _restaurantId,
+          bustCache: true,
+        ),
+        ApiService.instance.fetchKitchens(
+          restaurantId: _restaurantId,
+          includeInactive: true,
+        ),
+      ]);
+      final zones = results[0] as List<DeliveryZone>;
+      final kitchens = results[1] as List<Kitchen>;
       if (!mounted) return;
       setState(() {
-        _zones = zones
-          ..sort((a, b) {
-            final gov = a.governorate.compareTo(b.governorate);
-            if (gov != 0) return gov;
-            return a.areaName.compareTo(b.areaName);
-          });
+        _zones = _sortedZones(zones);
+        _kitchens = kitchens;
         _loading = false;
+        _refreshing = false;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
         _loading = false;
+        _refreshing = false;
       });
     }
   }
@@ -108,80 +166,123 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     final feeController = TextEditingController(
       text: existing != null ? existing.deliveryFee.toStringAsFixed(3) : '',
     );
+    var selectedKitchenId = existing?.defaultKitchenId;
+    if ((selectedKitchenId == null || selectedKitchenId.isEmpty) &&
+        _kitchens.isNotEmpty) {
+      selectedKitchenId = _kitchens
+          .firstWhere(
+            (kitchen) => kitchen.isDefault,
+            orElse: () => _kitchens.first,
+          )
+          .id;
+    }
     final formKey = GlobalKey<FormState>();
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(existing == null ? 'إضافة منطقة توصيل' : 'تعديل منطقة التوصيل'),
-        content: SizedBox(
-          width: 420,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: kuwaitGovernorates.contains(selectedGovernorate)
-                      ? selectedGovernorate
-                      : kuwaitGovernorates.first,
-                  decoration: const InputDecoration(
-                    labelText: 'المحافظة',
-                    border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            existing == null ? 'إضافة منطقة توصيل' : 'تعديل منطقة التوصيل',
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: kuwaitGovernorates.contains(selectedGovernorate)
+                        ? selectedGovernorate
+                        : kuwaitGovernorates.first,
+                    decoration: const InputDecoration(
+                      labelText: 'المحافظة',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: kuwaitGovernorates
+                        .map(
+                          (gov) => DropdownMenuItem(value: gov, child: Text(gov)),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) selectedGovernorate = value;
+                    },
                   ),
-                  items: kuwaitGovernorates
-                      .map((gov) => DropdownMenuItem(value: gov, child: Text(gov)))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) selectedGovernorate = value;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: areaController,
-                  decoration: const InputDecoration(
-                    labelText: 'اسم المنطقة',
-                    border: OutlineInputBorder(),
-                    hintText: 'مثال: السالمية',
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: areaController,
+                    decoration: const InputDecoration(
+                      labelText: 'اسم المنطقة',
+                      border: OutlineInputBorder(),
+                      hintText: 'مثال: السالمية',
+                    ),
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty ? 'مطلوب' : null,
                   ),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'مطلوب' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: feeController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: feeController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,3}'),
+                      ),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'رسوم التوصيل (د.ك)',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'مطلوب';
+                      final parsed = double.tryParse(value.trim());
+                      if (parsed == null || parsed < 0) return 'قيمة غير صالحة';
+                      return null;
+                    },
+                  ),
+                  if (_kitchens.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      initialValue: selectedKitchenId,
+                      decoration: const InputDecoration(
+                        labelText: 'المطبخ الافتراضي',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _kitchens
+                          .map(
+                            (kitchen) => DropdownMenuItem<String?>(
+                              value: kitchen.id,
+                              child: Text(
+                                kitchen.nameAr.isNotEmpty
+                                    ? kitchen.nameAr
+                                    : kitchen.name,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setDialogState(() => selectedKitchenId = value),
+                    ),
                   ],
-                  decoration: const InputDecoration(
-                    labelText: 'رسوم التوصيل (د.ك)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'مطلوب';
-                    final parsed = double.tryParse(value.trim());
-                    if (parsed == null || parsed < 0) return 'قيمة غير صالحة';
-                    return null;
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(context, true);
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() != true) return;
-              Navigator.pop(context, true);
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
       ),
     );
 
@@ -198,27 +299,29 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
     setState(() => _saving = true);
     try {
-      final zone = DeliveryZone(
+      final draft = DeliveryZone(
         id: existing?.id ?? '',
         governorate: selectedGovernorate,
         areaName: areaName,
         deliveryFee: deliveryFee,
         restaurantId: _restaurantId,
+        defaultKitchenId: selectedKitchenId,
       );
 
-      if (existing == null) {
-        await ApiService.instance.createDeliveryZone(zone);
-      } else {
-        await ApiService.instance.updateDeliveryZone(zone);
-      }
+      final savedZone = existing == null
+          ? await ApiService.instance.createDeliveryZone(draft)
+          : await ApiService.instance.updateDeliveryZone(draft);
 
       if (!mounted) return;
+      _upsertZoneLocally(savedZone);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(existing == null ? 'تمت إضافة المنطقة' : 'تم تحديث المنطقة'),
+          content: Text(
+            existing == null ? 'تمت إضافة المنطقة' : 'تم تحديث المنطقة',
+          ),
         ),
       );
-      await _loadZones();
+      unawaited(_loadZones(silent: true));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -255,10 +358,11 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     try {
       await ApiService.instance.deleteDeliveryZone(zone.id);
       if (!mounted) return;
+      _removeZoneLocally(zone.id);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم حذف المنطقة')),
       );
-      await _loadZones();
+      unawaited(_loadZones(silent: true));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -271,7 +375,6 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   @override
   Widget build(BuildContext context) {
-    // Same scroll pattern as _buildSettingsTab() — no Expanded (fixes blank web panel).
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -290,12 +393,21 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
             'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت.',
             style: TextStyle(color: Colors.black54),
           ),
+          const SizedBox(height: 24),
+          AdminKitchensPanel(
+            restaurantId: _restaurantId,
+            canManage: widget.canManage,
+            onKitchensChanged: _applyKitchensLocally,
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
           const SizedBox(height: 16),
           if (!widget.canManage)
             _messageCard(
               color: Colors.orange.shade50,
               icon: Icons.store_outlined,
-              message: 'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
+              message:
+                  'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
             )
           else ...[
             Text(
@@ -306,11 +418,23 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
               ),
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: _burgundy),
-              onPressed: _saving ? null : () => _showZoneDialog(),
-              icon: const Icon(Icons.add_location_alt_outlined),
-              label: const Text('إضافة منطقة جديدة'),
+            Row(
+              children: [
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: _burgundy),
+                  onPressed: _saving ? null : () => _showZoneDialog(),
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  label: const Text('إضافة منطقة جديدة'),
+                ),
+                if (_refreshing) ...[
+                  const SizedBox(width: 12),
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 20),
             _buildZonesSection(),
@@ -333,7 +457,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
         icon: Icons.error_outline,
         message: 'تعذر تحميل مناطق التوصيل:\n$_error',
         action: OutlinedButton.icon(
-          onPressed: _loadZones,
+          onPressed: () => _loadZones(),
           icon: const Icon(Icons.refresh),
           label: const Text('إعادة المحاولة'),
         ),
@@ -343,7 +467,8 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     if (_zones.isEmpty) {
       return _messageCard(
         icon: Icons.map_outlined,
-        message: 'لا توجد مناطق توصيل بعد.\nاضغط "إضافة منطقة جديدة" لبدء الإعداد.',
+        message:
+            'لا توجد مناطق توصيل بعد.\nاضغط "إضافة منطقة جديدة" لبدء الإعداد.',
         action: FilledButton.icon(
           style: FilledButton.styleFrom(backgroundColor: _burgundy),
           onPressed: _saving ? null : () => _showZoneDialog(),
@@ -394,6 +519,11 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
   }
 
   Widget _buildZoneTile(DeliveryZone zone) {
+    final kitchenLabel = _kitchens
+        .where((kitchen) => kitchen.id == zone.defaultKitchenId)
+        .map((kitchen) => kitchen.nameAr.isNotEmpty ? kitchen.nameAr : kitchen.name)
+        .firstOrNull;
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       leading: CircleAvatar(
@@ -401,7 +531,13 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
         child: const Icon(Icons.location_on_outlined, color: _burgundy, size: 22),
       ),
       title: Text(zone.areaName, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text('${zone.governorate} • ${zone.deliveryFee.toStringAsFixed(3)} د.ك'),
+      subtitle: Text(
+        [
+          zone.governorate,
+          '${zone.deliveryFee.toStringAsFixed(3)} د.ك',
+          if (kitchenLabel != null) kitchenLabel,
+        ].join(' • '),
+      ),
       trailing: Wrap(
         spacing: 0,
         children: [

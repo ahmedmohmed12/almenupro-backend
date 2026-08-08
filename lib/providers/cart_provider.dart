@@ -5,8 +5,13 @@ import '../models/menu_item.dart';
 
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
+  String? _restaurantId;
+  String? _restaurantSlug;
 
   List<CartItem> get items => List.unmodifiable(_items);
+
+  String? get restaurantId => _restaurantId;
+  String? get restaurantSlug => _restaurantSlug;
 
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
 
@@ -15,7 +20,54 @@ class CartProvider extends ChangeNotifier {
 
   bool get isEmpty => _items.isEmpty;
 
-  void addMenuItem(MenuItem menuItem, {int quantity = 1}) {
+  bool get hasRestaurantScope =>
+      _restaurantId != null && _restaurantSlug != null;
+
+  bool matchesRestaurant({required String restaurantId, required String slug}) {
+    if (!hasRestaurantScope) return true;
+    return _restaurantId == restaurantId &&
+        _restaurantSlug == slug.trim().toLowerCase();
+  }
+
+  void setRestaurantScope({
+    required String restaurantId,
+    required String slug,
+  }) {
+    final cleanSlug = slug.trim().toLowerCase();
+    if (_restaurantId == restaurantId && _restaurantSlug == cleanSlug) {
+      return;
+    }
+    _restaurantId = restaurantId;
+    _restaurantSlug = cleanSlug;
+    if (_items.isNotEmpty) {
+      _items.clear();
+    }
+    notifyListeners();
+  }
+
+  void addMenuItem(
+    MenuItem menuItem, {
+    int quantity = 1,
+    String? restaurantId,
+    String? restaurantSlug,
+  }) {
+    if (restaurantId != null &&
+        restaurantSlug != null &&
+        restaurantSlug.trim().isNotEmpty) {
+      if (!matchesRestaurant(
+        restaurantId: restaurantId,
+        slug: restaurantSlug,
+      )) {
+        setRestaurantScope(
+          restaurantId: restaurantId,
+          slug: restaurantSlug,
+        );
+      } else if (!hasRestaurantScope) {
+        _restaurantId = restaurantId;
+        _restaurantSlug = restaurantSlug.trim().toLowerCase();
+      }
+    }
+
     final existingIndex =
         _items.indexWhere((item) => item.menuItem.id == menuItem.id);
 
@@ -42,7 +94,26 @@ class CartProvider extends ChangeNotifier {
     required List<SelectedOption> selectedOptions,
     required int quantity,
     String? specialNotes,
+    String? restaurantId,
+    String? restaurantSlug,
   }) {
+    if (restaurantId != null &&
+        restaurantSlug != null &&
+        restaurantSlug.trim().isNotEmpty) {
+      if (!matchesRestaurant(
+        restaurantId: restaurantId,
+        slug: restaurantSlug,
+      )) {
+        setRestaurantScope(
+          restaurantId: restaurantId,
+          slug: restaurantSlug,
+        );
+      } else if (!hasRestaurantScope) {
+        _restaurantId = restaurantId;
+        _restaurantSlug = restaurantSlug.trim().toLowerCase();
+      }
+    }
+
     _items.add(
       CartItem(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -77,6 +148,13 @@ class CartProvider extends ChangeNotifier {
 
   void clear() {
     _items.clear();
+    notifyListeners();
+  }
+
+  void resetScope() {
+    _items.clear();
+    _restaurantId = null;
+    _restaurantSlug = null;
     notifyListeners();
   }
 }

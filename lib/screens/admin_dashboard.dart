@@ -9,7 +9,12 @@ import '../firebase_options.dart';
 import '../models/order.dart';
 import '../models/restaurant_settings.dart';
 import '../utils/firebase_config.dart';
+import '../utils/admin_history_listener.dart';
+import '../utils/admin_route.dart';
+import '../utils/admin_settings_url.dart';
+import '../utils/food_cost_utils.dart';
 import '../utils/image_url.dart';
+import '../widgets/admin/admin_food_cost_report_panel.dart';
 import '../utils/whatsapp_phone.dart';
 import '../services/admin_auth_service.dart';
 import '../services/admin_order_monitor_service.dart';
@@ -19,11 +24,15 @@ import '../services/menu_storage_service.dart';
 import '../services/orders_service.dart';
 import '../services/order_alert_sound_service.dart';
 import '../services/order_browser_notification_service.dart';
+import '../services/pos_operations_service.dart';
 import '../services/restaurant_settings_service.dart';
 import '../services/super_admin_scope_service.dart';
 import '../services/talabat_menu_service.dart';
 import '../widgets/admin/admin_corner_toast.dart';
+import '../widgets/admin/admin_daily_sales_card.dart';
 import '../widgets/admin/admin_pos_panel.dart';
+import '../widgets/admin/pos/pos_shift_shell.dart';
+import '../widgets/admin/admin_kitchen_panel.dart';
 import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_item_addons_editor.dart';
 import '../widgets/admin/admin_item_linked_sides_editor.dart';
@@ -36,6 +45,7 @@ import '../widgets/admin/admin_super_restaurants_panel.dart';
 import '../widgets/admin/admin_sound_settings_card.dart';
 import '../widgets/admin/admin_top_header.dart';
 import '../widgets/admin/admin_smart_upsell_panel.dart';
+import '../widgets/admin/settings/admin_settings_tab.dart';
 import '../widgets/admin/settings/admin_settings_tabbed_panel.dart';
 import '../widgets/admin/admin_working_hours_card.dart';
 
@@ -52,15 +62,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   bool _isAuthenticated = false;
   bool _isSuperAdmin = false;
+  bool _isCashierSession = false;
   bool _isLoggingIn = false;
   var _loginMode = 0;
   final _usernameController = TextEditingController();
   final _slugController = TextEditingController(text: 'molton-cookies');
+  final _cashierNameController = TextEditingController();
   final _passwordController = TextEditingController();
   String? _errorMessage;
   String? _restaurantLabel;
   int _selectedIndex = AdminSidebar.ordersIndex;
   AdminMenuPanelStatus? _menuPanelStatus;
+
+  int _sidebarIndexFromCurrentUrl({required bool isSuperAdmin}) {
+    if (!kIsWeb) {
+      return isSuperAdmin
+          ? AdminSidebar.superMenuIndex
+          : AdminSidebar.ordersIndex;
+    }
+    return AdminRoute.sidebarIndexForPath(
+      Uri.base.path,
+      isSuperAdmin: isSuperAdmin,
+    );
+  }
+
+  AdminSettingsTab _activeSettingsTab() {
+    if (kIsWeb) {
+      return readSettingsTabFromUrl();
+    }
+    return AdminSettingsTab.defaultTab;
+  }
+
+  int get _settingsNavIndex =>
+      _isSuperAdmin ? AdminSidebar.superSettingsIndex : AdminSidebar.settingsIndex;
+
+  void _openSettingsTab(AdminSettingsTab tab) {
+    setState(() => _selectedIndex = _settingsNavIndex);
+    writeSettingsTabToUrl(tab);
+  }
+
+  void _syncSidebarFromBrowserUrl() {
+    if (!mounted) return;
+    if (_isCashierSession) {
+      setState(() => _selectedIndex = AdminSidebar.posIndex);
+      return;
+    }
+    setState(() {
+      _selectedIndex = _sidebarIndexFromCurrentUrl(isSuperAdmin: _isSuperAdmin);
+    });
+  }
 
   final _whatsappController = TextEditingController();
   String _whatsappCountryCode = WhatsAppPhone.defaultCountryCode;
@@ -70,6 +120,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   bool get _whatsappConfigured => _loadedSettings?.hasWhatsappNumber ?? false;
 
   bool get _shouldShowWhatsappBanner {
+    if (_isCashierSession) return false;
     if (_isSuperAdmin && !SuperAdminScopeService.instance.hasSelection) {
       return false;
     }
@@ -79,6 +130,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    listenToAdminHistory(_syncSidebarFromBrowserUrl);
     _bootstrapAuth();
     OrderAlertSoundService.instance.initialize();
   }
@@ -103,14 +155,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (!mounted) return;
 
     if (AdminAuthService.instance.isLoggedIn) {
+      final isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
+      final isCashier = AdminAuthService.instance.isCashierSession;
+      if (isCashier) {
+        await PosOperationsService.instance.restoreCashierSessionIfNeeded();
+      }
       setState(() {
         _isAuthenticated = true;
-        _isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
+        _isSuperAdmin = isSuperAdmin;
+        _isCashierSession = isCashier;
         _restaurantLabel = AdminAuthService.instance.restaurantName;
+        _selectedIndex = isCashier
+            ? AdminSidebar.posIndex
+            : _sidebarIndexFromCurrentUrl(isSuperAdmin: isSuperAdmin);
       });
       await _initSuperAdminScope();
       await _loadSettings();
-      if (!AdminAuthService.instance.isSuperAdmin) {
+      if (!AdminAuthService.instance.isSuperAdmin && !isCashier) {
         await _startAdminMonitoring();
       }
     } else {
@@ -124,6 +185,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     AdminOrderMonitorService.instance.stop();
     _usernameController.dispose();
     _slugController.dispose();
+    _cashierNameController.dispose();
     _passwordController.dispose();
     _whatsappController.dispose();
     super.dispose();
@@ -201,6 +263,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           username: _usernameController.text.trim(),
           password: _passwordController.text,
         );
+      } else if (_loginMode == 2) {
+        final result = await AdminAuthService.instance.loginCashier(
+          restaurantName: _slugController.text.trim(),
+          cashierName: _cashierNameController.text.trim(),
+          password: _passwordController.text,
+        );
+        PosOperationsService.instance.applyCashierSession(result.cashierSession);
       } else {
         await AdminAuthService.instance.loginRestaurantAdmin(
           restaurantSlug: _slugController.text.trim(),
@@ -209,19 +278,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
       }
 
       if (!mounted) return;
+      final isCashier = AdminAuthService.instance.isCashierSession;
       setState(() {
         _isAuthenticated = true;
         _isSuperAdmin = AdminAuthService.instance.isSuperAdmin;
+        _isCashierSession = isCashier;
         _restaurantLabel = AdminAuthService.instance.restaurantName;
-        _selectedIndex = _isSuperAdmin
-            ? AdminSidebar.superRestaurantsIndex
-            : AdminSidebar.ordersIndex;
+        _selectedIndex = isCashier
+            ? AdminSidebar.posIndex
+            : _sidebarIndexFromCurrentUrl(
+                isSuperAdmin: AdminAuthService.instance.isSuperAdmin,
+              );
       });
 
       OrderAlertSoundService.instance.unlockFromUserGesture();
       await _initSuperAdminScope();
       await _loadSettings();
-      if (!AdminAuthService.instance.isSuperAdmin) {
+      if (!AdminAuthService.instance.isSuperAdmin && !isCashier) {
         await _startAdminMonitoring();
       }
     } catch (error) {
@@ -238,19 +311,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
     AdminOrderMonitorService.instance.stop();
     SuperAdminScopeService.instance.removeListener(_onSuperAdminScopeChanged);
     await SuperAdminScopeService.instance.clearSelection();
+    PosOperationsService.instance.clearCashierSession();
     await AdminAuthService.instance.logout();
     if (!mounted) return;
     setState(() {
       _isAuthenticated = false;
       _isSuperAdmin = false;
+      _isCashierSession = false;
       _restaurantLabel = null;
       _passwordController.clear();
+      _cashierNameController.clear();
       _selectedIndex = AdminSidebar.ordersIndex;
     });
   }
 
   Future<void> _startAdminMonitoring() async {
-    if (_isSuperAdmin || AdminAuthService.instance.isSuperAdmin) return;
+    if (_isSuperAdmin ||
+        AdminAuthService.instance.isSuperAdmin ||
+        AdminAuthService.instance.isCashierSession) {
+      return;
+    }
 
     final monitor = AdminOrderMonitorService.instance;
     monitor.onNewPendingOrder = _onNewPendingOrderDetected;
@@ -361,6 +441,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final priceController = TextEditingController(
       text: data != null ? data['price'].toString() : '',
     );
+    final costPriceRaw = data?['costPrice'] ?? data?['cost_price'];
+    final costPriceController = TextEditingController(
+      text: costPriceRaw != null && costPriceRaw.toString().isNotEmpty
+          ? costPriceRaw.toString()
+          : '',
+    );
     final categoryController = TextEditingController(
       text: data?['categoryName'] ?? 'أشهر الأصناف',
     );
@@ -434,14 +520,58 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: priceController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'السعر (د.ك)',
-                        border: OutlineInputBorder(),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: priceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'السعر (د.ك)',
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => setDialogState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: costPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'تكلفة الطعام / Food Cost (د.ك)',
+                              helperText: 'تكلفة المكونات لكل حصة',
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => setDialogState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Builder(
+                      builder: (context) {
+                        final sellingPrice =
+                            double.tryParse(priceController.text.trim()) ?? 0;
+                        final costPrice =
+                            double.tryParse(costPriceController.text.trim());
+                        if (sellingPrice <= 0 ||
+                            costPrice == null ||
+                            costPrice < 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: FoodCostBadge(
+                            sellingPrice: sellingPrice,
+                            costPrice: costPrice,
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -522,6 +652,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       'descriptionAr': descriptionAr,
                       'descriptionEn': descriptionEn,
                       'price': double.tryParse(priceController.text) ?? 0.0,
+                      if (costPriceController.text.trim().isNotEmpty)
+                        'costPrice':
+                            double.tryParse(costPriceController.text.trim()),
                       'categoryName': categoryController.text.trim(),
                       'categoryId': data?['categoryId'] ?? '',
                       'imageUrl': normalizeMenuImageUrl(imageUrlController.text.trim()),
@@ -814,6 +947,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   SegmentedButton<int>(
                     segments: const [
                       ButtonSegment(value: 0, label: Text('مدير مطعم')),
+                      ButtonSegment(value: 2, label: Text('كاشير')),
                       ButtonSegment(value: 1, label: Text('AlMenuPro')),
                     ],
                     selected: {_loginMode},
@@ -834,16 +968,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         prefixIcon: Icon(Icons.person),
                       ),
                     )
-                  else
+                  else ...[
                     TextField(
                       controller: _slugController,
-                      decoration: const InputDecoration(
-                        labelText: 'معرف المطعم (slug)',
-                        hintText: 'molton-cookies',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.store),
+                      decoration: InputDecoration(
+                        labelText: _loginMode == 2
+                            ? 'اسم المطعم'
+                            : 'معرف المطعم (slug)',
+                        hintText: _loginMode == 2
+                            ? 'Molton Cookies أو molton-cookies'
+                            : 'molton-cookies',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.store),
                       ),
                     ),
+                    if (_loginMode == 2) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _cashierNameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'اسم الكاشير',
+                          hintText: 'مثال: أحمد',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 12),
                   TextField(
                     controller: _passwordController,
@@ -877,7 +1029,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           : Text(
                               _loginMode == 1
                                   ? 'دخول Super Admin'
-                                  : 'دخول لوحة المطعم',
+                                  : _loginMode == 2
+                                      ? 'دخول الكاشير'
+                                      : 'دخول لوحة المطعم',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -922,9 +1076,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildAuthenticatedShell() {
     final sidebarItems = _isSuperAdmin
         ? AdminSidebar.superAdminItems
-        : AdminSidebar.defaultItems;
+        : _isCashierSession
+            ? AdminSidebar.cashierItems
+            : AdminSidebar.defaultItems;
 
     Widget buildSidebar({required bool inDrawer}) {
+      final settingsTabs =
+          AdminSettingsTab.sidebarItems(isSuperAdmin: _isSuperAdmin);
       return AdminSidebar(
         items: sidebarItems,
         selectedIndex: _selectedIndex,
@@ -934,6 +1092,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Navigator.of(context).maybePop();
           }
         },
+        settingsNavIndex: _settingsNavIndex,
+        settingsTabs: settingsTabs,
+        activeSettingsTab: _selectedIndex == _settingsNavIndex
+            ? _activeSettingsTab()
+            : null,
+        onSettingsTabSelected: _openSettingsTab,
         width: inDrawer ? 280 : AdminSidebar.expandedWidth,
         enableCollapse: !inDrawer,
         footerBuilder: inDrawer ? null : _buildMenuSidebarFooter,
@@ -944,7 +1108,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildTopHeader(onMenuTap: mobile ? () => _shellScaffoldKey.currentState?.openDrawer() : null),
+          if (!_isCashierSession)
+            _buildTopHeader(
+              onMenuTap: mobile
+                  ? () => _shellScaffoldKey.currentState?.openDrawer()
+                  : null,
+            ),
           if (_shouldShowWhatsappBanner) _buildWhatsappMissingBanner(),
           Expanded(
             child: ListenableBuilder(
@@ -954,6 +1123,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       );
+
+      // Cashier JWT sessions: POS shell only — no admin sidebar / routes.
+      if (_isCashierSession) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF4F6F8),
+          body: content,
+        );
+      }
 
       if (mobile) {
         return Scaffold(
@@ -998,12 +1175,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildTopHeader({VoidCallback? onMenuTap}) {
+    if (_isCashierSession) {
+      final staffName = AdminAuthService.instance.session?.staffName;
+      final label = staffName != null && staffName.trim().isNotEmpty
+          ? '$staffName — ${_restaurantLabel ?? 'POS'}'
+          : (_restaurantLabel ?? 'نقطة البيع');
+      return AdminTopHeader(
+        isSuperAdmin: false,
+        showOrderNotifications: false,
+        restaurantLabel: label,
+        onMenuTap: null,
+        onLogout: _logout,
+      );
+    }
+
     if (_isSuperAdmin) {
       return AdminTopHeader(
         isSuperAdmin: true,
         showOrderNotifications: false,
         restaurantLabel: _restaurantLabel,
         onMenuTap: onMenuTap,
+        onLogout: _logout,
       );
     }
 
@@ -1016,6 +1208,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           restaurantLabel: _restaurantLabel,
           pendingOrdersCount: pendingCount,
           onMenuTap: onMenuTap,
+          onLogout: _logout,
           onNotificationsTap: () {
             setState(() => _selectedIndex = AdminSidebar.ordersIndex);
             _ordersPanelKey.currentState?.selectNewOrdersTab();
@@ -1039,6 +1232,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildActiveTab() {
+    if (_isCashierSession) {
+      return PosShiftShell(
+        onOrderSubmitted: () {
+          unawaited(OrdersService.instance.refreshOrders());
+        },
+        onLogout: _logout,
+      );
+    }
+
     if (_isSuperAdmin) {
       switch (_selectedIndex) {
         case AdminSidebar.superMenuIndex:
@@ -1066,6 +1268,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         case AdminSidebar.superSettingsIndex:
           return AdminSettingsTabbedPanel(
             isSuperAdmin: true,
+            activeTab: _activeSettingsTab(),
             restaurantLabel: _restaurantLabel,
           );
         default:
@@ -1076,6 +1279,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     switch (_selectedIndex) {
       case AdminSidebar.ordersIndex:
         return AdminOrdersPanel(key: _ordersPanelKey);
+      case AdminSidebar.kitchenIndex:
+        return const AdminKitchenPanel();
       case AdminSidebar.customersIndex:
         return const AdminCustomersPanel();
       case AdminSidebar.menuIndex:
@@ -1095,13 +1300,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case AdminSidebar.settingsIndex:
         return AdminSettingsTabbedPanel(
           isSuperAdmin: false,
+          activeTab: _activeSettingsTab(),
           restaurantLabel: _restaurantLabel,
         );
       case AdminSidebar.posIndex:
-        return AdminPosPanel(
+        return PosShiftShell(
           onOrderSubmitted: () {
             unawaited(OrdersService.instance.refreshOrders());
           },
+          onLogout: _logout,
         );
       default:
         return AdminOrdersPanel(key: _ordersPanelKey);
@@ -1112,7 +1319,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Material(
       color: const Color(0xFFFFF3E0),
       child: InkWell(
-        onTap: () => setState(() => _selectedIndex = AdminSidebar.settingsIndex),
+        onTap: () => _openSettingsTab(AdminSettingsTab.whatsapp),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1133,9 +1340,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     vertical: 10,
                   ),
                 ),
-                onPressed: () => setState(
-                  () => _selectedIndex = AdminSidebar.settingsIndex,
-                ),
+                onPressed: () => _openSettingsTab(AdminSettingsTab.whatsapp),
                 icon: const Icon(Icons.settings, size: 18),
                 label: const Text('إعدادات الواتساب'),
               );
@@ -1424,6 +1629,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // Analytics tab kept below
 
   Widget _buildAnalyticsTab() {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: AdminDailySalesCard(),
+    );
+  }
+
+  Widget _buildAnalyticsTabLegacy() {
     if (!isFirebaseConfigured) {
       return FutureBuilder<AnalyticsSnapshot>(
         future: AnalyticsDemoService.load(),
@@ -1601,6 +1813,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   _buildTopItemsCard(sortedItems),
                   const SizedBox(height: 20),
                   _buildTimeCard(hourlyOrders, dailyOrders),
+                ],
+                if (AdminAuthService.instance.isLoggedIn) ...[
+                  const SizedBox(height: 24),
+                  const AdminFoodCostReportPanel(),
                 ],
               ],
             ),

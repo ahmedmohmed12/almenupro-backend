@@ -15,6 +15,8 @@ class StaffUser {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  String get maskedPin => '****';
+
   factory StaffUser.fromJson(Map<String, dynamic> json) {
     return StaffUser(
       id: json['id']?.toString() ?? '',
@@ -56,12 +58,17 @@ class PosCashierSession {
         permissions[key.toString()] = value == true;
       });
     }
+    final roleRaw = json['posRole'] ?? json['role'];
+    final roleIdFromPos = roleRaw is Map ? roleRaw['id']?.toString() ?? '' : '';
+    final roleId = json['roleId']?.toString() ??
+        json['role_id']?.toString() ??
+        roleIdFromPos;
     return PosCashierSession(
-      staff: StaffUser.fromJson(Map<String, dynamic>.from(json['staff'] as Map? ?? {})),
+      staff: StaffUser.fromJson(
+        Map<String, dynamic>.from(json['staff'] as Map? ?? {}),
+      ),
       permissions: permissions,
-      roleId: json['role'] is Map
-          ? (json['role'] as Map)['id']?.toString() ?? ''
-          : json['roleId']?.toString() ?? '',
+      roleId: roleId,
     );
   }
 }

@@ -183,4 +183,17 @@ class PlatformCatalog {
 
   static List<SalesPlatformConfig> externalOnly(List<SalesPlatformConfig> platforms) =>
       platforms.where((p) => p.isExternal).toList();
+
+  static SalesPlatformConfig fromAnalyticsRow(
+    Map<String, dynamic> row,
+    List<SalesPlatformConfig> platforms,
+  ) {
+    final key = (row['platform'] ?? row['channel'] ?? 'pos').toString();
+    final resolved = resolve(key, platforms);
+    final name = row['name']?.toString().trim();
+    if (name != null && name.isNotEmpty) {
+      return resolved.copyWith(name: name);
+    }
+    return resolved;
+  }
 }

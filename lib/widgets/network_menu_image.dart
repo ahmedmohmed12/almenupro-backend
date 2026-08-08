@@ -23,7 +23,7 @@ class NetworkMenuImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.network(
-      resolveImageUrl(imageUrl),
+      resolvePreviewImageUrl(imageUrl),
       width: width,
       height: height,
       fit: fit,

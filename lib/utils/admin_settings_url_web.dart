@@ -11,7 +11,7 @@ AdminSettingsTab readSettingsTabFromUrl() {
   final legacy = AdminSettingsTab.fromId(uri.queryParameters['tab']);
   if (uri.queryParameters.containsKey('tab')) return legacy;
 
-  return AdminSettingsTab.whatsapp;
+  return AdminSettingsTab.defaultTab;
 }
 
 void writeSettingsTabToUrl(AdminSettingsTab tab) {

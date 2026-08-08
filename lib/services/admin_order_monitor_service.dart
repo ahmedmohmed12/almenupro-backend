@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/order.dart';
+import 'admin_auth_service.dart';
 import 'order_alert_sound_service.dart';
 import 'order_browser_notification_service.dart';
 import 'orders_demo_service.dart';
@@ -32,6 +33,12 @@ class AdminOrderMonitorService {
 
   Future<void> start() async {
     if (_isRunning) return;
+    if (AdminAuthService.instance.isCashierSession) {
+      if (kDebugMode) {
+        debugPrint('Admin order monitor skipped for cashier session');
+      }
+      return;
+    }
     _isRunning = true;
 
     await OrderAlertSoundService.instance.initialize();

@@ -4,7 +4,7 @@ const SOCIAL_CRAWLER_PATTERN =
 const DEFAULT_BACKEND_ORIGIN = 'https://almenupro-backend.vercel.app';
 
 export const config = {
-  matcher: ['/menu/:path*', '/restaurant/:path*', '/:slug'],
+  matcher: ['/menu/:path*', '/restaurant/:path*', '/((?!admin|api|og|legacy-menu)[^./]+)'],
 };
 
 function isSocialCrawler(userAgent) {
@@ -39,16 +39,21 @@ function parseMenuSlugFromPath(pathname) {
 }
 
 export default async function middleware(request) {
+  const passThrough = () =>
+    new Response(null, {
+      headers: { 'x-middleware-next': '1' },
+    });
+
   try {
     const url = new URL(request.url);
     const userAgent = request.headers.get('user-agent') || '';
     if (!isSocialCrawler(userAgent)) {
-      return;
+      return passThrough();
     }
 
     const slug = parseMenuSlugFromPath(url.pathname);
     if (!slug) {
-      return;
+      return passThrough();
     }
 
     const backendOrigin = (
@@ -60,7 +65,7 @@ export default async function middleware(request) {
       headers: { Accept: 'text/html' },
     });
     if (!response.ok) {
-      return;
+      return passThrough();
     }
 
     const html = await response.text();
@@ -73,6 +78,6 @@ export default async function middleware(request) {
     });
   } catch (error) {
     console.error('[og-middleware]', error);
-    return;
+    return passThrough();
   }
 }

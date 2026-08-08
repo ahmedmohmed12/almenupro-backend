@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../models/delivery_notification.dart';
 import '../../models/order.dart';
+import '../../services/admin_auth_service.dart';
 import '../../services/orders_service.dart';
 import '../../utils/order_sound.dart';
+import '../../utils/whatsapp_delivery_message.dart';
+import '../../utils/whatsapp_launcher.dart';
 import 'order_status_chip.dart';
 
 class AdminOrdersPanel extends StatefulWidget {
@@ -42,17 +46,71 @@ class AdminOrdersPanelState extends State<AdminOrdersPanel>
     _tabController.animateTo(0);
   }
 
-  Future<void> _updateStatus(String orderId, OrderStatus status) async {
+  Future<void> _updateStatus(Order order, OrderStatus status) async {
     try {
-      await _ordersService.updateOrderStatus(orderId, status);
+      final result = await _ordersService.updateOrderStatus(order.id, status);
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم تحديث الحالة: ${status.arabicLabel}')),
       );
+
+      if (status == OrderStatus.delivered) {
+        await _sendDeliveredWhatsApp(order, result?.deliveryNotification);
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذر تحديث الطلب: $error')),
+      );
+    }
+  }
+
+  Future<void> _sendDeliveredWhatsApp(
+    Order order,
+    DeliveryNotification? notification,
+  ) async {
+    final customerPhone = notification?.customerPhone.trim().isNotEmpty == true
+        ? notification!.customerPhone.trim()
+        : order.phone.trim();
+
+    if (customerPhone.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا يوجد رقم هاتف للعميل لإرسال رسالة الواتساب')),
+      );
+      return;
+    }
+
+    final message = notification?.hasMessage == true
+        ? notification!.message
+        : WhatsAppDeliveryMessage.build(
+            restaurantName:
+                AdminAuthService.instance.restaurantName ?? 'المطعم',
+            customerName: order.customerName,
+            invoiceNumber: order.invoiceNumber,
+            earnedCashback: notification?.rewards.earnedCashback ?? 0,
+            walletBalance: notification?.rewards.walletBalance ?? 0,
+            personalPromoCode: notification?.rewards.personalPromoCode ?? '',
+            personalPromoDiscount:
+                notification?.rewards.personalPromoDiscount ?? 0,
+          );
+
+    final opened = await openWhatsAppChat(
+      phone: customerPhone,
+      message: message,
+    );
+
+    if (!mounted) return;
+    if (opened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم فتح واتساب لإرسال رسالة التوصيل للعميل'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر فتح واتساب للعميل: $customerPhone')),
       );
     }
   }
@@ -338,7 +396,7 @@ class _OrdersList extends StatelessWidget {
   final DateFormat dateFormat;
   final String emptyTitle;
   final String emptySubtitle;
-  final Future<void> Function(String orderId, OrderStatus status) onStatusChanged;
+  final Future<void> Function(Order order, OrderStatus status) onStatusChanged;
   final bool readOnly;
 
   @override
@@ -452,7 +510,7 @@ class _AdminOrderCard extends StatelessWidget {
 
   final Order order;
   final DateFormat dateFormat;
-  final Future<void> Function(String orderId, OrderStatus status) onStatusChanged;
+  final Future<void> Function(Order order, OrderStatus status) onStatusChanged;
   final bool readOnly;
 
   @override
@@ -541,7 +599,7 @@ class _AdminOrderCard extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _actionColor(order.status),
                   ),
-                  onPressed: () => onStatusChanged(order.id, nextStatus),
+                  onPressed: () => onStatusChanged(order, nextStatus),
                   icon: const Icon(Icons.check_circle, color: Colors.white),
                   label: Text(
                     nextLabel,

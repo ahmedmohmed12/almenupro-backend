@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'settings/admin_settings_tab.dart';
+
 class AdminSidebarItem {
   const AdminSidebarItem({
     required this.icon,
@@ -21,6 +23,10 @@ class AdminSidebar extends StatefulWidget {
     this.width = expandedWidth,
     this.enableCollapse = true,
     this.footerBuilder,
+    this.settingsNavIndex,
+    this.settingsTabs = const [],
+    this.activeSettingsTab,
+    this.onSettingsTabSelected,
   });
 
   static const double expandedWidth = 260;
@@ -28,12 +34,13 @@ class AdminSidebar extends StatefulWidget {
 
   static const int posIndex = 0;
   static const int ordersIndex = 1;
-  static const int customersIndex = 2;
-  static const int menuIndex = 3;
-  static const int deliveryZonesIndex = 4;
-  static const int analyticsIndex = 5;
-  static const int smartUpsellIndex = 6;
-  static const int settingsIndex = 7;
+  static const int kitchenIndex = 2;
+  static const int customersIndex = 3;
+  static const int menuIndex = 4;
+  static const int deliveryZonesIndex = 5;
+  static const int analyticsIndex = 6;
+  static const int smartUpsellIndex = 7;
+  static const int settingsIndex = 8;
 
   /// Super Admin sidebar — no orders tab (restaurant admins only).
   static const int superMenuIndex = 0;
@@ -51,6 +58,10 @@ class AdminSidebar extends StatefulWidget {
     AdminSidebarItem(
       icon: Icons.receipt_long_outlined,
       label: 'الطلبات',
+    ),
+    AdminSidebarItem(
+      icon: Icons.soup_kitchen_outlined,
+      label: 'المطبخ / KDS',
     ),
     AdminSidebarItem(
       icon: Icons.people_outline,
@@ -75,6 +86,14 @@ class AdminSidebar extends StatefulWidget {
     AdminSidebarItem(
       icon: Icons.store,
       label: 'إعدادات المحل والواتساب',
+    ),
+  ];
+
+  /// Cashier sessions are limited to POS views only.
+  static const List<AdminSidebarItem> cashierItems = [
+    AdminSidebarItem(
+      icon: Icons.point_of_sale,
+      label: 'نقطة البيع POS',
     ),
   ];
 
@@ -117,6 +136,10 @@ class AdminSidebar extends StatefulWidget {
   final double width;
   final bool enableCollapse;
   final Widget Function(bool collapsed)? footerBuilder;
+  final int? settingsNavIndex;
+  final List<AdminSettingsTab> settingsTabs;
+  final AdminSettingsTab? activeSettingsTab;
+  final ValueChanged<AdminSettingsTab>? onSettingsTabSelected;
 
   @override
   State<AdminSidebar> createState() => _AdminSidebarState();
@@ -125,14 +148,24 @@ class AdminSidebar extends StatefulWidget {
 class _AdminSidebarState extends State<AdminSidebar> {
   var _collapsed = false;
   var _prefLoaded = false;
+  var _settingsExpanded = false;
 
   @override
   void initState() {
     super.initState();
+    _settingsExpanded = widget.activeSettingsTab != null;
     if (widget.enableCollapse) {
       _loadCollapsedPreference();
     } else {
       _prefLoaded = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeSettingsTab != null) {
+      _settingsExpanded = true;
     }
   }
 
@@ -254,82 +287,244 @@ class _AdminSidebarState extends State<AdminSidebar> {
       padding: EdgeInsets.symmetric(horizontal: _isCollapsed ? 8 : 12),
       itemCount: widget.items.length,
       itemBuilder: (context, index) {
-        final item = widget.items[index];
-        final isActive = widget.selectedIndex == index;
+        if (widget.settingsNavIndex == index && widget.settingsTabs.isNotEmpty) {
+          return _buildSettingsNavItem(widget.items[index], index);
+        }
+        return _buildRegularNavItem(widget.items[index], index);
+      },
+    );
+  }
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Material(
-            color: isActive ? AdminSidebar.activeBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => widget.onItemSelected(index),
-              child: Tooltip(
-                message: _isCollapsed ? item.label : '',
-                preferBelow: false,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: _isCollapsed ? 0 : 16,
-                    vertical: 14,
-                  ),
-                  child: _isCollapsed
-                      ? Center(
-                          child: Icon(
-                            item.icon,
-                            color: isActive
-                                ? AdminSidebar.activeGold
-                                : Colors.white70,
-                            size: 22,
-                          ),
-                        )
-                      : Row(
-                          children: [
-                            Icon(
-                              item.icon,
-                              color: isActive
-                                  ? AdminSidebar.activeGold
-                                  : Colors.white70,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: AnimatedOpacity(
-                                opacity: _isCollapsed ? 0 : 1,
-                                duration: const Duration(milliseconds: 180),
-                                child: Text(
-                                  item.label,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: isActive
-                                        ? Colors.white
-                                        : Colors.white70,
-                                    fontWeight: isActive
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (isActive)
-                              Container(
-                                width: 4,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: AdminSidebar.activeGold,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                          ],
+  Widget _buildRegularNavItem(AdminSidebarItem item, int index) {
+    final isActive = widget.selectedIndex == index;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: isActive ? AdminSidebar.activeBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => widget.onItemSelected(index),
+          child: Tooltip(
+            message: _isCollapsed ? item.label : '',
+            preferBelow: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: _isCollapsed ? 0 : 16,
+                vertical: 14,
+              ),
+              child: _isCollapsed
+                  ? Center(
+                      child: Icon(
+                        item.icon,
+                        color: isActive
+                            ? AdminSidebar.activeGold
+                            : Colors.white70,
+                        size: 22,
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Icon(
+                          item.icon,
+                          color: isActive
+                              ? AdminSidebar.activeGold
+                              : Colors.white70,
+                          size: 22,
                         ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: AnimatedOpacity(
+                            opacity: _isCollapsed ? 0 : 1,
+                            duration: const Duration(milliseconds: 180),
+                            child: Text(
+                              item.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isActive
+                                    ? Colors.white
+                                    : Colors.white70,
+                                fontWeight: isActive
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (isActive)
+                          Container(
+                            width: 4,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: AdminSidebar.activeGold,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsNavItem(AdminSidebarItem item, int index) {
+    final isOnSettings = widget.selectedIndex == index;
+    final activeTab = widget.activeSettingsTab;
+
+    if (_isCollapsed) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Material(
+          color: isOnSettings ? AdminSidebar.activeBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              widget.onItemSelected(index);
+              final first = widget.settingsTabs.first;
+              widget.onSettingsTabSelected?.call(first);
+            },
+            child: Tooltip(
+              message: item.label,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Center(
+                  child: Icon(
+                    item.icon,
+                    color: isOnSettings
+                        ? AdminSidebar.activeGold
+                        : Colors.white70,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: isOnSettings ? AdminSidebar.activeBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                setState(() => _settingsExpanded = !_settingsExpanded);
+                if (!isOnSettings) {
+                  widget.onItemSelected(index);
+                  widget.onSettingsTabSelected?.call(widget.settingsTabs.first);
+                }
+              },
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Icon(
+                      item.icon,
+                      color: isOnSettings
+                          ? AdminSidebar.activeGold
+                          : Colors.white70,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        item.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isOnSettings ? Colors.white : Colors.white70,
+                          fontWeight:
+                              isOnSettings ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      _settingsExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: isOnSettings
+                          ? AdminSidebar.activeGold
+                          : Colors.white54,
+                      size: 22,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_settingsExpanded)
+              ...widget.settingsTabs.map((tab) {
+                final selected = isOnSettings && activeTab == tab;
+                return Padding(
+                  padding: const EdgeInsets.only(
+                    left: 12,
+                    right: 8,
+                    bottom: 4,
+                  ),
+                  child: Material(
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        widget.onItemSelected(index);
+                        widget.onSettingsTabSelected?.call(tab);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              tab.icon,
+                              size: 18,
+                              color: selected
+                                  ? AdminSidebar.activeGold
+                                  : Colors.white60,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                tab.labelAr,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.white70,
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
     );
   }
 

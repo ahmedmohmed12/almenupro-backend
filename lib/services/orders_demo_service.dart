@@ -3,6 +3,7 @@ import 'dart:async';
 import '../models/cart_item.dart';
 import '../models/delivery_address_details.dart';
 import '../models/menu_item.dart';
+import '../models/delivery_notification.dart';
 import '../models/order.dart';
 import 'api_service.dart';
 
@@ -77,23 +78,25 @@ class OrdersDemoService {
     } catch (_) {}
   }
 
-  static Future<void> updateOrderStatus(
+  static Future<OrderStatusUpdateResult?> updateOrderStatus(
     String orderId,
     OrderStatus status,
   ) async {
     await _ensureInitialized();
 
     final index = _orders.indexWhere((order) => order.id == orderId);
-    if (index == -1) return;
+    if (index == -1) return null;
 
+    OrderStatusUpdateResult? result;
     if (!orderId.startsWith('demo-')) {
       try {
-        await ApiService.instance.updateOrderStatus(orderId, status);
+        result = await ApiService.instance.updateOrderStatus(orderId, status);
       } catch (_) {}
     }
 
     _orders[index] = _orders[index].copyWith(status: status);
     _emit();
+    return result ?? OrderStatusUpdateResult(orderId: orderId);
   }
 
   static Future<void> registerOrder(Order order) async {
@@ -255,9 +258,22 @@ class OrdersDemoService {
     DeliveryAddressDetails addressDetails = const DeliveryAddressDetails(),
     String orderSource = '',
     OrderType orderType = OrderType.delivery,
+    String? externalOrderId,
+    double? platformGrossTotal,
+    double? platformCommission,
+    double? platformCommissionPercent,
+    String? promoCode,
+    double promoDiscount = 0,
+    double walletAmount = 0,
+    double walletDiscount = 0,
+    String? targetKitchenId,
+    String? targetKitchenName,
   }) {
     final items = cartItems.map(OrderLineItem.fromCartItem).toList();
     final subtotal = cartItems.fold<double>(0, (sum, item) => sum + item.totalPrice);
+    final total = (subtotal + deliveryFee - promoDiscount - walletDiscount)
+        .clamp(0.0, double.infinity)
+        .toDouble();
 
     return Order(
       id: 'pending',
@@ -267,7 +283,10 @@ class OrdersDemoService {
       items: items,
       subtotal: subtotal,
       deliveryFee: deliveryFee,
-      totalPrice: subtotal + deliveryFee,
+      promoCode: promoCode,
+      promoDiscount: promoDiscount > 0 ? promoDiscount : null,
+      walletDiscount: walletDiscount > 0 ? walletDiscount : null,
+      totalPrice: total,
       orderType: orderType,
       status: OrderStatus.pending,
       createdAt: DateTime.now(),
@@ -278,6 +297,12 @@ class OrdersDemoService {
       deliveryZoneId: deliveryZoneId,
       addressDetails: addressDetails,
       orderSource: orderSource.isEmpty ? null : orderSource,
+      externalOrderId: externalOrderId,
+      platformGrossTotal: platformGrossTotal,
+      platformCommission: platformCommission,
+      platformCommissionPercent: platformCommissionPercent,
+      targetKitchenId: targetKitchenId,
+      targetKitchenName: targetKitchenName,
     );
   }
 }

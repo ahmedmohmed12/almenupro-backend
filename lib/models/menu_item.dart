@@ -110,6 +110,8 @@ class MenuItem {
   final String descriptionAr;
   final String descriptionEn;
   final double price;
+  /// Unit ingredient cost in KWD (food cost per serving).
+  final double? costPrice;
   final String imageUrl;
   final int? talabatId;
   final bool isAvailable;
@@ -129,6 +131,7 @@ class MenuItem {
     this.descriptionAr = '',
     this.descriptionEn = '',
     required this.price,
+    this.costPrice,
     required this.imageUrl,
     this.talabatId,
     required this.isAvailable,
@@ -206,6 +209,7 @@ class MenuItem {
       descriptionAr: descriptionAr,
       descriptionEn: descriptionEn,
       price: double.parse(json['price'].toString()),
+      costPrice: _parseCostPrice(json),
       imageUrl: normalizeMenuImageUrl(json['image_url'] ?? json['imageUrl']),
       talabatId: json['talabat_id'] is int
           ? json['talabat_id'] as int
@@ -220,6 +224,13 @@ class MenuItem {
           .toList(),
       linkedItemIds: _parseLinkedItemIds(json),
     );
+  }
+
+  static double? _parseCostPrice(Map<String, dynamic> json) {
+    final raw = json['costPrice'] ?? json['cost_price'];
+    if (raw == null || raw == '') return null;
+    if (raw is num) return raw >= 0 ? raw.toDouble() : null;
+    return double.tryParse(raw.toString());
   }
 
   static List<int> _parseLinkedItemIds(Map<String, dynamic> json) {
@@ -269,6 +280,7 @@ class MenuItem {
       price: (map['price'] as num?)?.toDouble() ??
           double.tryParse(map['price']?.toString() ?? '') ??
           0,
+      costPrice: _parseCostPrice(map),
       imageUrl: normalizeMenuImageUrl(map['imageUrl'] ?? map['image_url']),
       talabatId: map['talabat_id'] is int
           ? map['talabat_id'] as int
@@ -301,6 +313,10 @@ class MenuItem {
       'description_ar': descriptionAr.isNotEmpty ? descriptionAr : description,
       'description_en': descriptionEn,
       'price': price,
+      if (costPrice != null) ...{
+        'cost_price': costPrice,
+        'costPrice': costPrice,
+      },
       'image_url': imageUrl,
       if (talabatId != null) 'talabat_id': talabatId,
       'is_available': isAvailable ? 1 : 0,
@@ -321,6 +337,7 @@ class MenuItem {
       'descriptionAr': descriptionAr.isNotEmpty ? descriptionAr : description,
       'descriptionEn': descriptionEn,
       'price': price,
+      if (costPrice != null) 'costPrice': costPrice,
       'imageUrl': imageUrl,
       'categoryName': categoryName,
       if (categoryNameEn.isNotEmpty) 'categoryNameEn': categoryNameEn,

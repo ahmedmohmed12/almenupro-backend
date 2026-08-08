@@ -17,6 +17,7 @@ class RestaurantSettings {
     this.impulseBumpItemIds = const [],
     this.impulseBumpMaxPrice = 2,
     this.smartRecommendationsEnabled = true,
+    this.smartClosingEnabled = true,
     this.logoUrl = '',
     this.restaurantDescription = '',
     this.cashbackType = CashbackType.percentage,
@@ -41,6 +42,7 @@ class RestaurantSettings {
   final List<int> impulseBumpItemIds;
   final double impulseBumpMaxPrice;
   final bool smartRecommendationsEnabled;
+  final bool smartClosingEnabled;
   final String logoUrl;
   final String restaurantDescription;
   final CashbackType cashbackType;
@@ -64,6 +66,25 @@ class RestaurantSettings {
 
   bool get hasFreeDeliveryGoal =>
       smartUpsellEnabled && freeDeliveryThreshold > 0;
+
+  bool qualifiesForFreeDelivery(double subtotal) =>
+      hasFreeDeliveryGoal && subtotal >= freeDeliveryThreshold;
+
+  /// Applies free-delivery threshold: returns 0 when subtotal qualifies.
+  double effectiveDeliveryFee({
+    required double subtotal,
+    required double zoneDeliveryFee,
+  }) {
+    if (zoneDeliveryFee <= 0) return 0;
+    if (qualifiesForFreeDelivery(subtotal)) return 0;
+    return zoneDeliveryFee;
+  }
+
+  bool get hasClosingAndRewards =>
+      smartClosingEnabled && smartUpsellEnabled;
+
+  bool get loyaltyEnabled =>
+      smartClosingEnabled && cashbackValue > 0;
 
   List<PaymentMethodConfig> get configuredPaymentMethods =>
       PaymentMethodCatalog.mergeWithDefaults(paymentMethods);
@@ -151,6 +172,8 @@ class RestaurantSettings {
               (json['impulse_bump_max_price'] as num?)?.toDouble() ??
               2,
       smartRecommendationsEnabled: json['smartRecommendationsEnabled'] != false,
+      smartClosingEnabled: json['smartClosingEnabled'] != false &&
+          json['smart_closing_enabled'] != false,
       logoUrl: json['logoUrl']?.toString() ?? json['logo_url']?.toString() ?? '',
       restaurantDescription: json['restaurantDescription']?.toString() ??
           json['restaurant_description']?.toString() ??
@@ -200,6 +223,7 @@ class RestaurantSettings {
     List<int>? impulseBumpItemIds,
     double? impulseBumpMaxPrice,
     bool? smartRecommendationsEnabled,
+    bool? smartClosingEnabled,
     String? logoUrl,
     String? restaurantDescription,
     CashbackType? cashbackType,
@@ -231,6 +255,7 @@ class RestaurantSettings {
       impulseBumpMaxPrice: impulseBumpMaxPrice ?? this.impulseBumpMaxPrice,
       smartRecommendationsEnabled:
           smartRecommendationsEnabled ?? this.smartRecommendationsEnabled,
+      smartClosingEnabled: smartClosingEnabled ?? this.smartClosingEnabled,
       logoUrl: logoUrl ?? this.logoUrl,
       restaurantDescription: restaurantDescription ?? this.restaurantDescription,
       cashbackType: cashbackType ?? this.cashbackType,
@@ -257,6 +282,7 @@ class RestaurantSettings {
         'impulseBumpItemIds': impulseBumpItemIds,
         'impulseBumpMaxPrice': impulseBumpMaxPrice,
         'smartRecommendationsEnabled': smartRecommendationsEnabled,
+        'smartClosingEnabled': smartClosingEnabled,
         'logoUrl': logoUrl,
         'restaurantDescription': restaurantDescription,
         'cashbackType': cashbackType.storageValue,

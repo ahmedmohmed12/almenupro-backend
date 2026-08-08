@@ -196,6 +196,28 @@ class RestaurantSettingsService {
     );
   }
 
+  Future<void> saveClosingSettings({
+    required bool smartClosingEnabled,
+    required CashbackType cashbackType,
+    required double cashbackValue,
+    required double minOrderForLoyalty,
+    String? restaurantId,
+  }) async {
+    final scopedRestaurantId =
+        restaurantId ?? SuperAdminScopeService.instance.effectiveRestaurantId;
+    final current = _cached ?? await load(restaurantId: scopedRestaurantId);
+    await _persist(
+      current.copyWith(
+        smartClosingEnabled: smartClosingEnabled,
+        cashbackType: cashbackType,
+        cashbackValue: cashbackValue,
+        minOrderForLoyalty: minOrderForLoyalty,
+        updatedAt: DateTime.now().toUtc(),
+      ),
+      restaurantId: scopedRestaurantId,
+    );
+  }
+
   Future<void> savePaymentMethods({
     required List<PaymentMethodConfig> paymentMethods,
     String? restaurantId,

@@ -12,7 +12,9 @@ import 'package:http/http.dart' as http;
 
 import '../models/customer.dart';
 import '../models/customer_checkout_profile.dart';
+import '../models/delivery_notification.dart';
 import '../models/delivery_zone.dart';
+import '../models/kitchen.dart';
 import '../models/loyalty_cashback.dart';
 import '../models/menu_item.dart';
 
@@ -22,6 +24,7 @@ import '../models/restaurant.dart';
 
 import '../models/restaurant_settings.dart';
 import '../models/smart_closing.dart';
+import '../models/staff_user.dart';
 
 import 'admin_auth_service.dart';
 import 'super_admin_scope_service.dart';
@@ -75,9 +78,16 @@ class ApiService {
 
   Map<String, String> get _jsonHeaders => {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         ...AdminAuthService.instance.authHeaders,
         ...SuperAdminScopeService.instance.scopeHeaders,
       };
+
+  void _ensureAdminApiAccess(String action) {
+    if (AdminAuthService.instance.isCashierSession) {
+      throw Exception('غير مصرح للكاشير بتنفيذ: $action');
+    }
+  }
 
   Future<bool> validateAuthSession() async {
     if (!AdminAuthService.instance.isLoggedIn) return false;
@@ -179,9 +189,58 @@ class ApiService {
 
   }
 
+  Future<CashierLoginResult> loginCashier({
+    required String restaurantName,
+    required String cashierName,
+    required String password,
+  }) async {
+    final payload = <String, dynamic>{
+      'restaurantName': restaurantName.trim(),
+      'cashierName': cashierName.trim(),
+      'password': password,
+    };
+
+    final response = await http
+        .post(
+          _uri('/pos/cashier/login'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(payload),
+        )
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('بيانات دخول الكاشير غير صحيحة');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    final map = Map<String, dynamic>.from(decoded);
+    // Prefer authRole if backend provided it; keep POS role under posRole.
+    if (map['authRole'] == null && map['role'] is String) {
+      map['authRole'] = map['role'];
+    }
+    final session = AdminSession.fromJson(map);
+    if (session.token.isEmpty) {
+      throw Exception('لم يتم استلام رمز الجلسة من السيرفر');
+    }
+    final posSession = PosCashierSession.fromJson(map);
+    return CashierLoginResult(
+      session: session,
+      cashierSession: posSession,
+      permissions: posSession.permissions,
+      roleId: posSession.roleId.isNotEmpty
+          ? posSession.roleId
+          : (map['roleId']?.toString() ?? ''),
+    );
+  }
+
 
 
   Future<List<Restaurant>> fetchRestaurants() async {
+    _ensureAdminApiAccess('عرض المطاعم');
 
     final response = await http
 
@@ -233,6 +292,7 @@ class ApiService {
     DateTime? subscriptionExpiresAt,
     String subscriptionNotes = '',
   }) async {
+    _ensureAdminApiAccess('إنشاء مطعم');
     final response = await http
         .post(
           _uri('/restaurants'),
@@ -449,6 +509,58 @@ class ApiService {
     } catch (_) {
       return const [];
     }
+  }
+
+  Future<Map<String, dynamic>> fetchFoodCostReport({
+    String? restaurantId,
+    int days = 30,
+  }) async {
+    _ensureAdminApiAccess('تقرير تكلفة الطعام');
+    final query = {
+      'restaurantId': _scopedRestaurantId(restaurantId: restaurantId),
+      'days': '$days',
+    };
+
+    final response = await http
+        .get(_uri('/analytics/food-cost-report', query), headers: _jsonHeaders)
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل تقرير تكلفة الطعام (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  Future<Map<String, dynamic>> fetchDailySalesAnalytics({
+    String? restaurantId,
+    int days = 7,
+  }) async {
+    _ensureAdminApiAccess('تحليل المبيعات');
+    final query = {
+      'restaurantId': _scopedRestaurantId(restaurantId: restaurantId),
+      'days': '$days',
+    };
+
+    final response = await http
+        .get(_uri('/analytics/daily-sales', query), headers: _jsonHeaders)
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل تقرير المبيعات (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw Exception('استجابة غير متوقعة من السيرفر');
+    }
+
+    return Map<String, dynamic>.from(decoded);
   }
 
   Future<List<Map<String, dynamic>>> fetchRecommendations({
@@ -704,18 +816,19 @@ class ApiService {
 
 
   Future<OrderCreationResult> createOrder(
-
     Order order, {
-
-    String restaurantId = defaultRestaurantId,
-
+    required String restaurantId,
+    String? restaurantSlug,
   }) async {
-
     try {
-
       final payload = order.toMap()
-
-        ..['restaurantId'] = restaurantId;
+        ..['restaurantId'] = restaurantId
+        ..['restaurant_id'] = restaurantId;
+      final slug = restaurantSlug?.trim();
+      if (slug != null && slug.isNotEmpty) {
+        payload['restaurantSlug'] = slug;
+        payload['restaurant_slug'] = slug;
+      }
 
 
 
@@ -848,6 +961,7 @@ class ApiService {
     RestaurantSettings settings, {
     String? restaurantId,
   }) async {
+    _ensureAdminApiAccess('تعديل الإعدادات');
 
     try {
 
@@ -915,42 +1029,43 @@ class ApiService {
 
 
 
-  Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
-
+  Future<OrderStatusUpdateResult> updateOrderStatus(
+    String orderId,
+    OrderStatus status,
+  ) async {
     try {
-
       final response = await http
-
           .patch(
-
             _uri('/orders/$orderId/status'),
-
             headers: _jsonHeaders,
-
             body: jsonEncode({'status': status.name}),
-
           )
-
           .timeout(_fetchTimeout);
 
-
-
       if (response.statusCode != 200) {
-
         throw Exception('فشل في تحديث الطلب (${response.statusCode})');
-
       }
 
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        return OrderStatusUpdateResult(orderId: orderId);
+      }
+
+      final map = Map<String, dynamic>.from(decoded);
+      final notificationRaw = map['deliveryNotification'] ?? map['delivery_notification'];
+      return OrderStatusUpdateResult(
+        orderId: orderId,
+        deliveryNotification: notificationRaw is Map
+            ? DeliveryNotification.fromMap(
+                Map<String, dynamic>.from(notificationRaw),
+              )
+            : null,
+      );
     } on TimeoutException {
-
       throw Exception('انتهت مهلة الاتصال بالسيرفر');
-
     } catch (error) {
-
       throw Exception('خطأ في تحديث الطلب: $error');
-
     }
-
   }
 
 
@@ -1046,6 +1161,7 @@ class ApiService {
 
 
   Future<MenuItem> createMenuItem(Map<String, dynamic> data) async {
+    _ensureAdminApiAccess('إضافة أصناف المنيو');
 
     final response = await http
 
@@ -1088,6 +1204,7 @@ class ApiService {
 
 
   Future<MenuItem> updateMenuItem(String itemId, Map<String, dynamic> data) async {
+    _ensureAdminApiAccess('تعديل أصناف المنيو');
 
     final response = await http
 
@@ -1130,6 +1247,7 @@ class ApiService {
 
 
   Future<void> reorderMenuItems(List<String> orderedIds) async {
+    _ensureAdminApiAccess('إعادة ترتيب المنيو');
 
     final response = await http
 
@@ -1158,6 +1276,7 @@ class ApiService {
 
 
   Future<void> deleteMenuItem(String itemId) async {
+    _ensureAdminApiAccess('حذف أصناف المنيو');
 
     final response = await http
 
@@ -1243,6 +1362,9 @@ class ApiService {
 
       'price': data['price'] ?? 0,
 
+      if (data['costPrice'] != null || data['cost_price'] != null)
+        'costPrice': data['costPrice'] ?? data['cost_price'],
+
       'categoryName': data['categoryName'] ?? data['category_name'] ?? 'عام',
 
       'categoryNameEn': data['categoryNameEn'] ?? data['category_name_en'] ?? '',
@@ -1270,6 +1392,7 @@ class ApiService {
   Future<List<DeliveryZone>> fetchDeliveryZones({
     String? slug,
     String? restaurantId,
+    bool bustCache = false,
   }) async {
     final query = <String, String>{};
     if (slug != null && slug.trim().isNotEmpty) {
@@ -1277,9 +1400,16 @@ class ApiService {
     } else {
       query['restaurantId'] = _scopedRestaurantId(restaurantId: restaurantId);
     }
+    if (bustCache) {
+      query['_'] = DateTime.now().millisecondsSinceEpoch.toString();
+    }
+
+    final headers = AdminAuthService.instance.isLoggedIn
+        ? _jsonHeaders
+        : _publicHeaders;
 
     final response = await http
-        .get(_uri('/delivery-zones', query), headers: _publicHeaders)
+        .get(_uri('/delivery-zones', query), headers: headers)
         .timeout(_fetchTimeout);
 
     if (response.statusCode != 200) {
@@ -1294,6 +1424,220 @@ class ApiService {
         .map((raw) => DeliveryZone.fromMap(Map<String, dynamic>.from(raw)))
         .where((zone) => zone.isActive)
         .toList();
+  }
+
+  Future<List<Kitchen>> fetchKitchens({
+    String? restaurantId,
+    bool includeInactive = false,
+    bool allowCashier = false,
+  }) async {
+    if (!allowCashier) {
+      _ensureAdminApiAccess('fetch kitchens');
+    }
+    final query = <String, String>{
+      'restaurant_id': _scopedRestaurantId(restaurantId: restaurantId),
+    };
+    if (includeInactive) {
+      query['include_inactive'] = '1';
+    }
+
+    final response = await http
+        .get(_uri('/kitchens', query), headers: _jsonHeaders)
+        .timeout(_fetchTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception('فشل في تحميل المطابخ (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return const [];
+
+    return decoded
+        .whereType<Map>()
+        .map((raw) => Kitchen.fromMap(Map<String, dynamic>.from(raw)))
+        .toList();
+  }
+
+  Future<Kitchen> saveKitchen({
+    required Kitchen kitchen,
+    String? restaurantId,
+  }) async {
+    _ensureAdminApiAccess('save kitchen');
+    final scoped = _scopedRestaurantId(restaurantId: restaurantId);
+    final payload = kitchen.toMap()..['restaurant_id'] = scoped;
+
+    final isUpdate = kitchen.id.isNotEmpty;
+    final response = isUpdate
+        ? await http
+            .put(
+              _uri('/kitchens/${kitchen.id}'),
+              headers: _jsonHeaders,
+              body: jsonEncode(payload),
+            )
+            .timeout(_writeTimeout)
+        : await http
+            .post(
+              _uri('/kitchens'),
+              headers: _jsonHeaders,
+              body: jsonEncode(payload),
+            )
+            .timeout(_writeTimeout);
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+        isUpdate
+            ? 'فشل في تحديث المطبخ (${response.statusCode})'
+            : 'فشل في إضافة المطبخ (${response.statusCode})',
+      );
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) throw Exception('استجابة غير متوقعة من السيرفر');
+    return Kitchen.fromMap(Map<String, dynamic>.from(decoded));
+  }
+
+  Future<void> deleteKitchen(String kitchenId) async {
+    _ensureAdminApiAccess('delete kitchen');
+    final response = await http
+        .delete(_uri('/kitchens/$kitchenId'), headers: _jsonHeaders)
+        .timeout(_writeTimeout);
+    if (response.statusCode != 200) {
+      throw Exception('فشل في حذف المطبخ (${response.statusCode})');
+    }
+  }
+
+  Future<Order> updateOrderKitchen({
+    required String orderId,
+    required String targetKitchenId,
+  }) async {
+    try {
+      final response = await http
+          .patch(
+            _uri('/orders/$orderId/kitchen'),
+            headers: _jsonHeaders,
+            body: jsonEncode({'targetKitchenId': targetKitchenId}),
+          )
+          .timeout(_fetchTimeout);
+
+      if (response.statusCode != 200) {
+        String message = 'فشل في تحديث مطبخ الطلب (${response.statusCode})';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['error'] != null) {
+            message = decoded['error'].toString();
+          }
+        } catch (_) {}
+        throw Exception(message);
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw Exception('استجابة غير متوقعة من السيرفر');
+      }
+      final orderRaw = decoded['order'] is Map
+          ? Map<String, dynamic>.from(decoded['order'] as Map)
+          : Map<String, dynamic>.from(decoded);
+      return Order.fromMap(
+        orderRaw['id']?.toString() ?? orderId,
+        orderRaw,
+      );
+    } on TimeoutException {
+      throw Exception('انتهت مهلة الاتصال بالسيرفر');
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception('خطأ في تحديث مطبخ الطلب: $error');
+    }
+  }
+
+  Future<WalletValidationResult> validateWalletAmount({
+    required String phone,
+    required double walletAmount,
+    required double subtotal,
+    required double deliveryFee,
+    double promoDiscount = 0,
+    String? restaurantId,
+    String? slug,
+  }) async {
+    final normalizedPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (normalizedPhone.length < 8 || walletAmount <= 0) {
+      return const WalletValidationResult(valid: false, error: 'invalid');
+    }
+
+    final payload = <String, dynamic>{
+      'phone': normalizedPhone,
+      'walletAmount': walletAmount,
+      'subtotal': subtotal,
+      'deliveryFee': deliveryFee,
+      'promoDiscount': promoDiscount,
+    };
+    if (slug != null && slug.trim().isNotEmpty) {
+      payload['slug'] = slug.trim();
+    } else {
+      payload['restaurantId'] = _scopedRestaurantId(restaurantId: restaurantId);
+    }
+
+    try {
+      final response = await http
+          .post(
+            _uri('/wallet/validate'),
+            headers: _publicHeaders,
+            body: jsonEncode(payload),
+          )
+          .timeout(_fetchTimeout);
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        return const WalletValidationResult(valid: false, error: 'invalid_response');
+      }
+      return WalletValidationResult.fromMap(Map<String, dynamic>.from(decoded));
+    } catch (error) {
+      debugPrint('Wallet validation failed: $error');
+      return const WalletValidationResult(valid: false, error: 'network');
+    }
+  }
+
+  Future<PromoValidationResult> validatePromoCode({
+    required String phone,
+    required String promoCode,
+    required double subtotal,
+    required double deliveryFee,
+    String? restaurantId,
+    String? slug,
+  }) async {
+    final normalizedPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (normalizedPhone.length < 8 || promoCode.trim().isEmpty) {
+      return const PromoValidationResult(valid: false, error: 'invalid');
+    }
+
+    final payload = <String, dynamic>{
+      'phone': normalizedPhone,
+      'promoCode': promoCode.trim(),
+      'subtotal': subtotal,
+      'deliveryFee': deliveryFee,
+    };
+    if (slug != null && slug.trim().isNotEmpty) {
+      payload['slug'] = slug.trim();
+    } else {
+      payload['restaurantId'] = _scopedRestaurantId(restaurantId: restaurantId);
+    }
+
+    try {
+      final response = await http
+          .post(
+            _uri('/promo/validate'),
+            headers: _publicHeaders,
+            body: jsonEncode(payload),
+          )
+          .timeout(_fetchTimeout);
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        return const PromoValidationResult(valid: false, error: 'invalid_response');
+      }
+      return PromoValidationResult.fromMap(Map<String, dynamic>.from(decoded));
+    } catch (error) {
+      debugPrint('Promo validation failed: $error');
+      return const PromoValidationResult(valid: false, error: 'network');
+    }
   }
 
   Future<CustomerCheckoutProfile?> fetchCustomerCheckoutProfile({
@@ -1328,7 +1672,12 @@ class ApiService {
       final profile = CustomerCheckoutProfile.fromMap(
         Map<String, dynamic>.from(profileRaw),
       );
-      return profile.hasUsableData ? profile : null;
+      if (profile.hasUsableData ||
+          profile.hasActivePromo ||
+          profile.hasWalletBalance) {
+        return profile;
+      }
+      return null;
     } catch (error) {
       debugPrint('Customer lookup failed: $error');
       return null;
@@ -1336,6 +1685,7 @@ class ApiService {
   }
 
   Future<List<Customer>> fetchCustomers({String? restaurantId}) async {
+    _ensureAdminApiAccess('عرض العملاء');
     final query = <String, String>{};
     if (restaurantId != null && restaurantId.trim().isNotEmpty) {
       query['restaurant_id'] = restaurantId.trim();
@@ -1364,6 +1714,7 @@ class ApiService {
     String customerId, {
     String? restaurantId,
   }) async {
+    _ensureAdminApiAccess('تفاصيل العميل');
     final query = <String, String>{};
     if (restaurantId != null && restaurantId.trim().isNotEmpty) {
       query['restaurant_id'] = restaurantId.trim();
@@ -1533,6 +1884,21 @@ class ApiService {
     return SmartClosingPayload.fromMap(Map<String, dynamic>.from(decoded));
   }
 
+}
+
+
+class CashierLoginResult {
+  const CashierLoginResult({
+    required this.session,
+    required this.cashierSession,
+    required this.permissions,
+    this.roleId = '',
+  });
+
+  final AdminSession session;
+  final PosCashierSession cashierSession;
+  final Map<String, bool> permissions;
+  final String roleId;
 }
 
 class TalabatImportResult {

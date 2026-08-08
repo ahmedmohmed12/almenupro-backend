@@ -27,11 +27,16 @@ class SuperAdminScopeService extends ChangeNotifier {
   bool get hasSelection =>
       _selectedRestaurantId != null && _selectedRestaurantId!.isNotEmpty;
 
-  String get effectiveRestaurantId =>
-      AdminAuthService.instance.isRestaurantAdmin
-          ? (AdminAuthService.instance.restaurantId ??
-              ApiService.defaultRestaurantId)
-          : (_selectedRestaurantId ?? ApiService.defaultRestaurantId);
+  bool get hasEffectiveRestaurant => hasSelection;
+
+  String get effectiveRestaurantId {
+    final auth = AdminAuthService.instance;
+    // Restaurant admins and cashiers are always scoped to their JWT restaurant.
+    if (auth.isRestaurantAdmin || auth.isCashierSession) {
+      return auth.restaurantId ?? ApiService.defaultRestaurantId;
+    }
+    return _selectedRestaurantId ?? ApiService.defaultRestaurantId;
+  }
 
   Map<String, String> get scopeHeaders {
     if (!AdminAuthService.instance.isSuperAdmin || !hasSelection) {
