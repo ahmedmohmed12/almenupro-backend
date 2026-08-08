@@ -2,8 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "installCommand": "node scripts/preparePublicUploads.js",
-  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v8')\"",
+  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v9')\"",
   "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "data/**",
+          "lib/**/*.js",
+          "uploads/menu/**",
+          "public/menu-images/**"
+        ]
+      }
+    },
     {
       "src": "api/kitchens/index.js",
       "use": "@vercel/node",
@@ -70,6 +82,10 @@
     }
   ],
   "routes": [
+    {
+      "src": "/",
+      "dest": "/index.js"
+    },
     {
       "src": "/api/kitchens",
       "dest": "/api/kitchens/index.js"
