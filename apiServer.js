@@ -104,6 +104,7 @@ const { enrichPlatformRows } = require('./lib/platformChannelUtils');
 const { normalizeSalesPlatforms } = require('./lib/salesPlatforms');
 const { normalizePosRoles } = require('./lib/posPermissions');
 const { handlePosRoutes } = require('./lib/posRoutes');
+const { handleKitchenRoutes } = require('./lib/kitchenRoutes');
 const {
   buildRestaurantOgData,
   buildOgMenuHtml,
@@ -839,6 +840,24 @@ const server = http.createServer(async (req, res) => {
   });
   if (posHandled) return;
 
+  const kitchenHandled = await handleKitchenRoutes(req, res, url, {
+    readBody,
+    sendJson,
+    authError,
+    parseAuthHeader,
+    requireAuth,
+    rejectCashier,
+    resolveScopedRestaurantId,
+    resolveRestaurantId,
+    assertRestaurantAccess,
+    filterByRestaurant,
+    readKitchens,
+    writeKitchens,
+    readOrders,
+    DEFAULT_RESTAURANT_ID,
+  });
+  if (kitchenHandled) return;
+
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '')) {
     sendJson(res, 200, {
       ok: true,
@@ -860,6 +879,8 @@ const server = http.createServer(async (req, res) => {
         customerDetail: '/api/customers/{id}',
         orders: '/api/orders',
         settings: '/api/settings',
+        kitchens: '/api/kitchens?restaurant_id={id}',
+        deliveryZones: '/api/delivery-zones?restaurant_id={id}',
         images: '/menu-images/{filename}',
       },
       frontend: 'https://almenupro-frontend-three.vercel.app',
@@ -1079,11 +1100,15 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
     const items = await readItems();
+    const kitchens = await readKitchens();
     const { resolveImageDiskPath } = require('./lib/menuImageStorage');
     const storage = getStorageStatus();
     sendJson(res, 200, {
       ok: true,
       service: 'almenupro-api',
+      apiVersion: 'kitchen-routes-v2',
+      kitchensApi: true,
+      kitchenCount: kitchens.length,
       storage: storage.mode,
       persistent: storage.persistent,
       persistenceMessage: storage.message,
@@ -1708,144 +1733,6 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 400, { error: error.message || 'Invalid payload' });
     }
     return;
-  }
-
-  if (req.method === 'GET' && url.pathname === '/api/kitchens') {
-    const auth = parseAuthHeader(req);
-    const restaurants = await readRestaurants();
-    const restaurantId = await resolveScopedRestaurantId(req, url, auth, {
-      allowPublicDefault: true,
-    });
-
-    if (!restaurantId) {
-      sendJson(res, 404, { error: 'Restaurant not found' });
-      return;
-    }
-
-    const includeInactive = url.searchParams.get('include_inactive') === '1';
-    const allKitchens = filterByRestaurant(await readKitchens(), restaurantId);
-    const kitchens = includeInactive
-      ? allKitchens
-      : allKitchens.filter((kitchen) => String(kitchen.status || 'active') === 'active');
-
-    kitchens.sort(
-      (a, b) =>
-        (Number(a.sort_order ?? a.sortOrder ?? 0) || 0) -
-        (Number(b.sort_order ?? b.sortOrder ?? 0) || 0),
-    );
-    sendJson(res, 200, kitchens);
-    return;
-  }
-
-  if (req.method === 'POST' && url.pathname === '/api/kitchens') {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
-    if (rejectCashier(auth, res, 'Cashiers cannot manage kitchens')) return;
-
-    try {
-      const body = JSON.parse((await readBody(req)) || '{}');
-      const restaurantId = resolveRestaurantId(
-        auth,
-        body.restaurantId ||
-          body.restaurant_id ||
-          req.headers['x-restaurant-id'],
-      );
-
-      if (!restaurantId || !assertRestaurantAccess(auth, restaurantId, authError, res)) {
-        return;
-      }
-
-      const name = String(body.name || body.name_ar || body.nameAr || '').trim();
-      if (!name) {
-        sendJson(res, 400, { error: 'Kitchen name is required' });
-        return;
-      }
-
-      const id = `kitchen_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      const kitchen = normalizeKitchen(body, id, restaurantId);
-      kitchen.name = name;
-
-      const kitchens = await readKitchens();
-      if (kitchen.is_default || kitchen.isDefault) {
-        for (const entry of kitchens) {
-          if (kitchenRestaurantId(entry) === String(restaurantId)) {
-            entry.is_default = false;
-            entry.isDefault = false;
-          }
-        }
-      }
-
-      kitchens.push(kitchen);
-      await writeKitchens(kitchens);
-      sendJson(res, 201, kitchen);
-    } catch (error) {
-      sendJson(res, 400, { error: error.message || 'Invalid payload' });
-    }
-    return;
-  }
-
-  const kitchenMatch = url.pathname.match(/^\/api\/kitchens\/([^/]+)$/);
-  if (kitchenMatch) {
-    const kitchenId = decodeURIComponent(kitchenMatch[1]);
-    const auth = requireAuth(req, res);
-    if (!auth) return;
-    if (rejectCashier(auth, res, 'Cashiers cannot manage kitchens')) return;
-
-    const kitchens = await readKitchens();
-    const index = kitchens.findIndex((kitchen) => String(kitchen.id) === kitchenId);
-    if (index === -1) {
-      sendJson(res, 404, { error: 'Kitchen not found' });
-      return;
-    }
-
-    const existing = kitchens[index];
-    const restaurantId = String(
-      existing.restaurant_id || existing.restaurantId || DEFAULT_RESTAURANT_ID,
-    );
-    if (!assertRestaurantAccess(auth, restaurantId, authError, res)) {
-      return;
-    }
-
-    if (req.method === 'PUT') {
-      try {
-        const body = JSON.parse((await readBody(req)) || '{}');
-        const next = normalizeKitchen({ ...existing, ...body }, kitchenId, restaurantId);
-        if (next.is_default || next.isDefault) {
-          for (let i = 0; i < kitchens.length; i += 1) {
-            if (kitchenRestaurantId(kitchens[i]) === restaurantId) {
-              kitchens[i].is_default = kitchens[i].id === kitchenId;
-              kitchens[i].isDefault = kitchens[i].id === kitchenId;
-            }
-          }
-        }
-        kitchens[index] = next;
-        await writeKitchens(kitchens);
-        sendJson(res, 200, next);
-      } catch (error) {
-        sendJson(res, 400, { error: error.message || 'Invalid payload' });
-      }
-      return;
-    }
-
-    if (req.method === 'DELETE') {
-      const activeOrders = (await readOrders()).some(
-        (order) =>
-          String(order.target_kitchen_id || order.targetKitchenId || '') === kitchenId &&
-          String(order.restaurant_id || order.restaurantId) === restaurantId &&
-          !['delivered', 'cancelled'].includes(String(order.status || '').toLowerCase()),
-      );
-      if (activeOrders) {
-        sendJson(res, 409, {
-          error: 'Cannot delete kitchen with active orders',
-          code: 'KITCHEN_HAS_ACTIVE_ORDERS',
-        });
-        return;
-      }
-      kitchens.splice(index, 1);
-      await writeKitchens(kitchens);
-      sendJson(res, 200, { ok: true, id: kitchenId });
-      return;
-    }
   }
 
   if (req.method === 'GET' && url.pathname === '/api/delivery-zones') {

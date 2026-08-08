@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../l10n/strings_admin.dart';
 import '../../models/kitchen.dart';
+import '../../services/admin_auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/kitchen_catalog_service.dart';
 import '../../services/super_admin_scope_service.dart';
@@ -36,6 +37,7 @@ class _AdminKitchensPanelState extends State<AdminKitchensPanel> {
 
   String get _restaurantId =>
       widget.restaurantId ??
+      AdminAuthService.instance.restaurantId ??
       SuperAdminScopeService.instance.effectiveRestaurantId;
 
   @override
@@ -283,49 +285,63 @@ class _AdminKitchensPanelState extends State<AdminKitchensPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    s.kitchensPanelTitle,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: _burgundy,
+        Card(
+          color: const Color(0xFF6B1124),
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.kitchensPanelTitle,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        s.kitchensPanelSubtitle,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.canManage)
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: _burgundy,
                     ),
+                    onPressed: _saving ? null : () => _showKitchenDialog(),
+                    icon: const Icon(Icons.add),
+                    label: Text(s.isArabic ? 'إضافة مطبخ جديد' : 'Add new kitchen'),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    s.kitchensPanelSubtitle,
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                ],
-              ),
+              ],
             ),
-            if (widget.canManage)
-              FilledButton.icon(
-                onPressed: _saving ? null : () => _showKitchenDialog(),
-                icon: const Icon(Icons.add),
-                label: Text(s.isArabic ? 'إضافة مطبخ' : 'Add kitchen'),
-              ),
-            if (_refreshing) ...[
-              const SizedBox(width: 12),
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ],
-          ],
+          ),
         ),
         const SizedBox(height: 16),
+        if (_refreshing)
+          const LinearProgressIndicator(minHeight: 2, color: _burgundy),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: MaterialBanner(
+              backgroundColor: Colors.red.shade50,
+              content: Text(_error!),
+              actions: [
+                TextButton(onPressed: () => _load(silent: false), child: Text(s.retry)),
+              ],
+            ),
+          ),
         if (_loading)
           const Center(child: CircularProgressIndicator(color: _burgundy))
-        else if (_error != null)
-          Text(_error!, style: const TextStyle(color: Colors.red))
         else if (_kitchens.isEmpty)
           Card(
             child: Padding(

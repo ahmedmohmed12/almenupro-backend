@@ -1452,25 +1452,32 @@ class ApiService {
       query['include_inactive'] = '1';
     }
 
-    final response = await http
-        .get(_uri('/kitchens', query), headers: _jsonHeaders)
-        .timeout(_fetchTimeout);
+    try {
+      final response = await http
+          .get(_uri('/kitchens', query), headers: _jsonHeaders)
+          .timeout(_fetchTimeout);
 
-    if (response.statusCode == 404) {
-      return const [];
+      if (response.statusCode == 404) {
+        return const [];
+      }
+
+      if (response.statusCode != 200) {
+        throw Exception('فشل في تحميل المطابخ (${response.statusCode})');
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return const [];
+
+      return decoded
+          .whereType<Map>()
+          .map((raw) => Kitchen.fromMap(Map<String, dynamic>.from(raw)))
+          .toList();
+    } on TimeoutException {
+      throw Exception('انتهت مهلة تحميل المطابخ');
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception('تعذر تحميل المطابخ: $error');
     }
-
-    if (response.statusCode != 200) {
-      throw Exception('فشل في تحميل المطابخ (${response.statusCode})');
-    }
-
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List) return const [];
-
-    return decoded
-        .whereType<Map>()
-        .map((raw) => Kitchen.fromMap(Map<String, dynamic>.from(raw)))
-        .toList();
   }
 
   Future<Kitchen> saveKitchen({

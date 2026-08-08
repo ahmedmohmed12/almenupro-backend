@@ -39,6 +39,10 @@ class _AdminKitchenHubState extends State<AdminKitchenHub>
   }
 
   String get _restaurantId {
+    if (AdminAuthService.instance.isRestaurantAdmin) {
+      return AdminAuthService.instance.restaurantId ??
+          ApiService.defaultRestaurantId;
+    }
     final scoped = SuperAdminScopeService.instance.effectiveRestaurantId;
     if (scoped.isNotEmpty) return scoped;
     return AdminAuthService.instance.restaurantId ?? ApiService.defaultRestaurantId;

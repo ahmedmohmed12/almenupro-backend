@@ -79,6 +79,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   String get _restaurantId =>
       widget.restaurantId ??
+      AdminAuthService.instance.restaurantId ??
       SuperAdminScopeService.instance.effectiveRestaurantId;
 
   String get _restaurantLabel {
@@ -154,27 +155,51 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     });
 
     try {
-      final results = await Future.wait([
-        ApiService.instance.fetchDeliveryZones(
+      List<DeliveryZone> zones = const [];
+      List<Kitchen> kitchens = const [];
+      Object? zonesError;
+      Object? kitchensError;
+
+      try {
+        zones = await ApiService.instance.fetchDeliveryZones(
           restaurantId: _restaurantId,
           bustCache: true,
-        ),
-        ApiService.instance.fetchKitchens(
+        );
+      } catch (error) {
+        zonesError = error;
+      }
+
+      try {
+        kitchens = await ApiService.instance.fetchKitchens(
           restaurantId: _restaurantId,
           includeInactive: true,
-        ),
-      ]);
-      final zones = results[0] as List<DeliveryZone>;
-      final kitchens = results[1] as List<Kitchen>;
+        );
+      } catch (error) {
+        kitchensError = error;
+      }
+
       if (!mounted) return;
       setState(() {
-        _zones = _sortedZones(zones);
+        if (zonesError == null) {
+          _zones = _sortedZones(zones);
+        }
         _kitchens = kitchens;
         _loading = false;
         _refreshing = false;
-        _error = null;
+        _error = zonesError?.toString().replaceFirst('Exception: ', '');
       });
-      KitchenCatalogService.instance.publish(kitchens);
+      if (kitchens.isNotEmpty) {
+        KitchenCatalogService.instance.publish(kitchens);
+      }
+      if (kitchensError != null && zonesError == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تعذر تحميل المطابخ — يمكنك إضافة مطبخ جديد أو إعادة المحاولة',
+            ),
+          ),
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
