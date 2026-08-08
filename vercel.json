@@ -5,7 +5,6 @@
   "framework": null,
   "installCommand": "node scripts/preparePublicUploads.js",
   "buildCommand": "node scripts/preparePublicUploads.js && node scripts/verifyVercelDeploy.js",
-  "outputDirectory": null,
   "builds": [
     {
       "src": "index.js",
@@ -20,7 +19,7 @@
       }
     },
     {
-      "src": "server.js",
+      "src": "apiServer.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
@@ -50,82 +49,28 @@
           "lib/**/*.js"
         ]
       }
-    },
-    {
-      "src": "apiServer.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "lib/**/*.js",
-          "uploads/menu/**",
-          "public/menu-images/**"
-        ]
-      }
     }
   ],
   "routes": [
     {
       "src": "/api/kitchens",
-      "dest": "/api/kitchens.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Restaurant-Id"
-      }
+      "dest": "/api/kitchens.js"
     },
     {
       "src": "/api/kitchens/(.*)",
-      "dest": "/api/kitchens.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Restaurant-Id"
-      }
+      "dest": "/api/kitchens.js"
     },
     {
       "src": "/api/delivery-zones",
-      "dest": "/api/delivery-zones.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Restaurant-Id"
-      }
+      "dest": "/api/delivery-zones.js"
     },
     {
       "src": "/api/delivery-zones/(.*)",
-      "dest": "/api/delivery-zones.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Restaurant-Id"
-      }
+      "dest": "/api/delivery-zones.js"
     },
     {
-      "src": "/menu-images/(.*)",
-      "dest": "/apiServer.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/og/(.*)",
+      "src": "/(.*)",
       "dest": "/apiServer.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/apiServer.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Restaurant-Id"
-      }
-    },
-    {
-      "src": "/",
-      "dest": "/index.js"
     }
   ]
 }

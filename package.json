@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "vercel-build": "node scripts/preparePublicUploads.js && node scripts/verifyVercelDeploy.js",
     "verify:vercel": "node scripts/verifyVercelDeploy.js",
     "seed": "node seedFromTalabat.js",
     "test:og": "node scripts/testOgMeta.js",
@@ -12,7 +13,7 @@
     "test:delivery-whatsapp": "node scripts/testDeliveryWhatsApp.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   },
   "dependencies": {
     "mongodb": "^7.5.0"
