@@ -67,7 +67,7 @@ const config = {
       continue: true,
     },
     { handle: 'filesystem' },
-    { src: '^/$', dest: '/landing.html' },
+    { src: '^/$', dest: '/index.html' },
     { src: '^/admin$', dest: '/index.html' },
     { src: '^/admin/.*', dest: '/index.html' },
     { src: '^/menu/.*', dest: '/index.html' },

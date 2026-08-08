@@ -5,8 +5,10 @@
   "buildCommand": "",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/", "destination": "/landing.html" },
+    { "source": "/", "destination": "/index.html" },
     { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/kitchen", "destination": "/index.html" },
+    { "source": "/admin/kitchen/:path*", "destination": "/index.html" },
     { "source": "/admin/pos", "destination": "/index.html" },
     { "source": "/admin/pos/:path*", "destination": "/index.html" },
     { "source": "/admin/settings", "destination": "/index.html" },

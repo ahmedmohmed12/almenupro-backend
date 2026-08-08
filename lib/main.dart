@@ -87,8 +87,8 @@ class MyApp extends StatelessWidget {
     }
 
     return MaterialPageRoute(
-      settings: settings,
-      builder: (_) => const MenuScreen(),
+      settings: RouteSettings(name: '/admin', arguments: settings.arguments),
+      builder: (_) => const AdminDashboard(),
     );
   }
 

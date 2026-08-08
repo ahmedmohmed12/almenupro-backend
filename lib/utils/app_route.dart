@@ -15,12 +15,15 @@ class AppRoute {
     return route.isEmpty ? '/' : route;
   }
 
-  static bool isAdminRoute(String route) => AdminRoute.isAdminPath(route);
+  static bool isAdminRoute(String route) {
+    if (route == '/') return true;
+    return AdminRoute.isAdminPath(route);
+  }
 
   static bool isLegacyMenuRoute(String route) => route == '/legacy-menu';
 
   static bool isCustomerMenuRoute(String route) {
-    if (route == '/') return true;
+    if (route == '/') return false;
     if (route.startsWith('/menu/') || route.startsWith('/restaurant/')) {
       return true;
     }

@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.41.0 (multi-kitchen KDS + zone refresh)"
+echo "Almenupro frontend build v1.42.0 (admin default route + kitchen KDS)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=kitchen-kds-v1.41.0
+  --dart-define=BUILD_FEATURE=admin-default-v1.42.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"
@@ -40,8 +40,8 @@ cp "$FRONTEND_DIR/middleware.js" "$FRONTEND_DIR/dist/middleware.js"
 
 node "$FRONTEND_DIR/scripts/prepareVercelOutput.js"
 
-BUILD_ID="1.40.0-pos-sidebar-reports-$(date -u +%Y%m%d%H%M%S)"
-printf '{"build":"%s","features":["pos-sidebar-rbac","reports-tenant-fix","analytics-api","shift-reports","food-cost-report","pos-redesign","smart-upsell-analytics"]}\n' "$BUILD_ID" \
+BUILD_ID="1.42.0-admin-default-$(date -u +%Y%m%d%H%M%S)"
+printf '{"build":"%s","features":["admin-default-route","kitchen-kds","multi-kitchen-routing","zone-refresh"]}\n' "$BUILD_ID" \
   > "$FRONTEND_DIR/dist/build-info.json"
 
 # Cache-bust bootstrap loader so browsers fetch the latest main.dart.js bundle.

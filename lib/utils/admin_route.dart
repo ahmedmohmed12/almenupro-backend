@@ -14,6 +14,11 @@ class AdminRoute {
   /// Maps the current browser path to the admin sidebar tab index.
   static int sidebarIndexForPath(String? path, {required bool isSuperAdmin}) {
     final normalized = RestaurantRoute.normalizePath(path);
+    if (normalized == '/' || normalized == '/admin') {
+      return isSuperAdmin
+          ? AdminSidebar.superMenuIndex
+          : AdminSidebar.ordersIndex;
+    }
 
     if (AdminSettingsTab.isSettingsRoute(normalized)) {
       return isSuperAdmin
