@@ -1,7 +1,7 @@
 {
   "name": "almenupro-api",
   "private": true,
-  "main": "apiServer.js",
+  "main": "index.js",
   "scripts": {
     "start": "node apiServer.js",
     "seed": "node seedFromTalabat.js",
