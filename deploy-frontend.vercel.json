@@ -22,6 +22,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/admin/delivery-zones",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/delivery-zones/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/admin/pos",
       "destination": "/index.html"
     },

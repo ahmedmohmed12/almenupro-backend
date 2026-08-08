@@ -105,7 +105,18 @@ class ApiService {
     if (restaurantId != null && restaurantId.isNotEmpty) {
       return restaurantId;
     }
-    return SuperAdminScopeService.instance.effectiveRestaurantId;
+    final scoped = SuperAdminScopeService.instance.effectiveRestaurantId;
+    if (scoped.isNotEmpty) return scoped;
+    return AdminAuthService.instance.restaurantId ??
+        ApiService.defaultRestaurantId;
+  }
+
+  Map<String, String> _restaurantQuery({String? restaurantId}) {
+    final scoped = _scopedRestaurantId(restaurantId: restaurantId);
+    return {
+      'restaurant_id': scoped,
+      'restaurantId': scoped,
+    };
   }
 
 
@@ -1398,7 +1409,7 @@ class ApiService {
     if (slug != null && slug.trim().isNotEmpty) {
       query['slug'] = slug.trim();
     } else {
-      query['restaurantId'] = _scopedRestaurantId(restaurantId: restaurantId);
+      query.addAll(_restaurantQuery(restaurantId: restaurantId));
     }
     if (bustCache) {
       query['_'] = DateTime.now().millisecondsSinceEpoch.toString();
@@ -1435,7 +1446,7 @@ class ApiService {
       _ensureAdminApiAccess('fetch kitchens');
     }
     final query = <String, String>{
-      'restaurant_id': _scopedRestaurantId(restaurantId: restaurantId),
+      ..._restaurantQuery(restaurantId: restaurantId),
     };
     if (includeInactive) {
       query['include_inactive'] = '1';
@@ -1444,6 +1455,10 @@ class ApiService {
     final response = await http
         .get(_uri('/kitchens', query), headers: _jsonHeaders)
         .timeout(_fetchTimeout);
+
+    if (response.statusCode == 404) {
+      return const [];
+    }
 
     if (response.statusCode != 200) {
       throw Exception('فشل في تحميل المطابخ (${response.statusCode})');
@@ -1464,7 +1479,9 @@ class ApiService {
   }) async {
     _ensureAdminApiAccess('save kitchen');
     final scoped = _scopedRestaurantId(restaurantId: restaurantId);
-    final payload = kitchen.toMap()..['restaurant_id'] = scoped;
+    final payload = kitchen.toMap()
+      ..['restaurant_id'] = scoped
+      ..['restaurantId'] = scoped;
 
     final isUpdate = kitchen.id.isNotEmpty;
     final response = isUpdate

@@ -31,7 +31,15 @@ class AdminRoute {
     }
 
     if (normalized.startsWith('/admin/kitchen')) {
-      return AdminSidebar.kitchenIndex;
+      return isSuperAdmin
+          ? AdminSidebar.superKitchenIndex
+          : AdminSidebar.kitchenIndex;
+    }
+
+    if (normalized.startsWith('/admin/delivery-zones')) {
+      return isSuperAdmin
+          ? AdminSidebar.superDeliveryZonesIndex
+          : AdminSidebar.deliveryZonesIndex;
     }
 
     return isSuperAdmin

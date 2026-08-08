@@ -773,7 +773,9 @@ async function resolveScopedRestaurantId(req, url, auth, { allowPublicDefault = 
   const slugParam =
     url.searchParams.get('restaurant_slug') || url.searchParams.get('slug');
   const restaurantIdParam =
-    url.searchParams.get('restaurant_id') || req.headers['x-restaurant-id'];
+    url.searchParams.get('restaurant_id') ||
+    url.searchParams.get('restaurantId') ||
+    req.headers['x-restaurant-id'];
 
   if (slugParam) {
     const match = restaurants.find(

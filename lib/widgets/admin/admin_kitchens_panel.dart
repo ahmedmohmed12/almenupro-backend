@@ -6,6 +6,7 @@ import '../../l10n/app_strings.dart';
 import '../../l10n/strings_admin.dart';
 import '../../models/kitchen.dart';
 import '../../services/api_service.dart';
+import '../../services/kitchen_catalog_service.dart';
 import '../../services/super_admin_scope_service.dart';
 
 class AdminKitchensPanel extends StatefulWidget {
@@ -45,6 +46,7 @@ class _AdminKitchensPanelState extends State<AdminKitchensPanel> {
 
   void _publishKitchens(List<Kitchen> kitchens) {
     widget.onKitchensChanged?.call(kitchens);
+    KitchenCatalogService.instance.publish(kitchens);
   }
 
   void _upsertKitchenLocally(Kitchen kitchen) {
@@ -325,7 +327,45 @@ class _AdminKitchensPanelState extends State<AdminKitchensPanel> {
         else if (_error != null)
           Text(_error!, style: const TextStyle(color: Colors.red))
         else if (_kitchens.isEmpty)
-          Text(s.isArabic ? 'لا توجد مطابخ بعد' : 'No kitchens yet')
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(
+                    Icons.soup_kitchen_outlined,
+                    size: 48,
+                    color: _burgundy.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    s.isArabic ? 'لا توجد مطابخ بعد' : 'No kitchens yet',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    s.isArabic
+                        ? 'أنشئ مطبخك الأول لربطه بمناطق التوصيل وشاشة KDS'
+                        : 'Create your first kitchen to link delivery zones and KDS',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  if (widget.canManage)
+                    FilledButton.icon(
+                      onPressed: _saving ? null : () => _showKitchenDialog(),
+                      icon: const Icon(Icons.add),
+                      label: Text(s.isArabic ? 'إضافة مطبخ جديد' : 'Add new kitchen'),
+                    ),
+                ],
+              ),
+            ),
+          )
         else
           ..._kitchens.map(
             (kitchen) => Card(

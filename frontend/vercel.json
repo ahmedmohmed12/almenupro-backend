@@ -22,6 +22,30 @@
       "destination": "/index.html"
     },
     {
+      "source": "/admin/delivery-zones",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/delivery-zones/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/pos",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/pos/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/settings",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/settings/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/menu/:path*",
       "destination": "/index.html"
     },

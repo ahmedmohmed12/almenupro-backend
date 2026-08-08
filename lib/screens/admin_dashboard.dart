@@ -1259,6 +1259,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
         case AdminSidebar.superRestaurantsIndex:
           return const AdminSuperRestaurantsPanel();
+        case AdminSidebar.superKitchenIndex:
+          return const AdminKitchenHub();
         case AdminSidebar.superDeliveryZonesIndex:
           return _buildDeliveryZonesPanel();
         case AdminSidebar.superAnalyticsIndex:

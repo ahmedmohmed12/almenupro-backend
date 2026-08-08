@@ -24,15 +24,21 @@ class _AdminKitchenHubState extends State<AdminKitchenHub>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    SuperAdminScopeService.instance.addListener(_onScopeChanged);
   }
 
   @override
   void dispose() {
+    SuperAdminScopeService.instance.removeListener(_onScopeChanged);
     _tabs.dispose();
     super.dispose();
   }
 
-  String? get _restaurantId {
+  void _onScopeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String get _restaurantId {
     final scoped = SuperAdminScopeService.instance.effectiveRestaurantId;
     if (scoped.isNotEmpty) return scoped;
     return AdminAuthService.instance.restaurantId ?? ApiService.defaultRestaurantId;
@@ -96,11 +102,12 @@ class _AdminKitchenHubState extends State<AdminKitchenHub>
                 SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: AdminKitchensPanel(
+                    key: ValueKey('kitchens-$_restaurantId'),
                     restaurantId: _restaurantId,
                     canManage: true,
                   ),
                 ),
-                const AdminKitchenPanel(),
+                AdminKitchenPanel(key: ValueKey('kds-$_restaurantId')),
               ],
             ),
           ),

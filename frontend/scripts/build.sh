@@ -15,7 +15,7 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 
-echo "Almenupro frontend build v1.43.0 (kitchen management workflow)"
+echo "Almenupro frontend build v1.44.0 (kitchen API + admin routes fix)"
 
 cd "$ROOT"
 flutter --version
@@ -28,7 +28,7 @@ flutter build web \
   --no-wasm-dry-run \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPER_ADMIN_USER="$SUPER_ADMIN_USER" \
-  --dart-define=BUILD_FEATURE=kitchen-workflow-v1.43.0
+  --dart-define=BUILD_FEATURE=kitchen-fix-v1.44.0
 
 rm -rf "$FRONTEND_DIR/dist"
 mkdir -p "$FRONTEND_DIR/dist"

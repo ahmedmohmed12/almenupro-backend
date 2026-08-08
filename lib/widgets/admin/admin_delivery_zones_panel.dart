@@ -8,6 +8,7 @@ import '../../models/delivery_zone.dart';
 import '../../models/kitchen.dart';
 import '../../services/admin_auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/kitchen_catalog_service.dart';
 import '../../services/super_admin_scope_service.dart';
 
 /// Admin UI for managing per-restaurant delivery zones and fees.
@@ -38,7 +39,33 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
   @override
   void initState() {
     super.initState();
+    KitchenCatalogService.instance.addListener(_onKitchenCatalogChanged);
     _loadZones();
+  }
+
+  @override
+  void dispose() {
+    KitchenCatalogService.instance.removeListener(_onKitchenCatalogChanged);
+    super.dispose();
+  }
+
+  void _onKitchenCatalogChanged() {
+    if (!mounted) return;
+    setState(() {
+      _kitchens = KitchenCatalogService.instance.kitchens;
+    });
+  }
+
+  Future<void> _refreshKitchensForDialog() async {
+    try {
+      final kitchens = await ApiService.instance.fetchKitchens(
+        restaurantId: _restaurantId,
+        includeInactive: true,
+      );
+      if (!mounted) return;
+      setState(() => _kitchens = kitchens);
+      KitchenCatalogService.instance.publish(kitchens);
+    } catch (_) {}
   }
 
   @override
@@ -147,6 +174,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
         _refreshing = false;
         _error = null;
       });
+      KitchenCatalogService.instance.publish(kitchens);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -159,6 +187,8 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   Future<void> _showZoneDialog({DeliveryZone? existing}) async {
     if (!widget.canManage) return;
+
+    await _refreshKitchensForDialog();
 
     var selectedGovernorate = existing?.governorate.isNotEmpty == true
         ? existing!.governorate
