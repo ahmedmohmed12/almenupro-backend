@@ -1437,7 +1437,9 @@ class ApiService {
         .timeout(_fetchTimeout);
 
     if (response.statusCode != 200) {
-      throw Exception('فشل في تحميل مناطق التوصيل (${response.statusCode})');
+      throw Exception(
+        _httpErrorMessage(response, 'فشل في تحميل مناطق التوصيل (${response.statusCode})'),
+      );
     }
 
     final decoded = jsonDecode(response.body);
@@ -1783,8 +1785,13 @@ class ApiService {
   }
 
   Future<DeliveryZone> createDeliveryZone(DeliveryZone zone) async {
+    final scoped = _scopedRestaurantId(restaurantId: zone.restaurantId);
     final payload = zone.toMap()
-      ..['restaurantId'] = _scopedRestaurantId(restaurantId: zone.restaurantId);
+      ..['restaurantId'] = scoped
+      ..['restaurant_id'] = scoped;
+    if (zone.defaultKitchenId != null && zone.defaultKitchenId!.isNotEmpty) {
+      payload['default_kitchen_id'] = zone.defaultKitchenId;
+    }
 
     final response = await http
         .post(
@@ -1792,10 +1799,12 @@ class ApiService {
           headers: _jsonHeaders,
           body: jsonEncode(payload),
         )
-        .timeout(_fetchTimeout);
+        .timeout(_writeTimeout);
 
     if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception('فشل في إضافة منطقة التوصيل (${response.statusCode})');
+      throw Exception(
+        _httpErrorMessage(response, 'فشل في إضافة منطقة التوصيل (${response.statusCode})'),
+      );
     }
 
     final decoded = jsonDecode(response.body);
@@ -1807,16 +1816,23 @@ class ApiService {
   }
 
   Future<DeliveryZone> updateDeliveryZone(DeliveryZone zone) async {
+    final payload = zone.toMap();
+    if (zone.defaultKitchenId != null && zone.defaultKitchenId!.isNotEmpty) {
+      payload['default_kitchen_id'] = zone.defaultKitchenId;
+    }
+
     final response = await http
         .put(
           _uri('/delivery-zones/${zone.id}'),
           headers: _jsonHeaders,
-          body: jsonEncode(zone.toMap()),
+          body: jsonEncode(payload),
         )
-        .timeout(_fetchTimeout);
+        .timeout(_writeTimeout);
 
     if (response.statusCode != 200) {
-      throw Exception('فشل في تحديث منطقة التوصيل (${response.statusCode})');
+      throw Exception(
+        _httpErrorMessage(response, 'فشل في تحديث منطقة التوصيل (${response.statusCode})'),
+      );
     }
 
     final decoded = jsonDecode(response.body);
@@ -1830,10 +1846,12 @@ class ApiService {
   Future<void> deleteDeliveryZone(String zoneId) async {
     final response = await http
         .delete(_uri('/delivery-zones/$zoneId'), headers: _jsonHeaders)
-        .timeout(_fetchTimeout);
+        .timeout(_writeTimeout);
 
     if (response.statusCode != 200) {
-      throw Exception('فشل في حذف منطقة التوصيل (${response.statusCode})');
+      throw Exception(
+        _httpErrorMessage(response, 'فشل في حذف منطقة التوصيل (${response.statusCode})'),
+      );
     }
   }
 

@@ -2,10 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "installCommand": "node scripts/preparePublicUploads.js",
-  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-api-v4')\"",
+  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v5')\"",
   "builds": [
     {
       "src": "api/kitchens.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "data/**",
+          "lib/**/*.js"
+        ]
+      }
+    },
+    {
+      "src": "api/delivery-zones.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
@@ -27,26 +37,34 @@
       }
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/menu-images/(.*)",
-      "destination": "/apiServer.js"
+      "src": "/api/kitchens",
+      "dest": "/api/kitchens.js"
     },
     {
-      "source": "/og/(.*)",
-      "destination": "/apiServer.js"
+      "src": "/api/kitchens/(.*)",
+      "dest": "/api/kitchens.js"
     },
     {
-      "source": "/api/kitchens",
-      "destination": "/api/kitchens.js"
+      "src": "/api/delivery-zones",
+      "dest": "/api/delivery-zones.js"
     },
     {
-      "source": "/api/kitchens/:path*",
-      "destination": "/api/kitchens.js"
+      "src": "/api/delivery-zones/(.*)",
+      "dest": "/api/delivery-zones.js"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/apiServer.js"
+      "src": "/menu-images/(.*)",
+      "dest": "/apiServer.js"
+    },
+    {
+      "src": "/og/(.*)",
+      "dest": "/apiServer.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/apiServer.js"
     }
   ],
   "headers": [
@@ -62,7 +80,7 @@
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, PUT, OPTIONS" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, PUT, DELETE, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Restaurant-Id" }
       ]
     }

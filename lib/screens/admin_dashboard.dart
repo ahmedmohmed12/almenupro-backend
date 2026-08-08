@@ -1221,8 +1221,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildDeliveryZonesPanel() {
     final scope = SuperAdminScopeService.instance;
     final restaurantId = scope.effectiveRestaurantId;
-    final canManage =
-        !_isSuperAdmin || scope.hasSelection;
+    final canManage = _isSuperAdmin ? scope.hasSelection : true;
 
     return AdminDeliveryZonesPanel(
       key: ValueKey('delivery-zones-$restaurantId'),

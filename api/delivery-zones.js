@@ -1,12 +1,11 @@
 const { DEFAULT_RESTAURANT_ID, resolveRestaurantId } = require('../lib/adminAuth');
 const {
   initDataStore,
-  readKitchens,
-  writeKitchens,
-  readOrders,
+  readDeliveryZones,
+  writeDeliveryZones,
 } = require('../lib/dataStore');
 const { filterByRestaurant, assertRestaurantAccess } = require('../lib/tenantStore');
-const { handleKitchenRoutes } = require('../lib/kitchenRoutes');
+const { handleDeliveryZoneRoutes } = require('../lib/deliveryZoneRoutes');
 const {
   sendJson,
   readBody,
@@ -19,7 +18,7 @@ const {
 } = require('../lib/vercelApiUtils');
 
 const storeReady = initDataStore();
-const API_BASE = '/api/kitchens';
+const API_BASE = '/api/delivery-zones';
 
 module.exports = async (req, res) => {
   try {
@@ -36,7 +35,7 @@ module.exports = async (req, res) => {
 
   const url = buildRequestUrl(req, API_BASE);
 
-  const handled = await handleKitchenRoutes(req, res, url, {
+  const handled = await handleDeliveryZoneRoutes(req, res, url, {
     readBody,
     sendJson,
     authError,
@@ -47,13 +46,12 @@ module.exports = async (req, res) => {
     resolveRestaurantId,
     assertRestaurantAccess,
     filterByRestaurant,
-    readKitchens,
-    writeKitchens,
-    readOrders,
+    readDeliveryZones,
+    writeDeliveryZones,
     DEFAULT_RESTAURANT_ID,
   });
 
   if (!handled) {
-    sendJson(res, 404, { error: 'Kitchen route not found', path: url.pathname });
+    sendJson(res, 404, { error: 'Delivery zone route not found', path: url.pathname });
   }
 };

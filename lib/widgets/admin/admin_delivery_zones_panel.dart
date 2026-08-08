@@ -182,18 +182,18 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
       setState(() {
         if (zonesError == null) {
           _zones = _sortedZones(zones);
+          _error = null;
+        } else {
+          _error = zonesError.toString().replaceFirst('Exception: ', '');
         }
         _kitchens = kitchens;
-        _loading = false;
-        _refreshing = false;
-        _error = zonesError?.toString().replaceFirst('Exception: ', '');
       });
       if (kitchens.isNotEmpty) {
         KitchenCatalogService.instance.publish(kitchens);
       }
       if (kitchensError != null && zonesError == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
               'تعذر تحميل المطابخ — يمكنك إضافة مطبخ جديد أو إعادة المحاولة',
             ),
@@ -204,6 +204,10 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
       if (!mounted) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
         _loading = false;
         _refreshing = false;
       });
@@ -249,7 +253,7 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    initialValue: kuwaitGovernorates.contains(selectedGovernorate)
+                    value: kuwaitGovernorates.contains(selectedGovernorate)
                         ? selectedGovernorate
                         : kuwaitGovernorates.first,
                     decoration: const InputDecoration(
@@ -311,7 +315,9 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
                     )
                   else
                     DropdownButtonFormField<String>(
-                      initialValue: selectedKitchenId,
+                      value: _kitchens.any((kitchen) => kitchen.id == selectedKitchenId)
+                          ? selectedKitchenId
+                          : _kitchens.first.id,
                       decoration: const InputDecoration(
                         labelText: 'المطبخ *',
                         border: OutlineInputBorder(),
@@ -461,79 +467,96 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Card(
-            color: _burgundy,
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+    // Keep scroll content outside Expanded (prevents blank panel on Flutter web).
+    return ColoredBox(
+      color: const Color(0xFFF4F6F8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight > 0 ? constraints.maxHeight - 48 : 400,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'مناطق التوصيل ورسومها',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.canManage
-                              ? 'المطعم: $_restaurantLabel'
-                              : 'اختر مطعماً لإدارة مناطق التوصيل',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _buildHeaderCard(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت. '
+                    'يجب ربط كل منطقة بمطبخ من تبويب المطبخ.',
+                    style: TextStyle(color: Colors.black54),
                   ),
-                  if (widget.canManage)
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _burgundy,
+                  const SizedBox(height: 16),
+                  if (!widget.canManage)
+                    _messageCard(
+                      color: Colors.orange.shade50,
+                      icon: Icons.store_outlined,
+                      message:
+                          'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
+                    )
+                  else ...[
+                    if (_refreshing)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: LinearProgressIndicator(minHeight: 2, color: _burgundy),
                       ),
-                      onPressed: _saving ? null : () => _showZoneDialog(),
-                      icon: const Icon(Icons.add_location_alt_outlined),
-                      label: const Text('Add New Zone'),
-                    ),
+                    _buildZonesSection(),
+                  ],
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت. '
-            'يجب ربط كل منطقة بمطبخ من تبويب المطبخ.',
-            style: TextStyle(color: Colors.black54),
-          ),
-          const SizedBox(height: 16),
-          if (!widget.canManage)
-            _messageCard(
-              color: Colors.orange.shade50,
-              icon: Icons.store_outlined,
-              message:
-                  'اختر مطعماً من القائمة أعلاه لإدارة مناطق التوصيل الخاصة به.',
-            )
-          else ...[
-            if (_refreshing)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: LinearProgressIndicator(minHeight: 2, color: _burgundy),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard() {
+    return Card(
+      color: _burgundy,
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'مناطق التوصيل ورسومها',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.canManage
+                        ? 'المطعم: $_restaurantLabel'
+                        : 'اختر مطعماً لإدارة مناطق التوصيل',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                    ),
+                  ),
+                ],
               ),
-            _buildZonesSection(),
+            ),
+            if (widget.canManage)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _burgundy,
+                ),
+                onPressed: _saving ? null : () => _showZoneDialog(),
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('Add New Zone'),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -613,15 +636,19 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
   }
 
   Widget _buildZoneTile(DeliveryZone zone) {
-    final kitchenLabel = _kitchens
-        .where((kitchen) => kitchen.id == zone.defaultKitchenId)
-        .map((kitchen) => kitchen.nameAr.isNotEmpty ? kitchen.nameAr : kitchen.name)
-        .firstOrNull;
+    String? kitchenLabel;
+    for (final kitchen in _kitchens) {
+      if (kitchen.id == zone.defaultKitchenId) {
+        kitchenLabel =
+            kitchen.nameAr.isNotEmpty ? kitchen.nameAr : kitchen.name;
+        break;
+      }
+    }
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       leading: CircleAvatar(
-        backgroundColor: _burgundy.withValues(alpha: 0.12),
+        backgroundColor: _burgundy.withOpacity(0.12),
         child: const Icon(Icons.location_on_outlined, color: _burgundy, size: 22),
       ),
       title: Text(zone.areaName, style: const TextStyle(fontWeight: FontWeight.bold)),
