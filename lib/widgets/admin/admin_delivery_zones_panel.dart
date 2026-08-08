@@ -9,7 +9,6 @@ import '../../models/kitchen.dart';
 import '../../services/admin_auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/super_admin_scope_service.dart';
-import 'admin_kitchens_panel.dart';
 
 /// Admin UI for managing per-restaurant delivery zones and fees.
 class AdminDeliveryZonesPanel extends StatefulWidget {
@@ -243,17 +242,28 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
                       return null;
                     },
                   ),
-                  if (_kitchens.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String?>(
+                  const SizedBox(height: 12),
+                  if (_kitchens.isEmpty)
+                    TextFormField(
+                      enabled: false,
+                      decoration: InputDecoration(
+                        labelText: 'المطبخ *',
+                        border: const OutlineInputBorder(),
+                        helperText:
+                            'أضف مطبخاً أولاً من تبويب المطبخ → إدارة المطابخ',
+                        helperStyle: TextStyle(color: Colors.red.shade700),
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
                       initialValue: selectedKitchenId,
                       decoration: const InputDecoration(
-                        labelText: 'المطبخ الافتراضي',
+                        labelText: 'المطبخ *',
                         border: OutlineInputBorder(),
                       ),
                       items: _kitchens
                           .map(
-                            (kitchen) => DropdownMenuItem<String?>(
+                            (kitchen) => DropdownMenuItem<String>(
                               value: kitchen.id,
                               child: Text(
                                 kitchen.nameAr.isNotEmpty
@@ -265,8 +275,13 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
                           .toList(),
                       onChanged: (value) =>
                           setDialogState(() => selectedKitchenId = value),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'يجب اختيار مطبخ';
+                        }
+                        return null;
+                      },
                     ),
-                  ],
                 ],
               ),
             ),
@@ -291,6 +306,20 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
     if (saved != true || !mounted) {
       areaController.dispose();
       feeController.dispose();
+      return;
+    }
+
+    if (_kitchens.isEmpty ||
+        selectedKitchenId == null ||
+        selectedKitchenId!.isEmpty) {
+      areaController.dispose();
+      feeController.dispose();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب إضافة مطبخ وربطه بالمنطقة قبل الحفظ'),
+        ),
+      );
       return;
     }
 
@@ -392,18 +421,11 @@ class _AdminDeliveryZonesPanelState extends State<AdminDeliveryZonesPanel> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت.',
+            'عرض وتعديل رسوم التوصيل لكل محافظة ومنطقة في الكويت. '
+            'يجب ربط كل منطقة بمطبخ من تبويب المطبخ.',
             style: TextStyle(color: Colors.black54),
           ),
           const SizedBox(height: 24),
-          AdminKitchensPanel(
-            restaurantId: _restaurantId,
-            canManage: widget.canManage,
-            onKitchensChanged: _applyKitchensLocally,
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
           if (!widget.canManage)
             _messageCard(
               color: Colors.orange.shade50,

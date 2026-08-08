@@ -51,6 +51,39 @@ extension AppStringsAdmin on AppStrings {
   String get kitchensPanelSubtitle => isArabic
       ? 'أنشئ مطابخ متعددة واربطها بمناطق التوصيل.'
       : 'Create multiple kitchens and map them to delivery zones.';
+  String get kitchenHubSubtitle => isArabic
+      ? 'إدارة المطابخ وشاشة التشغيل (KDS) في مكان واحد'
+      : 'Manage kitchens and run the live kitchen display (KDS)';
+  String get kitchenOperationsTab =>
+      isArabic ? 'شاشة التشغيل' : 'Operations (KDS)';
+  String get kitchenSelectLabel =>
+      isArabic ? 'اختر المطبخ' : 'Select kitchen';
+  String get kitchenSelectPrompt =>
+      isArabic ? 'يرجى اختيار مطبخ لعرض الطلبات' : 'Select a kitchen to view orders';
+  String get kitchenActiveLabel => isArabic ? 'المطبخ النشط' : 'Active kitchen';
+  String get kitchenPendingTitle =>
+      isArabic ? 'الطلبات المعلقة' : 'Pending orders';
+  String get kitchenPendingEmpty => isArabic
+      ? 'لا توجد طلبات معلقة لهذا المطبخ حالياً'
+      : 'No pending orders for this kitchen';
+  String get kitchenCompletedTitle =>
+      isArabic ? 'الطلبات المكتملة' : 'Completed orders';
+  String get kitchenCompletedEmpty => isArabic
+      ? 'لا يوجد سجل طلبات مكتملة لهذا المطبخ بعد'
+      : 'No completed orders for this kitchen yet';
+  String get kitchenCashierLabel => isArabic ? 'الكاشير' : 'Cashier';
+  String get kitchenAcceptOrder => isArabic ? 'قبول الطلب' : 'Accept order';
+  String get kitchenStartPrep =>
+      isArabic ? 'بدء التحضير' : 'Start preparing';
+  String get kitchenSetupRequired => isArabic
+      ? 'أضف مطبخاً أولاً من تبويب إدارة المطابخ'
+      : 'Add a kitchen first from the management tab';
+  String get deleteKitchenConfirm => isArabic
+      ? 'هل تريد حذف هذا المطبخ؟'
+      : 'Delete this kitchen?';
+  String get kitchenLinkedToZones => isArabic
+      ? 'لا يمكن الحذف — المطبخ مرتبط بمناطق توصيل أو طلبات نشطة'
+      : 'Cannot delete — kitchen is linked to zones or active orders';
   String get markReady => isArabic ? 'جاهز' : 'Ready';
   String get markDelivered => isArabic ? 'تم التوصيل' : 'Delivered';
   String get newKitchenTicket =>

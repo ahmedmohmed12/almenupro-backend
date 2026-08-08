@@ -268,6 +268,8 @@ class OrdersDemoService {
     double walletDiscount = 0,
     String? targetKitchenId,
     String? targetKitchenName,
+    String? cashierId,
+    String? cashierName,
   }) {
     final items = cartItems.map(OrderLineItem.fromCartItem).toList();
     final subtotal = cartItems.fold<double>(0, (sum, item) => sum + item.totalPrice);
@@ -303,6 +305,8 @@ class OrdersDemoService {
       platformCommissionPercent: platformCommissionPercent,
       targetKitchenId: targetKitchenId,
       targetKitchenName: targetKitchenName,
+      cashierId: cashierId,
+      cashierName: cashierName,
     );
   }
 }

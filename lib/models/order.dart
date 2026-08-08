@@ -167,6 +167,9 @@ class Order {
     this.walletDiscount,
     this.targetKitchenId,
     this.targetKitchenName,
+    this.cashierId,
+    this.cashierName,
+    this.kitchenAssignedByName,
   });
 
   final String id;
@@ -197,9 +200,20 @@ class Order {
   final double? walletDiscount;
   final String? targetKitchenId;
   final String? targetKitchenName;
+  final String? cashierId;
+  final String? cashierName;
+  final String? kitchenAssignedByName;
 
   String get sourceLabelAr =>
       OrderPlatform.fromStorage(orderSource).arabicLabel;
+
+  String get receivedByLabel {
+    final cashier = cashierName?.trim();
+    if (cashier != null && cashier.isNotEmpty) return cashier;
+    final assigned = kitchenAssignedByName?.trim();
+    if (assigned != null && assigned.isNotEmpty) return assigned;
+    return '—';
+  }
 
   factory Order.fromMap(String id, Map<String, dynamic> map) {
     final rawItems = map['items'] as List<dynamic>? ?? [];
@@ -250,7 +264,22 @@ class Order {
           map['target_kitchen_id']?.toString(),
       targetKitchenName: map['targetKitchenName']?.toString() ??
           map['target_kitchen_name']?.toString(),
+      cashierId: map['cashierId']?.toString() ?? map['cashier_id']?.toString(),
+      cashierName:
+          map['cashierName']?.toString() ?? map['cashier_name']?.toString(),
+      kitchenAssignedByName: _readKitchenAssignedByName(map),
     );
+  }
+
+  static String? _readKitchenAssignedByName(Map<String, dynamic> map) {
+    final assignment =
+        map['kitchenAssignment'] ?? map['kitchen_assignment'];
+    if (assignment is Map) {
+      final name = assignment['assignedByName']?.toString() ??
+          assignment['assigned_by_name']?.toString();
+      if (name != null && name.trim().isNotEmpty) return name.trim();
+    }
+    return null;
   }
 
   Order copyWith({
@@ -319,6 +348,9 @@ class Order {
         'targetKitchenId': targetKitchenId,
       if (targetKitchenName != null && targetKitchenName!.isNotEmpty)
         'targetKitchenName': targetKitchenName,
+      if (cashierId != null && cashierId!.isNotEmpty) 'cashierId': cashierId,
+      if (cashierName != null && cashierName!.isNotEmpty)
+        'cashierName': cashierName,
     };
   }
 

@@ -32,7 +32,7 @@ import '../widgets/admin/admin_corner_toast.dart';
 import '../widgets/admin/admin_daily_sales_card.dart';
 import '../widgets/admin/admin_pos_panel.dart';
 import '../widgets/admin/pos/pos_shift_shell.dart';
-import '../widgets/admin/admin_kitchen_panel.dart';
+import '../widgets/admin/admin_kitchen_hub.dart';
 import '../widgets/admin/admin_delivery_zones_panel.dart';
 import '../widgets/admin/admin_item_addons_editor.dart';
 import '../widgets/admin/admin_item_linked_sides_editor.dart';
@@ -1280,7 +1280,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case AdminSidebar.ordersIndex:
         return AdminOrdersPanel(key: _ordersPanelKey);
       case AdminSidebar.kitchenIndex:
-        return const AdminKitchenPanel();
+        return const AdminKitchenHub();
       case AdminSidebar.customersIndex:
         return const AdminCustomersPanel();
       case AdminSidebar.menuIndex:

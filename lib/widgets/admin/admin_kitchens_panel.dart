@@ -230,6 +230,50 @@ class _AdminKitchensPanelState extends State<AdminKitchensPanel> {
     }
   }
 
+  Future<void> _deleteKitchen(Kitchen kitchen) async {
+    final s = AppStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.delete),
+        content: Text(s.deleteKitchenConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(s.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      await ApiService.instance.deleteKitchen(kitchen.id);
+      if (!mounted) return;
+      setState(() {
+        _kitchens = _kitchens.where((entry) => entry.id != kitchen.id).toList();
+      });
+      _publishKitchens(_kitchens);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.isArabic ? 'تم حذف المطبخ' : 'Kitchen deleted')),
+      );
+      unawaited(_load(silent: true));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
@@ -301,11 +345,22 @@ class _AdminKitchensPanelState extends State<AdminKitchensPanel> {
                   '${kitchen.isDefault ? (s.isArabic ? ' · افتراضي' : ' · default') : ''}',
                 ),
                 trailing: widget.canManage
-                    ? IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: _saving
-                            ? null
-                            : () => _showKitchenDialog(existing: kitchen),
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: _saving
+                                ? null
+                                : () => _showKitchenDialog(existing: kitchen),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: _saving
+                                ? null
+                                : () => _deleteKitchen(kitchen),
+                          ),
+                        ],
                       )
                     : null,
               ),

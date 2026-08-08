@@ -838,7 +838,7 @@ class ApiService {
 
             _uri('/orders'),
 
-            headers: const {'Content-Type': 'application/json'},
+            headers: _jsonHeaders,
 
             body: jsonEncode(payload),
 

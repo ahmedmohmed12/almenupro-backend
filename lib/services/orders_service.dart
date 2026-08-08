@@ -7,7 +7,9 @@ import '../models/smart_closing.dart';
 import '../utils/firebase_config.dart';
 import 'firebase_service.dart';
 import 'orders_demo_service.dart';
+import 'admin_auth_service.dart';
 import 'api_service.dart';
+import 'pos_operations_service.dart';
 
 /// Unified orders access for admin dashboard and checkout.
 class OrdersService {
@@ -59,7 +61,16 @@ class OrdersService {
     double walletDiscount = 0,
     String? targetKitchenId,
     String? targetKitchenName,
+    String? cashierId,
+    String? cashierName,
   }) async {
+    final auth = AdminAuthService.instance;
+    final cashier = PosOperationsService.instance.cashierSession;
+    final resolvedCashierId =
+        cashierId ?? auth.session?.staffId ?? cashier?.staff.id;
+    final resolvedCashierName =
+        cashierName ?? auth.session?.staffName ?? cashier?.staff.name;
+
     final meta = platformMeta ?? const PlatformOrderMeta();
     final order = OrdersDemoService.orderFromCart(
       cartItems: cartItems,
@@ -85,6 +96,8 @@ class OrdersService {
       walletDiscount: walletDiscount,
       targetKitchenId: targetKitchenId,
       targetKitchenName: targetKitchenName,
+      cashierId: resolvedCashierId,
+      cashierName: resolvedCashierName,
     );
 
     if (usesFirebase) {

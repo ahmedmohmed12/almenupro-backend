@@ -61,7 +61,7 @@ class AdminSidebar extends StatefulWidget {
     ),
     AdminSidebarItem(
       icon: Icons.soup_kitchen_outlined,
-      label: 'المطبخ / KDS',
+      label: 'المطبخ',
     ),
     AdminSidebarItem(
       icon: Icons.people_outline,

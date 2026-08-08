@@ -453,6 +453,10 @@ function normalizeOrder(raw, id, restaurantId = DEFAULT_RESTAURANT_ID) {
         String(raw.targetKitchenName || raw.target_kitchen_name || '').trim() || null,
       kitchenAssignment: raw.kitchenAssignment || raw.kitchen_assignment || null,
       kitchen_assignment: raw.kitchenAssignment || raw.kitchen_assignment || null,
+      cashierId: String(raw.cashierId || raw.cashier_id || '').trim() || null,
+      cashier_id: String(raw.cashierId || raw.cashier_id || '').trim() || null,
+      cashierName: String(raw.cashierName || raw.cashier_name || '').trim() || null,
+      cashier_name: String(raw.cashierName || raw.cashier_name || '').trim() || null,
     },
     raw.restaurant_id || raw.restaurantId || restaurantId,
   );
@@ -1891,6 +1895,14 @@ const server = http.createServer(async (req, res) => {
       zone.governorate = governorate;
       zone.areaName = areaName;
 
+      if (!zone.defaultKitchenId && !zone.default_kitchen_id) {
+        sendJson(res, 400, {
+          error: 'A kitchen must be assigned to each delivery zone',
+          code: 'KITCHEN_REQUIRED',
+        });
+        return;
+      }
+
       const zones = await readDeliveryZones();
       zones.push(zone);
       await writeDeliveryZones(zones);
@@ -1928,10 +1940,22 @@ const server = http.createServer(async (req, res) => {
       }
 
       const body = JSON.parse((await readBody(req)) || '{}');
+      const nextKitchenId = String(
+        body.defaultKitchenId ||
+          body.default_kitchen_id ||
+          body.kitchenId ||
+          body.kitchen_id ||
+          zone.defaultKitchenId ||
+          zone.default_kitchen_id ||
+          '',
+      ).trim();
+
       Object.assign(zone, {
         governorate: String(body.governorate ?? zone.governorate).trim(),
         areaName: String(body.areaName ?? body.area_name ?? zone.areaName).trim(),
         deliveryFee: Number(body.deliveryFee ?? body.delivery_fee ?? zone.deliveryFee) || 0,
+        defaultKitchenId: nextKitchenId || null,
+        default_kitchen_id: nextKitchenId || null,
         isActive:
           body.isActive === false ||
           body.is_active === false ||
@@ -1946,6 +1970,14 @@ const server = http.createServer(async (req, res) => {
 
       if (!zone.governorate || !zone.areaName) {
         sendJson(res, 400, { error: 'Governorate and area name are required' });
+        return;
+      }
+
+      if (!zone.defaultKitchenId && !zone.default_kitchen_id) {
+        sendJson(res, 400, {
+          error: 'A kitchen must be assigned to each delivery zone',
+          code: 'KITCHEN_REQUIRED',
+        });
         return;
       }
 
@@ -2356,9 +2388,24 @@ const server = http.createServer(async (req, res) => {
       body.totalPrice = orderTotalAfterPromo;
       body.total_price = orderTotalAfterPromo;
 
+      const authHeader = parseAuthHeader(req);
+      if (authHeader) {
+        if (!body.cashierId && !body.cashier_id && authHeader.staffId) {
+          body.cashierId = authHeader.staffId;
+          body.cashier_id = authHeader.staffId;
+        }
+        if (!body.cashierName && !body.cashier_name) {
+          const cashierLabel =
+            authHeader.staffName || authHeader.cashierName || authHeader.name || null;
+          if (cashierLabel) {
+            body.cashierName = cashierLabel;
+            body.cashier_name = cashierLabel;
+          }
+        }
+      }
+
       let order = normalizeOrder(body, id, restaurantId);
 
-      const authHeader = parseAuthHeader(req);
       try {
         const kitchenFields = await assignTargetKitchen({
           body,

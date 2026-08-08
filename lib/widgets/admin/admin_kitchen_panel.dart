@@ -17,7 +17,7 @@ import 'incoming_orders_alert_bar.dart';
 import 'order_invoice_detail_dialog.dart';
 import 'order_status_chip.dart';
 
-/// Live kitchen queue — auto-refreshes with the shared 3s order monitor.
+/// Kitchen operational view (KDS) — pending + completed orders per kitchen.
 class AdminKitchenPanel extends StatefulWidget {
   const AdminKitchenPanel({super.key});
 
@@ -32,6 +32,18 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
   List<Kitchen> _kitchens = const [];
   String? _filterKitchenId;
   var _loadingKitchens = true;
+
+  static const _activeStatuses = {
+    OrderStatus.pending,
+    OrderStatus.confirmed,
+    OrderStatus.preparing,
+    OrderStatus.ready,
+  };
+
+  static const _completedStatuses = {
+    OrderStatus.delivered,
+    OrderStatus.cancelled,
+  };
 
   @override
   void initState() {
@@ -51,7 +63,7 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
       setState(() {
         _kitchens = kitchens;
         _loadingKitchens = false;
-        if (_filterKitchenId == null && kitchens.length == 1) {
+        if (_filterKitchenId == null && kitchens.isNotEmpty) {
           _filterKitchenId = kitchens.first.id;
         }
       });
@@ -110,17 +122,24 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
       ..addAll(ids);
   }
 
-  List<Order> _kitchenQueue(List<Order> orders) {
-    Iterable<Order> result = orders.where(
-      (o) =>
-          o.status == OrderStatus.preparing || o.status == OrderStatus.ready,
-    );
-    if (_filterKitchenId != null && _filterKitchenId!.isNotEmpty) {
-      result = result.where(
-        (o) => o.targetKitchenId == _filterKitchenId,
-      );
-    }
-    return result.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  bool _matchesKitchen(Order order) {
+    if (_filterKitchenId == null || _filterKitchenId!.isEmpty) return false;
+    return order.targetKitchenId == _filterKitchenId;
+  }
+
+  List<Order> _filterOrders(List<Order> orders, Set<OrderStatus> statuses) {
+    return orders
+        .where((order) => statuses.contains(order.status) && _matchesKitchen(order))
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  List<Order> _pendingOrders(List<Order> orders) {
+    final active = orders
+        .where((order) => _activeStatuses.contains(order.status) && _matchesKitchen(order))
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return active;
   }
 
   String _kitchenLabel(String? kitchenId, AppStrings s) {
@@ -142,13 +161,33 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
       stream: _ordersService.watchOrders(),
       builder: (context, snapshot) {
         final orders = snapshot.data ?? [];
-        final kitchenOrders = _kitchenQueue(orders);
+        final pendingOrders = _pendingOrders(orders);
+        final completedOrders = _filterOrders(orders, _completedStatuses);
         final pendingCount =
             orders.where((o) => o.status == OrderStatus.pending).length;
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handleKitchenSnapshot(kitchenOrders);
+          _handleKitchenSnapshot(pendingOrders);
         });
+
+        if (_loadingKitchens) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF6B1124)),
+          );
+        }
+
+        if (_kitchens.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                s.kitchenSetupRequired,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 16),
+              ),
+            ),
+          );
+        }
 
         return ColoredBox(
           color: const Color(0xFFF4F6F8),
@@ -157,7 +196,7 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
             children: [
               IncomingOrdersAlertBar(
                 pendingCount: pendingCount,
-                kitchenCount: kitchenOrders.length,
+                kitchenCount: pendingOrders.length,
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -167,7 +206,7 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
                     Text(
                       s.kitchenMonitorTitle,
                       style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF6B1124),
                       ),
@@ -177,115 +216,90 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
                       s.kitchenMonitorSubtitle,
                       style: TextStyle(color: Colors.grey.shade700),
                     ),
-                    if (_kitchens.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          FilterChip(
-                            label: Text(s.posAllKitchens),
-                            selected: _filterKitchenId == null,
-                            onSelected: _loadingKitchens
-                                ? null
-                                : (_) => setState(() => _filterKitchenId = null),
-                            selectedColor:
-                                const Color(0xFF6B1124).withValues(alpha: 0.15),
-                            checkmarkColor: const Color(0xFF6B1124),
-                          ),
-                          ..._kitchens.map(
-                            (kitchen) => FilterChip(
-                              label: Text(kitchen.localizedName(s.localeCode)),
-                              selected: _filterKitchenId == kitchen.id,
-                              onSelected: _loadingKitchens
-                                  ? null
-                                  : (_) => setState(
-                                        () => _filterKitchenId = kitchen.id,
-                                      ),
-                              selectedColor:
-                                  const Color(0xFF6B1124).withValues(alpha: 0.15),
-                              checkmarkColor: const Color(0xFF6B1124),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String?>(
-                        value: _filterKitchenId,
-                        decoration: InputDecoration(
-                          labelText: s.posAllKitchens,
-                          isDense: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _filterKitchenId,
+                      decoration: InputDecoration(
+                        labelText: s.kitchenSelectLabel,
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        items: [
-                          DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text(s.posAllKitchens),
-                          ),
-                          ..._kitchens.map(
-                            (kitchen) => DropdownMenuItem<String?>(
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: _kitchens
+                          .map(
+                            (kitchen) => DropdownMenuItem<String>(
                               value: kitchen.id,
                               child: Text(kitchen.localizedName(s.localeCode)),
                             ),
-                          ),
-                        ],
-                        onChanged: _loadingKitchens
-                            ? null
-                            : (value) => setState(() => _filterKitchenId = value),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => _filterKitchenId = value),
+                    ),
+                    if (_filterKitchenId != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '${s.kitchenActiveLabel}: ${_kitchenLabel(_filterKitchenId, s)}',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ],
                 ),
               ),
               Expanded(
-                child: kitchenOrders.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.soup_kitchen_outlined,
-                                size: 56,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                s.kitchenEmptyTitle,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF6B1124),
+                child: _filterKitchenId == null
+                    ? Center(child: Text(s.kitchenSelectPrompt))
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        children: [
+                          _SectionHeader(
+                            title: s.kitchenPendingTitle,
+                            count: pendingOrders.length,
+                            color: const Color(0xFFD49A00),
+                          ),
+                          if (pendingOrders.isEmpty)
+                            _EmptySection(message: s.kitchenPendingEmpty)
+                          else
+                            ...pendingOrders.map(
+                              (order) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _KitchenTicketCard(
+                                  order: order,
+                                  timeLabel:
+                                      dateFormat.format(order.createdAt.toLocal()),
+                                  strings: s,
+                                  onStatus: _updateStatus,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                s.kitchenEmptyHint,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                            ],
+                            ),
+                          const SizedBox(height: 20),
+                          _SectionHeader(
+                            title: s.kitchenCompletedTitle,
+                            count: completedOrders.length,
+                            color: Colors.green.shade700,
                           ),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: kitchenOrders.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final order = kitchenOrders[index];
-                          return _KitchenTicketCard(
-                            order: order,
-                            timeLabel: dateFormat.format(order.createdAt.toLocal()),
-                            strings: s,
-                            onReady: () => _updateStatus(order, OrderStatus.ready),
-                            onDelivered: () =>
-                                _updateStatus(order, OrderStatus.delivered),
-                          );
-                        },
+                          if (completedOrders.isEmpty)
+                            _EmptySection(message: s.kitchenCompletedEmpty)
+                          else
+                            ...completedOrders.take(40).map(
+                              (order) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _KitchenTicketCard(
+                                  order: order,
+                                  timeLabel:
+                                      dateFormat.format(order.createdAt.toLocal()),
+                                  strings: s,
+                                  readOnly: true,
+                                  onStatus: _updateStatus,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
               ),
             ],
@@ -296,37 +310,139 @@ class _AdminKitchenPanelState extends State<AdminKitchenPanel> {
   }
 }
 
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.count,
+    required this.color,
+  });
+
+  final String title;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, top: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 22,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF6B1124),
+            ),
+          ),
+          const SizedBox(width: 8),
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: color.withValues(alpha: 0.15),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptySection extends StatelessWidget {
+  const _EmptySection({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.grey.shade600),
+      ),
+    );
+  }
+}
+
 class _KitchenTicketCard extends StatelessWidget {
   const _KitchenTicketCard({
     required this.order,
     required this.timeLabel,
     required this.strings,
-    required this.onReady,
-    required this.onDelivered,
+    required this.onStatus,
+    this.readOnly = false,
   });
 
   final Order order;
   final String timeLabel;
   final AppStrings strings;
-  final VoidCallback onReady;
-  final VoidCallback onDelivered;
+  final Future<void> Function(Order order, OrderStatus status) onStatus;
+  final bool readOnly;
+
+  OrderStatus? get _nextStatus {
+    return switch (order.status) {
+      OrderStatus.pending => OrderStatus.confirmed,
+      OrderStatus.confirmed => OrderStatus.preparing,
+      OrderStatus.preparing => OrderStatus.ready,
+      OrderStatus.ready => OrderStatus.delivered,
+      _ => null,
+    };
+  }
+
+  String? get _nextLabel {
+    return switch (order.status) {
+      OrderStatus.pending => strings.kitchenAcceptOrder,
+      OrderStatus.confirmed => strings.kitchenStartPrep,
+      OrderStatus.preparing => strings.markReady,
+      OrderStatus.ready => strings.markDelivered,
+      _ => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final items = order.items
         .map((item) => '${item.quantity}× ${item.name}')
         .join('\n');
+    final nextStatus = _nextStatus;
+    final nextLabel = _nextLabel;
 
     return Card(
-      elevation: 2,
-      color: Colors.white,
+      elevation: readOnly ? 0 : 2,
+      color: readOnly ? Colors.grey.shade50 : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
-          color: order.status == OrderStatus.preparing
-              ? const Color(0xFFD49A00)
-              : Colors.green.shade400,
-          width: 2,
+          color: readOnly
+              ? Colors.grey.shade300
+              : order.status == OrderStatus.preparing
+                  ? const Color(0xFFD49A00)
+                  : Colors.green.shade400,
+          width: readOnly ? 1 : 2,
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -349,7 +465,7 @@ class _KitchenTicketCard extends StatelessWidget {
                     ),
                   ),
                   OrderStatusChip(status: order.status),
-                  if (PosPrintHelper.canPrint)
+                  if (!readOnly && PosPrintHelper.canPrint)
                     IconButton(
                       tooltip: strings.quickPrintKitchen,
                       visualDensity: VisualDensity.compact,
@@ -365,98 +481,75 @@ class _KitchenTicketCard extends StatelessWidget {
                     ),
                 ],
               ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _Chip(
-                  label: order.orderType.labelAr,
-                  color: const Color(0xFF6B1124),
-                ),
-                if (order.targetKitchenName != null &&
-                    order.targetKitchenName!.isNotEmpty)
-                  _Chip(
-                    label: order.targetKitchenName!,
-                    color: Colors.deepOrange.shade700,
-                  ),
-                _Chip(
-                  label: order.sourceLabelAr,
-                  color: const Color(0xFFD49A00),
-                ),
-                _Chip(label: timeLabel, color: Colors.blueGrey),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              items,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                height: 1.45,
-              ),
-            ),
-            for (final item in order.items)
-              if ((item.specialNotes ?? '').trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'ملاحظة: ${item.specialNotes}',
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            const SizedBox(height: 14),
-            GestureDetector(
-              onTap: () {},
-              child: Row(
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
-                  if (order.status == OrderStatus.preparing)
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
-                          ),
-                          onPressed: onReady,
-                          child: Text(
-                            strings.markReady,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
+                  _Chip(
+                    label: order.orderType.labelAr,
+                    color: const Color(0xFF6B1124),
+                  ),
+                  if (order.targetKitchenName != null &&
+                      order.targetKitchenName!.isNotEmpty)
+                    _Chip(
+                      label: order.targetKitchenName!,
+                      color: Colors.deepOrange.shade700,
                     ),
-                  if (order.status == OrderStatus.preparing)
-                    const SizedBox(width: 8),
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6B1124),
-                        ),
-                        onPressed: onDelivered,
-                        child: Text(
-                          strings.markDelivered,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+                  _Chip(
+                    label: order.sourceLabelAr,
+                    color: const Color(0xFFD49A00),
+                  ),
+                  _Chip(label: timeLabel, color: Colors.blueGrey),
+                  _Chip(
+                    label: '${strings.kitchenCashierLabel}: ${order.receivedByLabel}',
+                    color: const Color(0xFF475569),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 12),
+              Text(
+                items,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  height: 1.45,
+                ),
+              ),
+              for (final item in order.items)
+                if ((item.specialNotes ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'ملاحظة: ${item.specialNotes}',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              if (!readOnly && nextStatus != null && nextLabel != null) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6B1124),
+                    ),
+                    onPressed: () => onStatus(order, nextStatus),
+                    child: Text(
+                      nextLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
