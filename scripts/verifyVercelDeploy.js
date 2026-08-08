@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 /**
- * Fail the Vercel build early if entrypoints, handlers, or routing config are invalid.
+ * Fail CI/Vercel build early if entrypoints, handlers, or routing config are invalid.
+ * Uses syntax checks only — does not boot MongoDB or the full data store.
  */
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
+
+// Prevent accidental Mongo init during CI syntax checks.
+delete process.env.MONGODB_URI;
+delete process.env.VERCEL;
 
 const requiredFiles = [
   'app.js',
@@ -20,24 +26,37 @@ const requiredFiles = [
   'lib/deliveryZoneApiHandler.js',
   'lib/kitchenRoutes.js',
   'lib/deliveryZoneRoutes.js',
+  'lib/vercelApiUtils.js',
 ];
 
 for (const relativePath of requiredFiles) {
-  if (!fs.existsSync(path.join(root, relativePath))) {
+  const fullPath = path.join(root, relativePath);
+  if (!fs.existsSync(fullPath)) {
     console.error(`[verify] Missing required file: ${relativePath}`);
     process.exit(1);
   }
 }
 
-const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+let vercel;
+try {
+  vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+} catch (error) {
+  console.error('[verify] Invalid vercel.json:', error.message);
+  process.exit(1);
+}
+
+if (vercel.framework !== null) {
+  console.error('[verify] vercel.json framework must be null (not Express)');
+  process.exit(1);
+}
 
 if (!Array.isArray(vercel.builds) || vercel.builds.length === 0) {
   console.error('[verify] vercel.json must define builds');
   process.exit(1);
 }
 
-if (vercel.framework !== null) {
-  console.error('[verify] vercel.json framework must be null (not Express)');
+if (!Array.isArray(vercel.routes) || vercel.routes.length === 0) {
+  console.error('[verify] vercel.json must define routes');
   process.exit(1);
 }
 
@@ -57,10 +76,24 @@ for (const dest of ['/api/kitchens.js', '/api/delivery-zones.js', '/apiServer.js
   }
 }
 
-require(path.join(root, 'app.js'));
-require(path.join(root, 'index.js'));
-require(path.join(root, 'server.js'));
-require(path.join(root, 'api/kitchens.js'));
-require(path.join(root, 'api/delivery-zones.js'));
+const syntaxCheckFiles = [
+  'app.js',
+  'index.js',
+  'server.js',
+  'api/kitchens.js',
+  'api/delivery-zones.js',
+  'lib/kitchenApiHandler.js',
+  'lib/deliveryZoneApiHandler.js',
+];
 
-console.log('[verify] Vercel deploy checks passed (kitchen-zones-v13)');
+for (const relativePath of syntaxCheckFiles) {
+  const fullPath = path.join(root, relativePath);
+  try {
+    execSync(`node --check "${fullPath}"`, { stdio: 'pipe' });
+  } catch (error) {
+    console.error(`[verify] Syntax error in ${relativePath}`);
+    process.exit(1);
+  }
+}
+
+console.log('[verify] Vercel deploy checks passed (kitchen-zones-v14)');
