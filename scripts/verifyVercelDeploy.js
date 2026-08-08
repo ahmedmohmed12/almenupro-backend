@@ -80,4 +80,4 @@ try {
   process.exit(1);
 }
 
-console.log('[verify] Vercel deploy checks passed (kitchen-zones-v11)');
+console.log('[verify] Vercel deploy checks passed (kitchen-zones-v12)');

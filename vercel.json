@@ -1,8 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "name": "almenupro-backend",
+  "framework": null,
   "installCommand": "node scripts/preparePublicUploads.js",
   "buildCommand": "node scripts/preparePublicUploads.js && node scripts/verifyVercelDeploy.js",
+  "outputDirectory": null,
   "builds": [
     {
       "src": "index.js",

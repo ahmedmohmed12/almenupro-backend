@@ -1,5 +1,18 @@
 # Vercel environment setup — AlMenuPro
 
+## GitHub ↔ Vercel linkage (backend)
+
+The **`almenupro-backend`** Vercel project must connect to this repository only:
+
+| Setting | Value |
+|---|---|
+| Repository | `https://github.com/ahmedmohmed12/almenupro-backend` |
+| Branch | `main` |
+| Root Directory | *(empty — repo root)* |
+| Framework | **Other** (not Express) |
+
+If production `/api/health` does not show `deployTag`, the project is likely linked to the wrong repo (`ahmed-almenupro/almenupro`) or using the wrong Root Directory. See [README.md](../README.md).
+
 ## Backend project (`almenupro-backend`)
 
 Add these in **Vercel → Project → Settings → Environment Variables**:
