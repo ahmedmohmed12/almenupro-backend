@@ -2,71 +2,22 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "installCommand": "node scripts/preparePublicUploads.js",
-  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v6')\"",
-  "builds": [
+  "buildCommand": "node scripts/preparePublicUploads.js && node -e \"console.log('kitchen-zones-v7-native-api')\"",
+  "rewrites": [
     {
-      "src": "api/kitchens.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "lib/**/*.js"
-        ]
-      }
+      "source": "/menu-images/(.*)",
+      "destination": "/api/root"
     },
     {
-      "src": "api/delivery-zones.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "lib/**/*.js"
-        ]
-      }
-    },
-    {
-      "src": "apiServer.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "data/**",
-          "uploads/menu/**",
-          "public/menu-images/**",
-          "lib/**/*.js"
-        ]
-      }
+      "source": "/og/(.*)",
+      "destination": "/api/root"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/kitchens",
-      "dest": "/api/kitchens.js"
-    },
-    {
-      "src": "/api/kitchens/(.*)",
-      "dest": "/api/kitchens.js"
-    },
-    {
-      "src": "/api/delivery-zones",
-      "dest": "/api/delivery-zones.js"
-    },
-    {
-      "src": "/api/delivery-zones/(.*)",
-      "dest": "/api/delivery-zones.js"
-    },
-    {
-      "src": "/menu-images/(.*)",
-      "dest": "/apiServer.js"
-    },
-    {
-      "src": "/og/(.*)",
-      "dest": "/apiServer.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/apiServer.js"
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "data/**,lib/**/*.js,uploads/menu/**,public/menu-images/**"
     }
-  ],
+  },
   "headers": [
     {
       "source": "/menu-images/(.*)",
